@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'quest_card.dart';
 
 /// Displays detailed information about a SampleItem.
 class QuestCardDetailsView extends StatelessWidget {
@@ -8,15 +7,15 @@ class QuestCardDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final questCard = ModalRoute.of(context)!.settings.arguments;
+    final Map<String, dynamic> id = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
 
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(questCard.toString()),
+        title: Text(id['docId'].toString()),
       ),
       body: Center(
-        child: Text(questCard.toString()),
+        child: Text(id['docId'].toString()),
       ),
     );
   }

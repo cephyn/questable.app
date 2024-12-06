@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+
 class QuestCard {
-  int? id;
+  String? id;
   String? title;
   String? gameSystem;
   String? edition;
@@ -53,30 +56,36 @@ class QuestCard {
     summary = json['summary'];
   }
 
+  String generateUniqueHash() {
+    var bytes = utf8.encode(toJson().toString());
+    var digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = <String, dynamic>{};
-    data['id'] = id;
-    data['title'] = title;
-    data['gameSystem'] = gameSystem;
-    data['edition'] = edition;
-    data['level'] = level;
-    data['pageLength'] = pageLength;
-    data['authors'] = authors;
-    data['publisher'] = publisher;
-    data['publicationYear'] = publicationYear;
-    data['setting'] = setting;
-    data['environments'] = environments;
-    data['link'] = link;
-    data['bossVillains'] = bossVillains;
-    data['commonMonsters'] = commonMonsters;
-    data['notableItems'] = notableItems;
-    data['summary'] = summary;
-    return data;
+    return {
+      'id': id,
+      'title': title,
+      'gameSystem': gameSystem,
+      'edition': edition,
+      'level': level,
+      'pageLength': pageLength,
+      'authors': authors,
+      'publisher': publisher,
+      'publicationYear': publicationYear,
+      'setting': setting,
+      'environments': environments,
+      'link': link,
+      'bossVillains': bossVillains,
+      'commonMonsters': commonMonsters,
+      'notableItems': notableItems,
+      'summary': summary,
+    };
   }
 
   static const sampleJson = '''{"quests": [
     {
-  "id": 1,
+  "id": "1",
   "title": "Shadows of the Forgotten Realm",
   "gameSystem": "Fantasy Legends",
   "edition": "3rd Edition",
@@ -94,7 +103,7 @@ class QuestCard {
   "summary": "The once-thriving kingdom of Eldoria is shrouded in darkness as ancient shadows reawaken to reclaim their lost power. Heroes must delve into forgotten ruins, uncovering long-buried secrets and battling sinister forces to restore light to the realm."
 },
 {
-  "id": 2,
+  "id": "2",
   "title": "Quest for the Crimson Crown",
   "gameSystem": "Mythic Realms",
   "edition": "1st Edition",
@@ -112,7 +121,7 @@ class QuestCard {
   "summary": "In the heart of the Emerald Empire, a mythical Crimson Crown holds the power to unite or destroy. As rival factions vie for control, brave adventurers embark on a perilous journey to retrieve the crown and decide the empire's fate."
 },
 {
-  "id": 3,
+  "id": "3",
   "title": "Secrets of the Enchanted Isle",
   "gameSystem": "Epic Quests",
   "edition": "2nd Edition",
@@ -130,7 +139,7 @@ class QuestCard {
   "summary": "Legends speak of an isle where magic flows freely and ancient creatures dwell. Explorers set sail to uncover the isle's secrets, facing enchanted forests, mystical beings, and the island's guardians in a quest to harness its magical treasures."
 },
 {
-  "id": 4,
+  "id": "4",
   "title": "Legends of the Arcane Citadel",
   "gameSystem": "Dark Realms",
   "edition": "4th Edition",
@@ -148,7 +157,7 @@ class QuestCard {
   "summary": "The Arcane Citadel, a fortress of unparalleled magic, stands at the center of a war between rival sorcerers. Heroes must navigate treacherous landscapes, forge alliances, and unlock the citadel's hidden powers to tip the scales in this epic battle."
 },
 {
-  "id": 5,
+  "id": "5",
   "title": "The Dragon's Hoard: A Tale of Valor",
   "gameSystem": "Arcane Realms",
   "edition": "3rd Edition",
@@ -166,7 +175,7 @@ class QuestCard {
   "summary": "A legendary dragon guards a hoard of untold riches, but obtaining its treasure requires more than just bravery. Adventurers must solve ancient puzzles, overcome deadly traps, and face the dragon's wrath in a tale of valor and cunning."
 },
 {
-  "id": 6,
+  "id": "6",
   "title": "Mysteries of the Eldritch Forest",
   "gameSystem": "Hero's Journey",
   "edition": "5th Edition",
@@ -193,7 +202,7 @@ class QuestCard {
   static String getMockSingleJsonData() {
     return '''
     {
-  "id": 6,
+  "id": "6",
   "title": "Mysteries of the Eldritch Forest",
   "gameSystem": "Hero's Journey",
   "edition": "5th Edition",

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
+import 'package:quest_cards/src/quest_card/quest_cards_prime.dart';
 
+import 'quest_card/quest_card_analyze.dart';
 import 'quest_card/quest_card_list_view.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
@@ -14,6 +17,8 @@ class MyApp extends StatelessWidget {
   });
 
   final SettingsController settingsController;
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -59,51 +64,97 @@ class MyApp extends StatelessWidget {
           darkTheme: ThemeData.dark(),
           themeMode: settingsController.themeMode,
 
-          home: Scaffold(
-            appBar: AppBar(
-              title: const Text('Quest Cards'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () {
-                    // Navigate to the settings page. If the user leaves and returns
-                    // to the app after it has been killed while running in the
-                    // background, the navigation stack is restored.
-                    Navigator.restorablePushNamed(
-                        context, SettingsView.routeName);
-                  },
-                ),
-              ],
-            ),
-            body: Row(
-              children: [
-                SafeArea(
-                  child: NavigationRail(
-                    extended: false,
-                    destinations: const [
-                      NavigationRailDestination(
-                        icon: Icon(Icons.home), 
-                        label: Text('Quests'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.upload), 
-                        label: Text('Analyze Quest'),
-                      ),
-                    ], 
-                    selectedIndex: 0,
-                    onDestinationSelected: (value) {
-                      print('selected: $value');
-                    },
-                  ),
-                ),
-                const Expanded(
-                  child: QuestCardListView(),
-                ),
-              ],
-            ),
-          ),
+          home: HomePage(),
         );
       },
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({
+    super.key,
+  });
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage>{
+  var _selectedIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget page;
+    switch(_selectedIndex){
+      case 0:
+        page = QuestCardListView();
+      case 1:
+        page = EditQuestCard();
+      case 2: 
+        page = QuestCardAnalyze();
+      case 3: 
+        page = PrimeQuestCards();
+      default:
+        page = Placeholder();
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Quest Cards'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              // Navigate to the settings page. If the user leaves and returns
+              // to the app after it has been killed while running in the
+              // background, the navigation stack is restored.
+              Navigator.restorablePushNamed(
+                  context, SettingsView.routeName);
+            },
+          ),
+        ],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Row(
+            children: [
+              SafeArea(
+                child: NavigationRail(
+                  extended: constraints.maxWidth >= 600,
+                  destinations: const [
+                    NavigationRailDestination(
+                      icon: Icon(Icons.home), 
+                      label: Text('Quests'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.add), 
+                      label: Text('Add Quest'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.upload), 
+                      label: Text('Analyze Quest'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.data_object), 
+                      label: Text('Prime DB'),
+                    ),
+                  ], 
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (int index) {
+                    setState((){
+                      _selectedIndex=index;
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: page,
+              ),
+            ],
+          );
+        }
+      ),
     );
   }
 }
