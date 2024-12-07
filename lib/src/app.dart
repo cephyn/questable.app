@@ -93,8 +93,6 @@ class _HomePageState extends State<HomePage>{
         page = EditQuestCard();
       case 2: 
         page = QuestCardAnalyze();
-      case 3: 
-        page = PrimeQuestCards();
       default:
         page = Placeholder();
     }
@@ -134,10 +132,6 @@ class _HomePageState extends State<HomePage>{
                     NavigationRailDestination(
                       icon: Icon(Icons.upload), 
                       label: Text('Analyze Quest'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.data_object), 
-                      label: Text('Prime DB'),
                     ),
                   ], 
                   selectedIndex: _selectedIndex,

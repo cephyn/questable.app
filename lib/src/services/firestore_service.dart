@@ -7,8 +7,9 @@ class FirestoreService{
   final CollectionReference questCards = FirebaseFirestore.instance.collection('questCards');
 
   //create
-  Future<void> addQuestCard(QuestCard questCard){
-    return questCards.add({
+  Future<String> addQuestCard(QuestCard questCard) async {
+    String docId = "";
+    await questCards.add({
       'id': questCard.generateUniqueHash(),
       'title': questCard.title,
       'gameSystem': questCard.gameSystem,
@@ -26,7 +27,11 @@ class FirestoreService{
       'notableItems': questCard.notableItems,
       'summary': questCard.summary,
       'timestamp': Timestamp.now(),
+    }).then((DocumentReference ref){
+      docId = ref.id;
     });
+    //print(docId);
+    return docId;
 }
 
   //read
@@ -60,6 +65,7 @@ class FirestoreService{
       'notableItems': questCard.notableItems,
       'summary': questCard.summary,
       'timestamp': Timestamp.now(),
+      'genre': questCard.genre,
     });
   }
 

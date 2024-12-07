@@ -36,7 +36,11 @@ class _AddQuestCardState extends State<EditQuestCard> {
               } else {
                 return const CircularProgressIndicator();
               }
-              return Scaffold(body: getQuestCardForm(context, args['docId']));
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text('Edit Quest Card'),
+                ),
+                body: getQuestCardForm(context, args['docId']));
             });
       }
       else{
@@ -95,6 +99,11 @@ class _AddQuestCardState extends State<EditQuestCard> {
               onSaved: (value) => _questCard.publicationYear = value,
             ),
             TextFormField(
+              decoration: InputDecoration(labelText: 'Genre'),
+              initialValue: _questCard.genre,
+              onSaved: (value) => _questCard.genre = value,
+            ),
+            TextFormField(
               decoration: InputDecoration(labelText: 'Setting'),
               initialValue: _questCard.setting,
               onSaved: (value) => _questCard.setting = value,
@@ -124,10 +133,13 @@ class _AddQuestCardState extends State<EditQuestCard> {
               initialValue: _questCard.notableItems?.join(", "),
               onSaved: (value) => _questCard.notableItems = value?.split(','),
             ),
-            TextFormField(
+            Expanded(child:
+              TextFormField(
               decoration: InputDecoration(labelText: 'Summary'),
               initialValue: _questCard.summary,
+              maxLines: null,
               onSaved: (value) => _questCard.summary = value,
+            ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),

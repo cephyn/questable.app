@@ -1,10 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:quest_cards/src/app.dart';
+import 'package:flutter/material.dart';
+import 'package:quest_cards/src/services/firebase_storage_service.dart';
+
+import '../services/firebase_vertexai_service.dart';
+import '../services/firestore_service.dart';
+import 'quest_card.dart';
+import 'quest_card_edit.dart';
 
 class QuestCardAnalyze extends StatefulWidget {
   const QuestCardAnalyze({super.key});
@@ -14,33 +17,22 @@ class QuestCardAnalyze extends StatefulWidget {
 }
 
 class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
+  PlatformFile? _file;
   String? _fileName;
-  Uint8List? _fileBytes;
+  final FirebaseStorageService firebaseStorageService = FirebaseStorageService();
+  final FirebaseVertexaiService aiService = FirebaseVertexaiService();
+  final FirestoreService firestoreService = FirestoreService();
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf','txt','doc']
+    );
     if (result != null) {
       setState(() {
-        _fileName = result.files.single.name;
-        if (kIsWeb) {
-          _fileBytes = result.files.single.bytes;
-        } else {
-          _fileBytes = File(result.files.single.path!).readAsBytesSync();
-        }
+        _file = result.files.single;
+        _fileName = _file!.name;
       });
-    }
-  }
-
-  Future<void> _uploadFile() async {
-    if (_fileBytes == null || _fileName == null) return;
-    try {
-      FirebaseStorage storage = FirebaseStorage.instance;
-      Reference ref = storage.ref().child('uploads/$_fileName');
-      UploadTask uploadTask = ref.putData(_fileBytes!);
-      await uploadTask.whenComplete(() => null);
-      String downloadURL = await ref.getDownloadURL();
-    } catch (e) {
-      print('Error uploading file: $e');
     }
   }
 
@@ -54,7 +46,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              _fileName != null
+              _file?.name != null
                   ? 'Selected File: $_fileName'
                   : 'No file selected.',
             ),
@@ -66,12 +58,18 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async{
-                await _uploadFile();
+                String url = await firebaseStorageService.uploadFile(_file!);
+                Map<String, dynamic> questCardSchema = jsonDecode(await aiService.analyzeFile(url));
+                QuestCard questCard = QuestCard.fromJson(questCardSchema);
+                String docId = await firestoreService.addQuestCard(questCard);
+                //print(url);
                 await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const HomePage(),
-                      ),
+                                  builder: (context) => const EditQuestCard(),
+                                  settings: RouteSettings(
+                                      arguments: {'docId': docId}),
+                                ),
                     );
               },
               child: Text('Upload File'),
