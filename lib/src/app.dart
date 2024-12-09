@@ -1,11 +1,13 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
-import 'package:quest_cards/src/quest_card/quest_cards_prime.dart';
-
 import 'quest_card/quest_card_analyze.dart';
 import 'quest_card/quest_card_list_view.dart';
+import 'quest_card/quest_card_search.dart';
+import 'services/firestore_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
 
@@ -17,8 +19,6 @@ class MyApp extends StatelessWidget {
   });
 
   final SettingsController settingsController;
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -80,23 +80,27 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>{
+class _HomePageState extends State<HomePage> {
   var _selectedIndex = 0;
+  final FirestoreService firestoreService = FirestoreService();
 
   @override
   Widget build(BuildContext context) {
     Widget page;
-    switch(_selectedIndex){
+    switch (_selectedIndex) {
       case 0:
         page = QuestCardListView();
       case 1:
-        page = EditQuestCard();
-      case 2: 
+        page = EditQuestCard(
+          docId: '',
+        );
+      case 2:
         page = QuestCardAnalyze();
+      case 3:
+        page = QuestCardSearch();
       default:
         page = Placeholder();
     }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quest Cards'),
@@ -107,48 +111,93 @@ class _HomePageState extends State<HomePage>{
               // Navigate to the settings page. If the user leaves and returns
               // to the app after it has been killed while running in the
               // background, the navigation stack is restored.
-              Navigator.restorablePushNamed(
-                  context, SettingsView.routeName);
+              Navigator.restorablePushNamed(context, SettingsView.routeName);
             },
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Row(
-            children: [
-              SafeArea(
-                child: NavigationRail(
-                  extended: constraints.maxWidth >= 600,
-                  destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.home), 
-                      label: Text('Quests'),
+      body: LayoutBuilder(builder: (context, constraints) {
+        return Row(
+          children: [
+            SafeArea(
+              child: NavigationRail(
+                extended: constraints.maxWidth >= 600,
+                trailing: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: FutureBuilder<int>(
+                        future: firestoreService.getQuestCardsCount(),
+                        builder: (BuildContext context,
+                            AsyncSnapshot<int> snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return CircularProgressIndicator();
+                          } else if (snapshot.hasError) {
+                            return Text(
+                              'Error: ${snapshot.error}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red,
+                              ),
+                            );
+                          } else if (snapshot.hasData) {
+                            int count = snapshot.data!;
+                            return Text(
+                              "$count Adventures",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          } else {
+                            return Text(
+                              'No data',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          }
+                        },
+                      ),
                     ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.add), 
-                      label: Text('Add Quest'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.upload), 
-                      label: Text('Analyze Quest'),
-                    ),
-                  ], 
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: (int index) {
-                    setState((){
-                      _selectedIndex=index;
-                    });
-                  },
+                    Divider(),
+                  ],
                 ),
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.home),
+                    label: Text('Quests'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.add),
+                    label: Text('Add Quest'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.upload),
+                    label: Text('Analyze Quest'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.search),
+                    label: Text('Search Quests'),
+                  ),
+                ],
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: (int index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                },
               ),
-              Expanded(
-                child: page,
-              ),
-            ],
-          );
-        }
-      ),
+            ),
+            Expanded(
+              child: page,
+            ),
+          ],
+        );
+      }),
     );
   }
 }

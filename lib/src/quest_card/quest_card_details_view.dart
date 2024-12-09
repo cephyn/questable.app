@@ -55,7 +55,7 @@ class QuestCardDetailsView extends StatelessWidget {
                           Text('Setting: ${questCard.setting ?? 'N/A'}'),
                           Text(
                               'Environments: ${questCard.environments?.join(', ') ?? 'N/A'}'),
-                          Text('Link: ${questCard.link ?? 'N/A'}'),
+                          Text('Product Link: ${questCard.link ?? 'N/A'}'),
                           Text(
                               'Boss Villains: ${questCard.bossVillains?.join(', ') ?? 'N/A'}'),
                           Text(

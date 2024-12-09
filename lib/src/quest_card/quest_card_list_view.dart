@@ -64,9 +64,9 @@ class QuestCardListView extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const EditQuestCard(),
-                                  settings: RouteSettings(
-                                      arguments: {'docId': docId}),
+                                  builder: (context) => EditQuestCard(
+                                    docId: docId,
+                                  ),
                                 ),
                               );
                             }),

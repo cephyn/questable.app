@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quest_cards/src/app.dart';
@@ -6,7 +8,8 @@ import 'package:quest_cards/src/services/firestore_service.dart';
 import 'quest_card.dart';
 
 class EditQuestCard extends StatefulWidget {
-  const EditQuestCard({super.key});
+  final String docId;
+  const EditQuestCard({super.key, required this.docId});
 
   @override
   State<EditQuestCard> createState() {
@@ -18,34 +21,31 @@ class _AddQuestCardState extends State<EditQuestCard> {
   final _formKey = GlobalKey<FormState>();
   QuestCard _questCard = QuestCard();
   final FirestoreService firestoreService = FirestoreService();
-  
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (ModalRoute.of(context)?.settings.arguments != null) {
-      final Map<String, dynamic> args =
-          ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-      if (args['docId'] != null) {
-        return StreamBuilder<DocumentSnapshot>(
-            stream: firestoreService.getQuestCardStream(args['docId']),
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                Map<String, dynamic> data =
-                    snapshot.data!.data() as Map<String, dynamic>;
-                _questCard = QuestCard.fromJson(data);
-              } else {
-                return const CircularProgressIndicator();
-              }
-              return Scaffold(
+    if (widget.docId != '') {
+      return StreamBuilder<DocumentSnapshot>(
+          stream: firestoreService.getQuestCardStream(widget.docId),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              Map<String, dynamic> data =
+                  snapshot.data!.data() as Map<String, dynamic>;
+              _questCard = QuestCard.fromJson(data);
+            } else {
+              return const CircularProgressIndicator();
+            }
+            return Scaffold(
                 appBar: AppBar(
                   title: Text('Edit Quest Card'),
                 ),
-                body: getQuestCardForm(context, args['docId']));
-            });
-      }
-      else{
-        return Scaffold(body: getQuestCardForm(context, null));
-      }
+                body: getQuestCardForm(context, widget.docId));
+          });
     } else {
       return Scaffold(body: getQuestCardForm(context, null));
     }
@@ -114,7 +114,7 @@ class _AddQuestCardState extends State<EditQuestCard> {
               onSaved: (value) => _questCard.environments = value?.split(','),
             ),
             TextFormField(
-              decoration: InputDecoration(labelText: 'Link'),
+              decoration: InputDecoration(labelText: 'Product Link'),
               initialValue: _questCard.link,
               onSaved: (value) => _questCard.link = value,
             ),
@@ -131,15 +131,16 @@ class _AddQuestCardState extends State<EditQuestCard> {
             TextFormField(
               decoration: InputDecoration(labelText: 'Notable Items'),
               initialValue: _questCard.notableItems?.join(", "),
+              maxLines: null,
               onSaved: (value) => _questCard.notableItems = value?.split(','),
             ),
-            Expanded(child:
-              TextFormField(
-              decoration: InputDecoration(labelText: 'Summary'),
-              initialValue: _questCard.summary,
-              maxLines: null,
-              onSaved: (value) => _questCard.summary = value,
-            ),
+            Expanded(
+              child: TextFormField(
+                decoration: InputDecoration(labelText: 'Summary'),
+                initialValue: _questCard.summary,
+                maxLines: null,
+                onSaved: (value) => _questCard.summary = value,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -148,10 +149,9 @@ class _AddQuestCardState extends State<EditQuestCard> {
                   // Validate returns true if the form is valid, or false otherwise.
                   if (_formKey.currentState!.validate()) {
                     _formKey.currentState?.save();
-                    if(docId == null){
+                    if (docId == null) {
                       firestoreService.addQuestCard(_questCard);
-                    }
-                    else{
+                    } else {
                       firestoreService.updateQuestCard(docId, _questCard);
                     }
                     // If the form is valid, display a snackbar. In the real world,

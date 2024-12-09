@@ -20,6 +20,7 @@ class QuestCard {
   List<String>? notableItems;
   String? summary;
   String? genre;
+  String? objectId;
 
   QuestCard(
       {this.id,
@@ -60,6 +61,27 @@ class QuestCard {
     genre = json['genre'];
   }
 
+  QuestCard.fromSearchJson(Map<String, dynamic> json) {
+    id = json['id'];
+    title = json['title'];
+    gameSystem = json['gameSystem'];
+    edition = json['edition'];
+    level = json['level'];
+    pageLength = json['pageLength'];
+    authors = json['authors'].cast<String>();
+    publisher = json['publisher'];
+    publicationYear = json['publicationYear'];
+    setting = json['setting'];
+    environments = json['environments'].cast<String>();
+    link = json['link'];
+    bossVillains = json['bossVillains'].cast<String>();
+    commonMonsters = json['commonMonsters'].cast<String>();
+    notableItems = json['notableItems'].cast<String>();
+    summary = json['summary'];
+    genre = json['genre'];
+    objectId = json['objectID'];
+  }
+
   String generateUniqueHash() {
     var bytes = utf8.encode(toJson().toString());
     var digest = sha256.convert(bytes);
@@ -85,6 +107,7 @@ class QuestCard {
       'notableItems': notableItems,
       'summary': summary,
       'genre': genre,
+      'objectId': objectId,
     };
   }
 
@@ -109,6 +132,9 @@ class QuestCard {
           Schema.string(description: 'The publisher of the adventure.'),
       'publicationYear': Schema.string(
           description: 'The year in which the adventure was published.'),
+      'genre': Schema.string(
+          description:
+              'The genre the adventure best fits in. Examples include fantasy, science fiction, etc.'),
       'setting': Schema.string(
           description:
               'The fictional world the adventure is set in, or the type of fictional world if one is not declared.'),
@@ -119,7 +145,7 @@ class QuestCard {
       'link': Schema.string(
           format: 'uri',
           description:
-              'A web link to where the adventure may be purchased or downloaded.'),
+              'A web link to where the adventure may be purchased or downloaded. Validate the web site exists, otherwise generate an empty string.'),
       'bossVillains': Schema.array(
           items: Schema.string(),
           description:
@@ -135,8 +161,6 @@ class QuestCard {
       'summary': Schema.string(
           description:
               'A short summary of the adventure, without spoilers. Limit to around 100 words.'),
-      'genre':
-          Schema.string(description: 'The genre the adventure best fits in.'),
     });
   }
 
