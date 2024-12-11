@@ -1,1 +1,22 @@
-{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"quest-cards-3c47a","configurations":{"web":"1:766749273273:web:90e9c95aa5e70bf5a27f68"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "quest-cards-3c47a",
+          "configurations": {
+            "web": "1:766749273273:web:90e9c95aa5e70bf5a27f68"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
