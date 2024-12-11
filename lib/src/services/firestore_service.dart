@@ -1,13 +1,17 @@
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../quest_card/quest_card.dart';
+import '../user/local_user.dart';
 
 class FirestoreService {
   //get collection of quest cards
   final CollectionReference questCards =
       FirebaseFirestore.instance.collection('questCards');
+  final CollectionReference users =
+      FirebaseFirestore.instance.collection('users');
 
   //create
   Future<String> addQuestCard(QuestCard questCard) async {
@@ -87,5 +91,53 @@ class FirestoreService {
   //delete
   Future<void> deleteQuestCard(String docId) {
     return questCards.doc(docId).delete();
+  }
+
+  Future<LocalUser?> getLocalUser(String userId) async {
+    try {
+      DocumentSnapshot documentSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      if (documentSnapshot.exists) {
+        return LocalUser.fromMap(
+            documentSnapshot.data() as Map<String, dynamic>);
+      } else {
+        log("User document not found: $userId");
+        return null;
+      }
+    } catch (e) {
+      log("Error getting user document $userId: $e");
+      return null;
+    }
+  }
+
+  Future<List<String>?> getUserRoles(String userId) async {
+    try {
+      DocumentSnapshot documentSnapshot = await users.doc(userId).get();
+      if (documentSnapshot.exists) {
+        Map<String, dynamic> data =
+            documentSnapshot.data() as Map<String, dynamic>;
+        return List<String>.from(data['roles'] ?? []);
+      }
+    } catch (e) {
+      log("Error getting user roles $userId: $e");
+    }
+    return null;
+  }
+
+  Future<void> storeInitialUserRole(String userId) async {
+    try {
+      DocumentReference userDocRef = users.doc(userId);
+      DocumentSnapshot userDoc = await userDocRef.get();
+
+      if (!userDoc.exists) {
+        await userDocRef.set({
+          'roles': ['user']
+        });
+      }
+    } catch (e) {
+      log('Error storing user roles $userId: $e');
+    }
   }
 }

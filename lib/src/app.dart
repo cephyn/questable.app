@@ -1,9 +1,11 @@
 import 'dart:developer';
 
+import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
+import 'auth/auth_gate.dart';
 import 'quest_card/quest_card_analyze.dart';
 import 'quest_card/quest_card_list_view.dart';
 import 'quest_card/quest_card_search.dart';
@@ -60,11 +62,14 @@ class MyApp extends StatelessWidget {
           // Define a light and dark color theme. Then, read the user's
           // preferred ThemeMode (light, dark, or system default) from the
           // SettingsController to display the correct theme.
-          theme: ThemeData(),
+          theme: ThemeData(
+            primarySwatch: Colors.green,
+          ),
           darkTheme: ThemeData.dark(),
           themeMode: settingsController.themeMode,
 
-          home: HomePage(),
+          //home: HomePage(),
+          home: AuthGate(),
         );
       },
     );
@@ -106,6 +111,36 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Quest Cards'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute<ProfileScreen>(
+                  builder: (context) => ProfileScreen(
+                    appBar: AppBar(
+                      title: const Text('User Profile'),
+                    ),
+                    actions: [
+                      SignedOutAction((context) {
+                        Navigator.of(context).pop();
+                      })
+                    ],
+                    children: [
+                      const Divider(),
+                      Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: Image.asset('assets/images/flutter_logo.png'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
               // Navigate to the settings page. If the user leaves and returns
@@ -115,6 +150,7 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ],
+        automaticallyImplyLeading: false,
       ),
       body: LayoutBuilder(builder: (context, constraints) {
         return Row(
@@ -164,6 +200,15 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     Divider(),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        children: [
+                          //Image.asset('dash.png'),
+                          const SignOutButton(),
+                        ],
+                      ),
+                    )
                   ],
                 ),
                 destinations: const [

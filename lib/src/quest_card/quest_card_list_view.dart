@@ -1,18 +1,25 @@
+import 'dart:developer';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
+import 'package:quest_cards/src/role_based_widgets/role_based_delete_documents_button.dart';
+import 'package:quest_cards/src/services/firebase_auth_service.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
+
+import '../user/local_user.dart';
 
 class QuestCardListView extends StatelessWidget {
   QuestCardListView({super.key});
   final FirestoreService firestoreService = FirestoreService();
+  final FirebaseAuthService auth = FirebaseAuthService();
+  final RoleBasedDeleteDocumentsButton rbDeleteDocumentsButton =
+      RoleBasedDeleteDocumentsButton();
 
   @override
   Widget build(BuildContext context) {
-    //QuestCard qc = QuestCard.fromJson(jsonDecode(mockQuestJson));
-    //print(qc);
-    //List<QuestCard> myCards =[qc];
+    firestoreService.storeInitialUserRole(auth.getCurrentUser().uid);
 
     return Scaffold(
       // To work with lists that may contain a large number of items, it’s best
@@ -70,11 +77,8 @@ class QuestCardListView extends StatelessWidget {
                                 ),
                               );
                             }),
-                        IconButton(
-                            icon: const Icon(Icons.delete),
-                            onPressed: () {
-                              firestoreService.deleteQuestCard(docId);
-                            }),
+                        rbDeleteDocumentsButton.deleteQuestCardButton(
+                            auth.getCurrentUser().uid, docId),
                       ],
                     ),
                   );

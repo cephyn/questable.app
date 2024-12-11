@@ -14,13 +14,17 @@ dependencies:
   cloud_firestore: ^5.5.1
   crypto: ^3.0.6
   file_picker: ^8.1.4
+  firebase_auth: ^5.3.4
   firebase_core: ^3.8.1
   firebase_storage: ^12.3.7
+  firebase_ui_auth: ^1.16.0
+  firebase_ui_oauth_google: ^1.4.0
   firebase_vertexai: ^1.0.4
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  google_sign_in: ^6.2.2
   infinite_scroll_pagination: ^4.1.0
   mime: ^2.0.0
 
