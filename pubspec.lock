@@ -421,6 +421,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  google_fonts:
+    dependency: "direct main"
+    description:
+      name: google_fonts
+      sha256: b1ac0fe2832c9cc95e5e88b57d627c5e68c223b9657f4b96e1487aa9098c7b82
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.2.1"
   google_identity_services_web:
     dependency: transitive
     description:
@@ -517,6 +525,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.9.0"
+  json_class:
+    dependency: transitive
+    description:
+      name: json_class
+      sha256: f27de435c3b47ceea23c13d0516afa98c71c62c7a762a6c8f1df665189eb855e
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.1"
+  json_schema:
+    dependency: transitive
+    description:
+      name: json_schema
+      sha256: b183ba828374365a89b81246c06a9a636935897d509cd846998bbc0d9bd0a2cf
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.0"
+  json_theme_annotation:
+    dependency: transitive
+    description:
+      name: json_theme_annotation
+      sha256: "25609edd1a5462f18d9017793679e0bbb8f7874b8fa09ef89eafdbaf15a8474f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.3+13"
+  json_theme_plus:
+    dependency: "direct main"
+    description:
+      name: json_theme_plus
+      sha256: "1d1d17e2e978cd8532bd060f54d4d4abe33fd0d3f974f3324f9f87bd31bcf0ce"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.6.6"
   leak_tracker:
     dependency: transitive
     description:
@@ -589,6 +629,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  nested:
+    dependency: transitive
+    description:
+      name: nested
+      sha256: "03bac4c528c64c95c722ec99280375a6f2fc708eec17c7b3f07253b626cd2a20"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   path:
     dependency: transitive
     description:
@@ -677,6 +725,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  provider:
+    dependency: "direct main"
+    description:
+      name: provider
+      sha256: c8a055ee5ce3fd98d6fc872478b03823ffdb448699c6ebdbbc71d59b596fd48c
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.2"
+  quiver:
+    dependency: transitive
+    description:
+      name: quiver
+      sha256: ea0b925899e64ecdfbf9c7becb60d5b50e706ade44a85b2363be2a22d88117d2
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.2"
+  rfc_6901:
+    dependency: transitive
+    description:
+      name: rfc_6901
+      sha256: df1bbfa3d023009598f19636d6114c6ac1e0b7bb7bf6a260f0e6e6ce91416820
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   rxdart:
     dependency: transitive
     description:
@@ -762,6 +834,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  uri:
+    dependency: transitive
+    description:
+      name: uri
+      sha256: "889eea21e953187c6099802b7b4cf5219ba8f3518f604a1033064d45b1b8268a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   uuid:
     dependency: transitive
     description:
@@ -844,4 +924,4 @@ packages:
     version: "6.5.0"
 sdks:
   dart: ">=3.5.4 <4.0.0"
-  flutter: ">=3.24.0"
+  flutter: ">=3.24.5"

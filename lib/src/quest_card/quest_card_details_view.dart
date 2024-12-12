@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/firestore_service.dart';
 import 'quest_card.dart';
+import 'quest_card_edit.dart';
 
 /// Displays detailed information about a SampleItem.
 class QuestCardDetailsView extends StatelessWidget {
@@ -38,35 +39,68 @@ class QuestCardDetailsView extends StatelessWidget {
                       padding: const EdgeInsets.all(16.0),
                       child: ListView(
                         children: [
-                          Text('Title: ${questCard.title ?? 'N/A'}',
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.bold)),
-                          SizedBox(height: 10),
-                          Text('Game System: ${questCard.gameSystem ?? 'N/A'}'),
-                          Text('Edition: ${questCard.edition ?? 'N/A'}'),
-                          Text('Level: ${questCard.level ?? 'N/A'}'),
-                          Text('Page Length: ${questCard.pageLength ?? 'N/A'}'),
                           Text(
-                              'Authors: ${questCard.authors?.join(', ') ?? 'N/A'}'),
-                          Text('Publisher: ${questCard.publisher ?? 'N/A'}'),
+                            'Title: ${questCard.title ?? 'N/A'}',
+                            style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo),
+                          ),
+                          SizedBox(height: 16),
+                          Divider(),
+                          _buildInfoRow('Game System', questCard.gameSystem),
+                          _buildInfoRow('Edition', questCard.edition),
+                          _buildInfoRow('Level', questCard.level),
+                          _buildInfoRow(
+                              'Page Length', questCard.pageLength!.toString()),
+                          _buildInfoRow(
+                              'Authors', questCard.authors?.join(', ')),
+                          _buildInfoRow('Publisher', questCard.publisher),
+                          _buildInfoRow(
+                              'Publication Year', questCard.publicationYear),
+                          _buildInfoRow('Genre', questCard.genre),
+                          _buildInfoRow('Setting', questCard.setting),
+                          _buildInfoRow('Environments',
+                              questCard.environments?.join(', ')),
+                          _buildInfoRow('Product Link', questCard.link),
+                          _buildInfoRow('Boss Villains',
+                              questCard.bossVillains?.join(', ')),
+                          _buildInfoRow('Common Monsters',
+                              questCard.commonMonsters?.join(', ')),
+                          _buildInfoRow('Notable Items',
+                              questCard.notableItems?.join(', ')),
+                          SizedBox(height: 16),
                           Text(
-                              'Publication Year: ${questCard.publicationYear ?? 'N/A'}'),
-                          Text('Genre: ${questCard.genre ?? 'N/A'}'),
-                          Text('Setting: ${questCard.setting ?? 'N/A'}'),
+                            'Summary:',
+                            style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo),
+                          ),
+                          SizedBox(height: 8),
                           Text(
-                              'Environments: ${questCard.environments?.join(', ') ?? 'N/A'}'),
-                          Text('Product Link: ${questCard.link ?? 'N/A'}'),
-                          Text(
-                              'Boss Villains: ${questCard.bossVillains?.join(', ') ?? 'N/A'}'),
-                          Text(
-                              'Common Monsters: ${questCard.commonMonsters?.join(', ') ?? 'N/A'}'),
-                          Text(
-                              'Notable Items: ${questCard.notableItems?.join(', ') ?? 'N/A'}'),
-                          Text('Summary: ${questCard.summary ?? 'N/A'}'),
+                            questCard.summary ?? 'N/A',
+                            style:
+                                TextStyle(fontSize: 16, color: Colors.black87),
+                          ),
                         ],
                       ),
                     ),
                   ),
+                ),
+                floatingActionButton: FloatingActionButton(
+                  tooltip: 'Edit',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditQuestCard(
+                          docId: args['docId'],
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.edit),
                 ),
               );
             });
@@ -76,5 +110,29 @@ class QuestCardDetailsView extends StatelessWidget {
     } else {
       return Scaffold(body: Placeholder());
     }
+  }
+
+  Widget _buildInfoRow(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value ?? 'N/A',
+              //style: TextStyle(color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -89,19 +89,20 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
       endDrawer: Drawer(
         child: _filters(context),
       ),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           children: <Widget>[
-            SizedBox(
-                height: 44,
-                child: TextField(
-                  controller: _searchTextController,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: 'Enter a search term',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                )),
+            TextField(
+              controller: _searchTextController,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Enter a search term',
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
             StreamBuilder<SearchMetadata>(
               stream: searchMetadata,
               builder: (context, snapshot) {
@@ -116,7 +117,7 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
             ),
             Expanded(
               child: _hits(context),
-            )
+            ),
           ],
         ),
       ),
@@ -124,65 +125,64 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
   }
 
   Widget _hits(BuildContext context) => PagedListView<int, QuestCard>(
-      pagingController: _pagingController,
-      builderDelegate: PagedChildBuilderDelegate<QuestCard>(
+        pagingController: _pagingController,
+        builderDelegate: PagedChildBuilderDelegate<QuestCard>(
           noItemsFoundIndicatorBuilder: (_) => const Center(
-                child: Text('No results found'),
+            child: Text('No results found'),
+          ),
+          itemBuilder: (_, item, __) => Card(
+            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            child: ListTile(
+              leading: Icon(Icons.book, color: Colors.indigo),
+              title: Text(
+                item.title!,
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
-          itemBuilder: (_, item, __) => Container(
-                color: Colors.white,
-                height: 80,
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  children: [
-                    SizedBox(width: 50, child: Icon(Icons.book)),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: ListTile(
-                        title: Text(item.title!),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const QuestCardDetailsView(),
-                              settings: RouteSettings(
-                                  arguments: {'docId': item.objectId}),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              )));
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const QuestCardDetailsView(),
+                    settings:
+                        RouteSettings(arguments: {'docId': item.objectId}),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
 
   Widget _filters(BuildContext context) => Scaffold(
         appBar: AppBar(
           title: const Text('Filters'),
         ),
         body: StreamBuilder<List<SelectableItem<Facet>>>(
-            stream: _facetList.facets,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const SizedBox.shrink();
-              }
-              final selectableFacets = snapshot.data!;
-              return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: selectableFacets.length,
-                  itemBuilder: (_, index) {
-                    final selectableFacet = selectableFacets[index];
-                    return CheckboxListTile(
-                      value: selectableFacet.isSelected,
-                      title: Text(
-                          "${selectableFacet.item.value} (${selectableFacet.item.count})"),
-                      onChanged: (_) {
-                        _facetList.toggle(selectableFacet.item.value);
-                      },
-                    );
-                  });
-            }),
+          stream: _facetList.facets,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const SizedBox.shrink();
+            }
+            final selectableFacets = snapshot.data!;
+            return ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: selectableFacets.length,
+              itemBuilder: (_, index) {
+                final selectableFacet = selectableFacets[index];
+                return CheckboxListTile(
+                  value: selectableFacet.isSelected,
+                  title: Text(
+                    "${selectableFacet.item.value} (${selectableFacet.item.count})",
+                    style: TextStyle(color: Colors.black87),
+                  ),
+                  onChanged: (_) {
+                    _facetList.toggle(selectableFacet.item.value);
+                  },
+                );
+              },
+            );
+          },
+        ),
       );
 }
 

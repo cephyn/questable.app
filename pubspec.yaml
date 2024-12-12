@@ -24,9 +24,12 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  google_fonts: ^6.2.1
   google_sign_in: ^6.2.2
   infinite_scroll_pagination: ^4.1.0
+  json_theme_plus: ^6.6.6
   mime: ^2.0.0
+  provider: ^6.1.2
 
 dependency_overrides:
   algolia_client_core: 1.27.1
@@ -49,3 +52,4 @@ flutter:
   assets:
     # Add assets from the images directory to the application.
     - assets/images/
+    - assets/appainter_theme_green.json

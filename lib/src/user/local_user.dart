@@ -5,19 +5,14 @@ import 'package:flutter/foundation.dart';
 class LocalUser {
   String uid;
   List<String> roles;
-  LocalUser({
-    required this.uid,
-    required this.roles,
-  });
+  String email;
+  LocalUser({required this.uid, required this.roles, required this.email});
 
-  LocalUser copyWith({
-    String? uid,
-    List<String>? roles,
-  }) {
+  LocalUser copyWith({String? uid, List<String>? roles, String? email}) {
     return LocalUser(
-      uid: uid ?? this.uid,
-      roles: roles ?? this.roles,
-    );
+        uid: uid ?? this.uid,
+        roles: roles ?? this.roles,
+        email: email ?? this.email);
   }
 
   Map<String, dynamic> toMap() {
@@ -29,9 +24,9 @@ class LocalUser {
 
   factory LocalUser.fromMap(Map<String, dynamic> map) {
     return LocalUser(
-      uid: map['uid'] ?? '',
-      roles: List<String>.from(map['roles']),
-    );
+        uid: map['uid'] ?? '',
+        roles: List<String>.from(map['roles']),
+        email: map['email']);
   }
 
   String toJson() => json.encode(toMap());
@@ -40,7 +35,7 @@ class LocalUser {
       LocalUser.fromMap(json.decode(source));
 
   @override
-  String toString() => 'User(uid: $uid, roles: $roles)';
+  String toString() => 'User(uid: $uid, roles: $roles, email: $email)';
 
   @override
   bool operator ==(Object other) {
@@ -48,9 +43,10 @@ class LocalUser {
 
     return other is LocalUser &&
         other.uid == uid &&
-        listEquals(other.roles, roles);
+        listEquals(other.roles, roles) &&
+        other.email == email;
   }
 
   @override
-  int get hashCode => uid.hashCode ^ roles.hashCode;
+  int get hashCode => uid.hashCode ^ roles.hashCode ^ email.hashCode;
 }

@@ -5,10 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:firebase_ui_oauth_google/firebase_ui_oauth_google.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:quest_cards/src/services/firebase_auth_service.dart';
 
 import '../app.dart';
 import '../services/firestore_service.dart';
+import '../settings/settings_controller.dart';
 import '../user/local_user.dart';
 
 class AuthGate extends StatelessWidget {
@@ -18,6 +20,7 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settingsController = Provider.of<SettingsController>(context);
     return StreamBuilder<User?>(
       stream: auth.getAuthStateChanges(),
       builder: (context, snapshot) {
@@ -42,8 +45,16 @@ class AuthGate extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: action == AuthAction.signIn
-                    ? const Text('Welcome to Quest Cards, please sign in!')
-                    : const Text('Welcome to Quest Cars, please sign up!'),
+                    ? const Text(
+                        'Welcome to Quest Cards, please sign in!',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      )
+                    : const Text(
+                        'Welcome to Quest Cards, please sign up!',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
               );
             },
             footerBuilder: (context, action) {
@@ -66,12 +77,11 @@ class AuthGate extends StatelessWidget {
             },
           );
         } else {
-          //log(snapshot.data!.toString());
-          User user = snapshot.data!;
-          firestoreService.getLocalUser(user.uid);
+          //User user = snapshot.data!;
+          //firestoreService.getLocalUser(user.uid);
         }
 
-        return const HomePage();
+        return HomePage(settingsController: settingsController);
       },
     );
   }

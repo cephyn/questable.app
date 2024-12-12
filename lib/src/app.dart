@@ -14,33 +14,21 @@ import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
 
 /// The Widget that configures your application.
-class MyApp extends StatelessWidget {
-  const MyApp({
-    super.key,
-    required this.settingsController,
-  });
+import 'package:provider/provider.dart';
 
-  final SettingsController settingsController;
+class MyApp extends StatelessWidget {
+  final ThemeData theme;
+
+  const MyApp({super.key, required this.theme});
 
   @override
   Widget build(BuildContext context) {
-    // Glue the SettingsController to the MaterialApp.
-    //
-    // The ListenableBuilder Widget listens to the SettingsController for changes.
-    // Whenever the user updates their settings, the MaterialApp is rebuilt.
+    final settingsController = Provider.of<SettingsController>(context);
     return ListenableBuilder(
       listenable: settingsController,
       builder: (BuildContext context, Widget? child) {
         return MaterialApp(
-          // Providing a restorationScopeId allows the Navigator built by the
-          // MaterialApp to restore the navigation stack when a user leaves and
-          // returns to the app after it has been killed while running in the
-          // background.
           restorationScopeId: 'app',
-
-          // Provide the generated AppLocalizations to the MaterialApp. This
-          // allows descendant Widgets to display the correct translations
-          // depending on the user's locale.
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
@@ -48,27 +36,11 @@ class MyApp extends StatelessWidget {
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [
-            Locale('en', ''), // English, no country code
+            Locale('en', ''),
           ],
-
-          // Use AppLocalizations to configure the correct application title
-          // depending on the user's locale.
-          //
-          // The appTitle is defined in .arb files found in the localization
-          // directory.
           onGenerateTitle: (BuildContext context) =>
               AppLocalizations.of(context)!.appTitle,
-
-          // Define a light and dark color theme. Then, read the user's
-          // preferred ThemeMode (light, dark, or system default) from the
-          // SettingsController to display the correct theme.
-          theme: ThemeData(
-            primarySwatch: Colors.green,
-          ),
-          darkTheme: ThemeData.dark(),
-          themeMode: settingsController.themeMode,
-
-          //home: HomePage(),
+          theme: theme,
           home: AuthGate(),
         );
       },
@@ -77,9 +49,8 @@ class MyApp extends StatelessWidget {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({
-    super.key,
-  });
+  final SettingsController settingsController;
+  const HomePage({super.key, required this.settingsController});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -95,17 +66,22 @@ class _HomePageState extends State<HomePage> {
     switch (_selectedIndex) {
       case 0:
         page = QuestCardListView();
+        break;
       case 1:
         page = EditQuestCard(
           docId: '',
         );
+        break;
       case 2:
         page = QuestCardAnalyze();
+        break;
       case 3:
         page = QuestCardSearch();
+        break;
       default:
         page = Placeholder();
     }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quest Cards'),
@@ -128,7 +104,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       const Divider(),
                       Padding(
-                        padding: const EdgeInsets.all(2),
+                        padding: const EdgeInsets.all(8.0),
                         child: AspectRatio(
                           aspectRatio: 1,
                           child: Image.asset('assets/images/flutter_logo.png'),
@@ -143,10 +119,14 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              // Navigate to the settings page. If the user leaves and returns
-              // to the app after it has been killed while running in the
-              // background, the navigation stack is restored.
-              Navigator.restorablePushNamed(context, SettingsView.routeName);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsView(
+                    controller: widget.settingsController,
+                  ),
+                ),
+              );
             },
           ),
         ],
@@ -161,7 +141,7 @@ class _HomePageState extends State<HomePage> {
                 trailing: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.all(16.0),
                       child: FutureBuilder<int>(
                         future: firestoreService.getQuestCardsCount(),
                         builder: (BuildContext context,
@@ -204,11 +184,10 @@ class _HomePageState extends State<HomePage> {
                       padding: const EdgeInsets.all(8.0),
                       child: Column(
                         children: [
-                          //Image.asset('dash.png'),
                           const SignOutButton(),
                         ],
                       ),
-                    )
+                    ),
                   ],
                 ),
                 destinations: const [

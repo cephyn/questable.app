@@ -2,9 +2,11 @@ import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:quest_cards/src/app.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 
+import '../settings/settings_controller.dart';
 import 'quest_card.dart';
 
 class EditQuestCard extends StatefulWidget {
@@ -52,101 +54,101 @@ class _AddQuestCardState extends State<EditQuestCard> {
   }
 
   Form getQuestCardForm(BuildContext context, String? docId) {
+    final settingsController = Provider.of<SettingsController>(context);
     return Form(
-        key: _formKey,
-        child: Column(
+      key: _formKey,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
           children: <Widget>[
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Title'),
+            _buildTextField(
+              label: 'Title',
               initialValue: _questCard.title,
               onSaved: (value) => _questCard.title = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Game System'),
+            _buildTextField(
+              label: 'Game System',
               initialValue: _questCard.gameSystem,
               onSaved: (value) => _questCard.gameSystem = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Edition'),
+            _buildTextField(
+              label: 'Edition',
               initialValue: _questCard.edition,
               onSaved: (value) => _questCard.edition = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Level'),
+            _buildTextField(
+              label: 'Level',
               initialValue: _questCard.level,
               onSaved: (value) => _questCard.level = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Page Length'),
+            _buildTextField(
+              label: 'Page Length',
               initialValue: _questCard.pageLength?.toString(),
               keyboardType: TextInputType.number,
               onSaved: (value) =>
                   _questCard.pageLength = int.tryParse(value ?? ''),
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Authors'),
+            _buildTextField(
+              label: 'Authors',
               initialValue: _questCard.authors?.join(", "),
               onSaved: (value) => _questCard.authors = value?.split(','),
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Publisher'),
+            _buildTextField(
+              label: 'Publisher',
               initialValue: _questCard.publisher,
               onSaved: (value) => _questCard.publisher = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Publication Year'),
+            _buildTextField(
+              label: 'Publication Year',
               initialValue: _questCard.publicationYear,
               onSaved: (value) => _questCard.publicationYear = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Genre'),
+            _buildTextField(
+              label: 'Genre',
               initialValue: _questCard.genre,
               onSaved: (value) => _questCard.genre = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Setting'),
+            _buildTextField(
+              label: 'Setting',
               initialValue: _questCard.setting,
               onSaved: (value) => _questCard.setting = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Environments'),
+            _buildTextField(
+              label: 'Environments',
               initialValue: _questCard.environments?.join(", "),
               onSaved: (value) => _questCard.environments = value?.split(','),
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Product Link'),
+            _buildTextField(
+              label: 'Product Link',
               initialValue: _questCard.link,
               onSaved: (value) => _questCard.link = value,
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Boss Villains'),
+            _buildTextField(
+              label: 'Boss Villains',
               initialValue: _questCard.bossVillains?.join(", "),
               onSaved: (value) => _questCard.bossVillains = value?.split(','),
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Common Monsters'),
+            _buildTextField(
+              label: 'Common Monsters',
               initialValue: _questCard.commonMonsters?.join(", "),
               onSaved: (value) => _questCard.commonMonsters = value?.split(','),
             ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Notable Items'),
+            _buildTextField(
+              label: 'Notable Items',
               initialValue: _questCard.notableItems?.join(", "),
               maxLines: null,
               onSaved: (value) => _questCard.notableItems = value?.split(','),
             ),
-            Expanded(
-              child: TextFormField(
-                decoration: InputDecoration(labelText: 'Summary'),
-                initialValue: _questCard.summary,
-                maxLines: null,
-                onSaved: (value) => _questCard.summary = value,
-              ),
+            _buildTextField(
+              label: 'Summary',
+              initialValue: _questCard.summary,
+              maxLines: null,
+              onSaved: (value) => _questCard.summary = value,
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: ElevatedButton(
                 onPressed: () {
-                  // Validate returns true if the form is valid, or false otherwise.
                   if (_formKey.currentState!.validate()) {
                     _formKey.currentState?.save();
                     if (docId == null) {
@@ -154,12 +156,11 @@ class _AddQuestCardState extends State<EditQuestCard> {
                     } else {
                       firestoreService.updateQuestCard(docId, _questCard);
                     }
-                    // If the form is valid, display a snackbar. In the real world,
-                    // you'd often call a server or save the information in a database.
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const HomePage(),
+                        builder: (context) =>
+                            HomePage(settingsController: settingsController),
                       ),
                     );
                   }
@@ -168,6 +169,30 @@ class _AddQuestCardState extends State<EditQuestCard> {
               ),
             ),
           ],
-        ));
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    String? initialValue,
+    TextInputType keyboardType = TextInputType.text,
+    int? maxLines = 1,
+    required FormFieldSetter<String?> onSaved,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(),
+        ),
+        initialValue: initialValue,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        onSaved: onSaved,
+      ),
+    );
   }
 }

@@ -126,14 +126,15 @@ class FirestoreService {
     return null;
   }
 
-  Future<void> storeInitialUserRole(String userId) async {
+  Future<void> storeInitialUserRole(String userId, String email) async {
     try {
       DocumentReference userDocRef = users.doc(userId);
-      DocumentSnapshot userDoc = await userDocRef.get();
+      DocumentSnapshot documentSnapshot = await userDocRef.get();
 
-      if (!userDoc.exists) {
+      if (!documentSnapshot.exists) {
         await userDocRef.set({
-          'roles': ['user']
+          'roles': ['user'],
+          'email': email
         });
       }
     } catch (e) {
