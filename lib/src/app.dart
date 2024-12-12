@@ -107,7 +107,7 @@ class _HomePageState extends State<HomePage> {
                         padding: const EdgeInsets.all(8.0),
                         child: AspectRatio(
                           aspectRatio: 1,
-                          child: Image.asset('assets/images/flutter_logo.png'),
+                          child: Image.asset('assets/images/QuestableY4x4.png'),
                         ),
                       ),
                     ],

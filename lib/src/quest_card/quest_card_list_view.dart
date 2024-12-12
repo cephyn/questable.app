@@ -45,7 +45,7 @@ class QuestCardListView extends StatelessWidget {
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundImage:
-                            AssetImage('assets/images/flutter_logo.png'),
+                            AssetImage('assets/images/QuestableTx4x4.png'),
                       ),
                       title: Text(
                         title,
