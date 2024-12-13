@@ -77,11 +77,63 @@ class AuthGate extends StatelessWidget {
             },
           );
         } else {
-          //User user = snapshot.data!;
-          //firestoreService.getLocalUser(user.uid);
+          FutureBuilder<void>(
+            future: firestoreService.storeInitialUserRole(
+                auth.getCurrentUser().uid, auth.getCurrentUser().email!),
+            builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator(); // Display a loading indicator
+              } else if (snapshot.hasError) {
+                return Text(
+                    'Error: ${snapshot.error}'); // Display error message
+              } else {
+                return Text(
+                    'User role initialized successfully!'); // Display success message
+              }
+            },
+          );
         }
 
-        return HomePage(settingsController: settingsController);
+        return FutureBuilder<List<String>?>(
+          future: firestoreService.getUserRoles(auth.getCurrentUser().uid),
+          builder:
+              (BuildContext context, AsyncSnapshot<List<String>?> snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircularProgressIndicator();
+            } else if (snapshot.hasError) {
+              return Text('Error: ${snapshot.error}');
+            } else if (snapshot.hasData) {
+              List<String>? roles = snapshot.data;
+              if (roles != null &&
+                  (roles.contains('admin') || roles.contains('user'))) {
+                return HomePage(settingsController: settingsController);
+              } else {
+                return Scaffold(
+                  body: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Thanks for signing up, an admin will process your signup soon.",
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(
+                            height:
+                                20), // Add space between the text and button
+                        const SignOutButton(),
+                      ],
+                    ),
+                  ),
+                );
+// Or any other widget for non-admin users
+              }
+            } else {
+              return Scaffold(body: Text('No roles found'));
+            }
+          },
+        );
       },
     );
   }

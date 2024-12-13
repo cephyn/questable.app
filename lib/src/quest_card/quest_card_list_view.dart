@@ -17,8 +17,8 @@ class QuestCardListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    firestoreService.storeInitialUserRole(
-        auth.getCurrentUser().uid, auth.getCurrentUser().email!);
+    //firestoreService.storeInitialUserRole(
+    //auth.getCurrentUser().uid, auth.getCurrentUser().email!);
 
     return Scaffold(
       appBar: AppBar(
