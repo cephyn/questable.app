@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:developer';
-
 import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:firebase_ui_oauth_google/firebase_ui_oauth_google.dart';
@@ -11,7 +8,6 @@ import 'package:quest_cards/src/services/firebase_auth_service.dart';
 import '../app.dart';
 import '../services/firestore_service.dart';
 import '../settings/settings_controller.dart';
-import '../user/local_user.dart';
 
 class AuthGate extends StatelessWidget {
   AuthGate({super.key});
@@ -21,6 +17,7 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settingsController = Provider.of<SettingsController>(context);
+
     return StreamBuilder<User?>(
       stream: auth.getAuthStateChanges(),
       builder: (context, snapshot) {
@@ -29,8 +26,9 @@ class AuthGate extends StatelessWidget {
             providers: [
               EmailAuthProvider(),
               GoogleProvider(
-                  clientId:
-                      "766749273273-cdmn3l0qt31qoqp6uknnboh59aqv1sqn.apps.googleusercontent.com"),
+                clientId:
+                    "766749273273-cdmn3l0qt31qoqp6uknnboh59aqv1sqn.apps.googleusercontent.com",
+              ),
             ],
             headerBuilder: (context, constraints, shrinkOffset) {
               return Padding(
@@ -77,28 +75,34 @@ class AuthGate extends StatelessWidget {
             },
           );
         } else {
-          FutureBuilder<void>(
+          return FutureBuilder<void>(
             future: firestoreService.storeInitialUserRole(
                 auth.getCurrentUser().uid, auth.getCurrentUser().email!),
-            builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
+            builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return CircularProgressIndicator(); // Display a loading indicator
+                return Center(
+                    child:
+                        CircularProgressIndicator()); // Display a loading indicator
               } else if (snapshot.hasError) {
-                return Text(
-                    'Error: ${snapshot.error}'); // Display error message
+                return Center(
+                    child: Text(
+                        'Error: ${snapshot.error}')); // Display error message
               } else {
                 return FutureBuilder<List<String>?>(
                   future:
                       firestoreService.getUserRoles(auth.getCurrentUser().uid),
                   builder: (BuildContext context,
-                      AsyncSnapshot<List<String>?> snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      AsyncSnapshot<List<String>?> rolesSnapshot) {
+                    if (rolesSnapshot.connectionState ==
+                        ConnectionState.waiting) {
                       return Scaffold(
                           body: Center(child: CircularProgressIndicator()));
-                    } else if (snapshot.hasError) {
-                      return Text('Error: ${snapshot.error}');
-                    } else if (snapshot.hasData) {
-                      List<String>? roles = snapshot.data;
+                    } else if (rolesSnapshot.hasError) {
+                      return Scaffold(
+                          body: Center(
+                              child: Text('Error: ${rolesSnapshot.error}')));
+                    } else if (rolesSnapshot.hasData) {
+                      List<String>? roles = rolesSnapshot.data;
                       if (roles != null &&
                           (roles.contains('admin') || roles.contains('user'))) {
                         return HomePage(settingsController: settingsController);
@@ -124,15 +128,15 @@ class AuthGate extends StatelessWidget {
                         );
                       }
                     } else {
-                      return Scaffold(body: Text('No roles found'));
+                      return Scaffold(
+                          body: Center(child: Text('No roles found')));
                     }
                   },
-                ); // Display success message
+                );
               }
             },
           );
         }
-        return Scaffold(body: Text('Unknown Issue'));
       },
     );
   }

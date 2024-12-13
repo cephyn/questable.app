@@ -3,12 +3,10 @@ import 'dart:developer';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:quest_cards/src/services/firebase_storage_service.dart';
 
 import '../services/firebase_vertexai_service.dart';
 import '../services/firestore_service.dart';
-import '../settings/settings_controller.dart';
 import 'quest_card.dart';
 import 'quest_card_edit.dart';
 

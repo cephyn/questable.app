@@ -1,4 +1,3 @@
-import 'dart:developer';
 
 import 'package:algolia_helper_flutter/algolia_helper_flutter.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart';
