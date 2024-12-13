@@ -28,6 +28,7 @@ class MyApp extends StatelessWidget {
       listenable: settingsController,
       builder: (BuildContext context, Widget? child) {
         return MaterialApp(
+          title: "Questable",
           restorationScopeId: 'app',
           localizationsDelegates: const [
             AppLocalizations.delegate,
