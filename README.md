@@ -1,6 +1,11 @@
 # quest_cards
 
 A new Flutter project.
+Build Steps:
+    -terminal-
+    flutter build web --no-tree-shake-icons
+    -firebase cli-
+    firebase deploy
 
 ## Getting Started
 

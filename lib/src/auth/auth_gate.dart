@@ -46,12 +46,12 @@ class AuthGate extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: action == AuthAction.signIn
                     ? const Text(
-                        'Welcome to Quest Cards, please sign in!',
+                        'Welcome to Questable, please sign in!',
                         style: TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold),
                       )
                     : const Text(
-                        'Welcome to Quest Cards, please sign up!',
+                        'Welcome to Questable, please sign up!',
                         style: TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold),
                       ),

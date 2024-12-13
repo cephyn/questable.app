@@ -80,18 +80,6 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
                     ),
                   ),
                 );
-                /*FutureBuilder<String>(
-                  future: analyzeFile(),
-                  builder: (context, AsyncSnapshot<String> snapshot) {
-                    if (snapshot.hasData) {
-                      log(snapshot.data!);
-                      docId = snapshot.data!;
-                    } else {
-                      return CircularProgressIndicator();
-                    }
-                    return sendToEdit(context, docId);
-                  },
-                );*/
               },
               child: Text('Upload File'),
             ),
@@ -119,12 +107,32 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   }*/
 
   Future<String> analyzeFile() async {
-    String url = await firebaseStorageService.uploadFile(_file!);
-    Map<String, dynamic> questCardSchema =
-        jsonDecode(await aiService.analyzeFile(url));
-    QuestCard questCard = QuestCard.fromJson(questCardSchema);
-    String docId = await firestoreService.addQuestCard(questCard);
+    try {
+      // Upload the file and get the URL
+      String url = await firebaseStorageService.uploadFile(_file!);
 
-    return docId;
+      // Analyze the file using AI service and decode the result
+      Map<String, dynamic> questCardSchema =
+          jsonDecode(await aiService.analyzeFile(url));
+      QuestCard questCard = QuestCard.fromJson(questCardSchema);
+
+      // Check for duplicates
+      String? dupeId =
+          await firestoreService.getQuestByTitle(questCard.title ?? '');
+      //log("AF dupeId: $dupeId");
+
+      if (dupeId != null) {
+        // A duplicate is found
+        log("Dupe uploaded: $dupeId ${questCard.title}");
+        return dupeId;
+      } else {
+        // No duplicate found, add the new quest card
+        String docId = await firestoreService.addQuestCard(questCard);
+        return docId;
+      }
+    } catch (e) {
+      log("Error in analyzeFile: $e");
+      rethrow; // Rethrow the exception after logging
+    }
   }
 }

@@ -84,7 +84,7 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quest Cards'),
+        title: const Text('Questable'),
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -161,7 +161,7 @@ class _HomePageState extends State<HomePage> {
                           } else if (snapshot.hasData) {
                             int count = snapshot.data!;
                             return Text(
-                              "$count Adventures",
+                              "$count Quests Scribed",
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

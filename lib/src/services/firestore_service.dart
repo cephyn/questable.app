@@ -88,6 +88,28 @@ class FirestoreService {
     });
   }
 
+  Future<String?> getQuestByTitle(String title) async {
+    try {
+      // Perform the query and wait for the results
+      var querySnapshot =
+          await questCards.where("title", isEqualTo: title).get();
+      String? questId;
+
+      // Iterate through the query results to get the document ID
+      for (var docSnapshot in querySnapshot.docs) {
+        //log('GQT: ${docSnapshot.id}');
+        questId = docSnapshot.id;
+      }
+
+      // Return the found quest ID, or null if not found
+      return questId;
+    } catch (e) {
+      // Log any error that occurs
+      log("Error completing: $e");
+      return null;
+    }
+  }
+
   //delete
   Future<void> deleteQuestCard(String docId) {
     return questCards.doc(docId).delete();

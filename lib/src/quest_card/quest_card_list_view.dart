@@ -86,7 +86,7 @@ class QuestCardListView extends StatelessWidget {
                 },
               );
             } else {
-              return const Text("No QuestCards");
+              return const Text("No Quests");
             }
           },
         ),
