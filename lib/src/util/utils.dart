@@ -20,6 +20,9 @@ class Utils {
         return AssetImage('assets/icons/dndx48.png');
       case "Cypher System":
         return AssetImage('assets/icons/CSOLxBlackx48.png');
+      case "Shadowdark":
+      case "Shadowdark RPG":
+        return AssetImage('assets/icons/shadowdarkx48.png');
       default:
         return AssetImage('assets/icons/d20x48.png');
     }
