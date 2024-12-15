@@ -1,9 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 
-import '../settings/settings_controller.dart';
 import '../util/utils.dart';
 import 'quest_card.dart';
 import 'quest_card_details_view.dart';
@@ -54,7 +52,7 @@ class _AddQuestCardState extends State<EditQuestCard> {
   }
 
   Form getQuestCardForm(BuildContext context, String? docId) {
-    final settingsController = Provider.of<SettingsController>(context);
+    //final settingsController = Provider.of<SettingsController>(context);
     return Form(
       key: _formKey,
       child: Padding(

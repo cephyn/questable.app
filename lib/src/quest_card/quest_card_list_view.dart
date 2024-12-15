@@ -17,8 +17,7 @@ class QuestCardListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //firestoreService.storeInitialUserRole(
-    //auth.getCurrentUser().uid, auth.getCurrentUser().email!);
+
     Utils.setBrowserTabTitle("List Quests");
     return Scaffold(
       appBar: AppBar(

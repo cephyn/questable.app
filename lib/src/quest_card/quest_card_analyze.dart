@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:quest_cards/src/services/firebase_storage_service.dart';
 
+import '../services/firebase_auth_service.dart';
 import '../services/firebase_vertexai_service.dart';
 import '../services/firestore_service.dart';
 import '../util/utils.dart';
@@ -25,6 +27,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       FirebaseStorageService();
   final FirebaseVertexaiService aiService = FirebaseVertexaiService();
   final FirestoreService firestoreService = FirestoreService();
+  final FirebaseAuthService auth = FirebaseAuthService();
   String? docId;
 
   Future<void> _pickFile() async {
@@ -81,30 +84,13 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
                   ),
                 );
               },
-              child: Text('Upload File'),
+              child: Text('Analyze File'),
             ),
-            /*ElevatedButton(
-              onPressed: () async {
-                String docId = await analyzeFile();
-                await sendToEdit(context, docId);
-              },
-              child: Text('Upload File'),
-            ),*/
           ],
         ),
       ),
     );
   }
-
-  /* sendToEdit(BuildContext context, String docId) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const EditQuestCard(),
-        settings: RouteSettings(arguments: {'docId': docId}),
-      ),
-    );
-  }*/
 
   Future<String> analyzeFile() async {
     try {
@@ -115,6 +101,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       Map<String, dynamic> questCardSchema =
           jsonDecode(await aiService.analyzeFile(url));
       QuestCard questCard = QuestCard.fromJson(questCardSchema);
+      questCard.uploadedBy = auth.getCurrentUser().email;
 
       // Check for duplicates
       String? dupeId =
@@ -126,6 +113,13 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         log("Dupe uploaded: $dupeId ${questCard.title}");
         return dupeId;
       } else {
+        //check that it is an adventure:
+        if (questCard.classification != 'Adventure') {
+          //AI has determined it is not an adventure, send an email to admin
+          await firestoreService
+              .sendNonAdventureEmailToAdmin(questCard.toJson().toString());
+        }
+
         // No duplicate found, add the new quest card
         String docId = await firestoreService.addQuestCard(questCard);
         return docId;

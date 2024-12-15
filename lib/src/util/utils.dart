@@ -23,6 +23,8 @@ class Utils {
       case "Shadowdark":
       case "Shadowdark RPG":
         return AssetImage('assets/icons/shadowdarkx48.png');
+      case "Tales of the Valiant":
+        return AssetImage('assets/icons/TVx48.66.png');
       default:
         return AssetImage('assets/icons/d20x48.png');
     }
