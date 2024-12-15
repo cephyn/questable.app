@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/firestore_service.dart';
+import '../util/utils.dart';
 import 'quest_card.dart';
 import 'quest_card_edit.dart';
 
@@ -11,6 +12,7 @@ class QuestCardDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Utils.setBrowserTabTitle("Quest Details");
     QuestCard questCard = QuestCard();
     final FirestoreService firestoreService = FirestoreService();
 

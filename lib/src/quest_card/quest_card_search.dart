@@ -1,10 +1,10 @@
-
 import 'package:algolia_helper_flutter/algolia_helper_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart';
 import '../search/hits_page.dart';
 import '../services/firestore_service.dart';
+import '../util/utils.dart';
 import 'quest_card_details_view.dart';
 
 class QuestCardSearch extends StatefulWidget {
@@ -75,6 +75,7 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
 
   @override
   Widget build(BuildContext context) {
+    Utils.setBrowserTabTitle("Search Quests");
     return Scaffold(
       key: _mainScaffoldKey,
       appBar: AppBar(

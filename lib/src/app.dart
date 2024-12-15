@@ -1,19 +1,18 @@
-
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
+import 'package:quest_cards/src/user/local_user_list.dart';
 import 'auth/auth_gate.dart';
 import 'quest_card/quest_card_analyze.dart';
 import 'quest_card/quest_card_list_view.dart';
 import 'quest_card/quest_card_search.dart';
+import 'services/firebase_auth_service.dart';
 import 'services/firestore_service.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
-
-/// The Widget that configures your application.
-import 'package:provider/provider.dart';
 
 class MyApp extends StatelessWidget {
   final ThemeData theme;
@@ -59,6 +58,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   var _selectedIndex = 0;
   final FirestoreService firestoreService = FirestoreService();
+  final FirebaseAuthService auth = FirebaseAuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +77,9 @@ class _HomePageState extends State<HomePage> {
         break;
       case 3:
         page = QuestCardSearch();
+        break;
+      case 4:
+        page = LocalUserList();
         break;
       default:
         page = Placeholder();
@@ -132,96 +135,120 @@ class _HomePageState extends State<HomePage> {
         ],
         automaticallyImplyLeading: false,
       ),
-      body: LayoutBuilder(builder: (context, constraints) {
-        return Row(
-          children: [
-            SafeArea(
-              child: NavigationRail(
-                extended: constraints.maxWidth >= 600,
-                trailing: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: FutureBuilder<int>(
-                        future: firestoreService.getQuestCardsCount(),
-                        builder: (BuildContext context,
-                            AsyncSnapshot<int> snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return CircularProgressIndicator();
-                          } else if (snapshot.hasError) {
-                            return Text(
-                              'Error: ${snapshot.error}',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Row(
+            children: [
+              SafeArea(
+                child: FutureBuilder<List<String>?>(
+                  future:
+                      firestoreService.getUserRoles(auth.getCurrentUser().uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else if (snapshot.hasData) {
+                      List<String>? roles = snapshot.data;
+                      return NavigationRail(
+                        extended: constraints.maxWidth >= 600,
+                        trailing: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: FutureBuilder<int>(
+                                future: firestoreService.getQuestCardsCount(),
+                                builder: (BuildContext context,
+                                    AsyncSnapshot<int> snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return CircularProgressIndicator();
+                                  } else if (snapshot.hasError) {
+                                    return Text(
+                                      'Error: ${snapshot.error}',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    );
+                                  } else if (snapshot.hasData) {
+                                    int count = snapshot.data!;
+                                    return FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          "$count Quests Scribed",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ));
+                                  } else {
+                                    return Text(
+                                      'No data',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    );
+                                  }
+                                },
                               ),
-                            );
-                          } else if (snapshot.hasData) {
-                            int count = snapshot.data!;
-                            return Text(
-                              "$count Quests Scribed",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            ),
+                            Divider(),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                children: [
+                                  const SignOutButton(),
+                                ],
                               ),
-                            );
-                          } else {
-                            return Text(
-                              'No data',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    Divider(),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        children: [
-                          const SignOutButton(),
+                            ),
+                          ],
+                        ),
+                        destinations: [
+                          NavigationRailDestination(
+                            icon: Icon(Icons.home),
+                            label: Text('Quests'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.add),
+                            label: Text('Add Quest'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.upload),
+                            label: Text('Analyze Quest'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.search),
+                            label: Text('Search Quests'),
+                          ),
+                          if (roles != null && roles.contains('admin'))
+                            NavigationRailDestination(
+                              icon: Icon(Icons.people),
+                              label: Text('List Users'),
+                            ),
                         ],
-                      ),
-                    ),
-                  ],
+                        selectedIndex: _selectedIndex,
+                        onDestinationSelected: (int index) {
+                          setState(() {
+                            _selectedIndex = index;
+                          });
+                        },
+                      );
+                    } else {
+                      return Center(child: Text("No roles found"));
+                    }
+                  },
                 ),
-                destinations: const [
-                  NavigationRailDestination(
-                    icon: Icon(Icons.home),
-                    label: Text('Quests'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.add),
-                    label: Text('Add Quest'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.upload),
-                    label: Text('Analyze Quest'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.search),
-                    label: Text('Search Quests'),
-                  ),
-                ],
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (int index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
-                },
               ),
-            ),
-            Expanded(
-              child: page,
-            ),
-          ],
-        );
-      }),
+              Expanded(
+                child: page,
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

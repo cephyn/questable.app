@@ -24,6 +24,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  flutter_web_plugins: 
+    sdk: flutter
   google_fonts: ^6.2.1
   google_sign_in: ^6.2.2
   infinite_scroll_pagination: ^4.1.0
@@ -52,4 +54,5 @@ flutter:
   assets:
     # Add assets from the images directory to the application.
     - assets/images/
+    - assets/icons/
     - assets/appainter_theme_green.json

@@ -1,15 +1,16 @@
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
-import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
-import 'package:quest_cards/src/role_based_widgets/role_based_delete_documents_buttons.dart';
-import 'package:quest_cards/src/services/firebase_auth_service.dart';
-import 'package:quest_cards/src/services/firestore_service.dart';
 
+import '../role_based_widgets/role_based_delete_documents_buttons.dart';
+import '../services/firebase_auth_service.dart';
+import '../services/firestore_service.dart';
 import '../util/utils.dart';
+import 'local_user.dart';
+import 'local_user_edit.dart';
 
-class QuestCardListView extends StatelessWidget {
-  QuestCardListView({super.key});
+class LocalUserList extends StatelessWidget {
+  LocalUserList({super.key});
   final FirestoreService firestoreService = FirestoreService();
   final FirebaseAuthService auth = FirebaseAuthService();
   final RoleBasedDeleteDocumentsButtons rbDeleteDocumentsButtons =
@@ -17,50 +18,36 @@ class QuestCardListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //firestoreService.storeInitialUserRole(
-    //auth.getCurrentUser().uid, auth.getCurrentUser().email!);
-    Utils.setBrowserTabTitle("List Quests");
+    Utils.setBrowserTabTitle("List Users");
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quests'),
       ),
       body: Center(
         child: StreamBuilder<QuerySnapshot>(
-          stream: firestoreService.getQuestCardsStream(),
+          stream: firestoreService.getUsersStream(),
           builder: (context, snapshot) {
             if (snapshot.hasData) {
-              List<QueryDocumentSnapshot> queryCardList = snapshot.data!.docs;
+              List<QueryDocumentSnapshot> usersList = snapshot.data!.docs;
               return ListView.builder(
                 padding: const EdgeInsets.all(8),
-                itemCount: queryCardList.length,
+                itemCount: usersList.length,
                 itemBuilder: (context, index) {
-                  DocumentSnapshot document = queryCardList[index];
-                  String docId = document.id;
+                  DocumentSnapshot document = usersList[index];
                   Map<String, dynamic> data =
                       document.data() as Map<String, dynamic>;
-                  String title = data['title'];
+                  LocalUser user = LocalUser.fromMap(data);
+                  user.uid = document.id;
                   return Card(
                     margin: const EdgeInsets.symmetric(
                         vertical: 8.0, horizontal: 16.0),
                     child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage:
-                            Utils.getSystemIcon(data['gameSystem']),
-                      ),
+                      leading: const Icon(Icons.person),
                       title: Text(
-                        title,
+                        user.email,
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const QuestCardDetailsView(),
-                            settings:
-                                RouteSettings(arguments: {'docId': docId}),
-                          ),
-                        );
-                      },
+                      subtitle: Text(user.roles.join(", ")),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -70,15 +57,14 @@ class QuestCardListView extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => EditQuestCard(
-                                    docId: docId,
-                                  ),
+                                  builder: (context) =>
+                                      LocalUserEdit(userId: user.uid),
                                 ),
                               );
                             },
                           ),
-                          rbDeleteDocumentsButtons.deleteQuestCardButton(
-                              auth.getCurrentUser().uid, docId),
+                          rbDeleteDocumentsButtons.deleteUserButton(
+                              auth.getCurrentUser().uid, user.uid),
                         ],
                       ),
                     ),
@@ -86,7 +72,7 @@ class QuestCardListView extends StatelessWidget {
                 },
               );
             } else {
-              return const Text("No Quests");
+              return const Text("No Users");
             }
           },
         ),

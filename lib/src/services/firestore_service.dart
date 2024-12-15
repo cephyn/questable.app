@@ -59,8 +59,8 @@ class FirestoreService {
   }
 
   Stream<DocumentSnapshot> getQuestCardStream(String docId) {
-    final questCardsStream = questCards.doc(docId).snapshots();
-    return questCardsStream;
+    final questCardStream = questCards.doc(docId).snapshots();
+    return questCardStream;
   }
 
   //update
@@ -114,6 +114,11 @@ class FirestoreService {
     return questCards.doc(docId).delete();
   }
 
+  Stream<QuerySnapshot> getUsersStream() {
+    final usersStream = users.orderBy('email', descending: true).snapshots();
+    return usersStream;
+  }
+
   Future<LocalUser?> getLocalUser(String userId) async {
     try {
       DocumentSnapshot documentSnapshot = await FirebaseFirestore.instance
@@ -161,5 +166,20 @@ class FirestoreService {
     } catch (e) {
       log('Error storing user roles $userId: $e');
     }
+  }
+
+  getUserCardStream(String userId) {
+    final userStream = users.doc(userId).snapshots();
+    return userStream;
+  }
+
+  Future<void> updateUser(LocalUser user) {
+    return users
+        .doc(user.uid)
+        .update({'uid': user.uid, 'email': user.email, 'roles': user.roles});
+  }
+
+  Future<void> deleteUser(String docId) {
+    return users.doc(docId).delete();
   }
 }

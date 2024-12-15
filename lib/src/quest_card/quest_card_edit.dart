@@ -1,12 +1,12 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:quest_cards/src/app.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 
 import '../settings/settings_controller.dart';
+import '../util/utils.dart';
 import 'quest_card.dart';
+import 'quest_card_details_view.dart';
 
 class EditQuestCard extends StatefulWidget {
   final String docId;
@@ -30,6 +30,7 @@ class _AddQuestCardState extends State<EditQuestCard> {
 
   @override
   Widget build(BuildContext context) {
+    Utils.setBrowserTabTitle("Edit Quest");
     if (widget.docId != '') {
       return StreamBuilder<DocumentSnapshot>(
           stream: firestoreService.getQuestCardStream(widget.docId),
@@ -158,8 +159,8 @@ class _AddQuestCardState extends State<EditQuestCard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            HomePage(settingsController: settingsController),
+                        builder: (context) => const QuestCardDetailsView(),
+                        settings: RouteSettings(arguments: {'docId': docId}),
                       ),
                     );
                   }

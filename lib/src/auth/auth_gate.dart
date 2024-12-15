@@ -8,6 +8,7 @@ import 'package:quest_cards/src/services/firebase_auth_service.dart';
 import '../app.dart';
 import '../services/firestore_service.dart';
 import '../settings/settings_controller.dart';
+import '../util/utils.dart';
 
 class AuthGate extends StatelessWidget {
   AuthGate({super.key});
@@ -17,6 +18,7 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settingsController = Provider.of<SettingsController>(context);
+    Utils.setBrowserTabTitle("Questable");
 
     return StreamBuilder<User?>(
       stream: auth.getAuthStateChanges(),
@@ -110,19 +112,39 @@ class AuthGate extends StatelessWidget {
                         return Scaffold(
                           body: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "Thanks for signing up, an admin will process your account soon.",
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(
-                                    height:
-                                        20), // Add space between the text and button
-                                const SignOutButton(),
-                              ],
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle_outline,
+                                      size: 100,
+                                      color: Theme.of(context).primaryColor),
+                                  const SizedBox(height: 20),
+                                  Text(
+                                    "Thanks for signing up!",
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    "An admin will process your account soon.",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey[600],
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Divider(thickness: 2),
+                                  const SizedBox(height: 20),
+                                  const SignOutButton(),
+                                ],
+                              ),
                             ),
                           ),
                         );

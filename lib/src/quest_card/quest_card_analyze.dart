@@ -7,6 +7,7 @@ import 'package:quest_cards/src/services/firebase_storage_service.dart';
 
 import '../services/firebase_vertexai_service.dart';
 import '../services/firestore_service.dart';
+import '../util/utils.dart';
 import 'quest_card.dart';
 import 'quest_card_edit.dart';
 
@@ -39,6 +40,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
 
   @override
   Widget build(BuildContext context) {
+    Utils.setBrowserTabTitle("Analyze File");
     return Scaffold(
       appBar: AppBar(title: Text('Upload a File')),
       body: Padding(
