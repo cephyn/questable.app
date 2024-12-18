@@ -1,3 +1,4 @@
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
@@ -84,7 +85,7 @@ class QuestCardListView extends StatelessWidget {
                         backgroundImage:
                             Utils.getSystemIcon(data['gameSystem']),
                       ),
-                      title: Text(
+                      title: AutoSizeText(
                         title,
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
