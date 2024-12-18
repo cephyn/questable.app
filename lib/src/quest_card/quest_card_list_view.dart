@@ -17,11 +17,49 @@ class QuestCardListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     Utils.setBrowserTabTitle("List Quests");
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quests'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(10.0),
+          child: FutureBuilder<int>(
+            future: firestoreService.getQuestCardsCount(),
+            builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator();
+              } else if (snapshot.hasError) {
+                return Text(
+                  'Error: ${snapshot.error}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                );
+              } else if (snapshot.hasData) {
+                int count = snapshot.data!;
+                return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "$count Quests Scribed",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ));
+              } else {
+                return Text(
+                  'No data',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
+              }
+            },
+          ),
+        ),
       ),
       body: Center(
         child: StreamBuilder<QuerySnapshot>(

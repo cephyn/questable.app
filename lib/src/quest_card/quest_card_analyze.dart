@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:quest_cards/src/services/email_service.dart';
 import 'package:quest_cards/src/services/firebase_storage_service.dart';
 
 import '../services/firebase_auth_service.dart';
@@ -28,6 +29,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   final FirebaseVertexaiService aiService = FirebaseVertexaiService();
   final FirestoreService firestoreService = FirestoreService();
   final FirebaseAuthService auth = FirebaseAuthService();
+  final EmailService emailService = EmailService();
   String? docId;
 
   Future<void> _pickFile() async {
@@ -116,7 +118,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         //check that it is an adventure:
         if (questCard.classification != 'Adventure') {
           //AI has determined it is not an adventure, send an email to admin
-          await firestoreService
+          emailService
               .sendNonAdventureEmailToAdmin(questCard.toJson().toString());
         }
 

@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:quest_cards/src/services/email_service.dart';
 
 import '../quest_card/quest_card.dart';
 import '../user/local_user.dart';
@@ -11,8 +12,7 @@ class FirestoreService {
       FirebaseFirestore.instance.collection('questCards');
   final CollectionReference users =
       FirebaseFirestore.instance.collection('users');
-  final CollectionReference emails =
-      FirebaseFirestore.instance.collection('emails');
+  final EmailService emailService = EmailService();
 
   //create
   Future<String> addQuestCard(QuestCard questCard) async {
@@ -168,7 +168,7 @@ class FirestoreService {
           'roles': ['signup'],
           'email': email
         });
-        await sendSignupEmailToAdmin(email);
+        await emailService.sendSignupEmailToAdmin(email);
       }
     } catch (e) {
       log('Error storing user roles $userId: $e');
@@ -188,39 +188,5 @@ class FirestoreService {
 
   Future<void> deleteUser(String docId) {
     return users.doc(docId).delete();
-  }
-
-  Future<void> sendSignupEmailToAdmin(String userEmail) async {
-    String docId = "";
-    await emails.add({
-      'to': [
-        {'email': 'admin@questable.app', 'name': 'Questable Admin'}
-      ],
-      'from': {
-        'email': 'noreply@questable.app',
-        'name': 'noreply@questable.app'
-      },
-      'subject': 'New Questable Signup!',
-      'html': 'New signup from $userEmail',
-    }).then((DocumentReference ref) {
-      docId = ref.id;
-    });
-    //print(docId);
-    log(docId);
-  }
-
-  Future<void> sendNonAdventureEmailToAdmin(String adventureJson) async {
-    await emails.add({
-      'to': [
-        {'email': 'admin@questable.app', 'name': 'Questable Admin'}
-      ],
-      'from': {
-        'email': 'noreply@questable.app',
-        'name': 'noreply@questable.app'
-      },
-      'subject': 'Questable: Non-Adventure Uploaded',
-      'html':
-          'AI has detected a non-adventure file: <code>$adventureJson</code>',
-    }).then((DocumentReference ref) {});
   }
 }

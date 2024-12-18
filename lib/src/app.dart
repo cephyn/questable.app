@@ -155,48 +155,6 @@ class _HomePageState extends State<HomePage> {
                         trailing: Column(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: FutureBuilder<int>(
-                                future: firestoreService.getQuestCardsCount(),
-                                builder: (BuildContext context,
-                                    AsyncSnapshot<int> snapshot) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.waiting) {
-                                    return CircularProgressIndicator();
-                                  } else if (snapshot.hasError) {
-                                    return Text(
-                                      'Error: ${snapshot.error}',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red,
-                                      ),
-                                    );
-                                  } else if (snapshot.hasData) {
-                                    int count = snapshot.data!;
-                                    return FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          "$count Quests Scribed",
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ));
-                                  } else {
-                                    return Text(
-                                      'No data',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            ),
-                            Divider(),
-                            Padding(
                               padding: const EdgeInsets.all(8.0),
                               child: Column(
                                 children: [

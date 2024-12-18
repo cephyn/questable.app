@@ -1,6 +1,7 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:quest_cards/src/services/email_service.dart';
 
 import '../services/firestore_service.dart';
 import '../util/utils.dart';
@@ -19,6 +20,7 @@ class LocalUserEdit extends StatefulWidget {
 class _LocalUserEditState extends State<LocalUserEdit> {
   final _formKey = GlobalKey<FormState>();
   final FirestoreService firestoreService = FirestoreService();
+  final EmailService emailService = EmailService();
   LocalUser? _localUser;
 
   @override
@@ -44,7 +46,29 @@ class _LocalUserEditState extends State<LocalUserEdit> {
           _localUser?.uid = widget.userId;
           return Scaffold(
             appBar: AppBar(title: Text('Edit User')),
-            body: getUserForm(context),
+            body: Column(children: [
+              getUserForm(context),
+              Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await emailService.sendActivationEmail(_localUser!.email);
+                    Fluttertoast.showToast(
+                        msg: "Email Sent!",
+                        toastLength: Toast.LENGTH_SHORT,
+                        gravity: ToastGravity.CENTER,
+                        timeInSecForIosWeb: 1,
+                        backgroundColor: Colors.red,
+                        textColor: Colors.white,
+                        fontSize: 16.0);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    textStyle: TextStyle(fontSize: 16),
+                  ),
+                  child: const Text('Send Activation Email'),
+                ),
+              ),
+            ]),
           );
         } else {
           return Scaffold(body: Center(child: Text('No data found')));
@@ -67,18 +91,29 @@ class _LocalUserEditState extends State<LocalUserEdit> {
         child: StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
             return ListView(
+              scrollDirection: Axis.vertical,
+              shrinkWrap: true,
               children: <Widget>[
                 _buildInfoRow('Email', _localUser?.email),
                 _buildInfoRow('UID', _localUser?.uid),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Text('Roles',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Roles',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
                 ),
                 // Create checkboxes for each role
                 ...availableRoles.map((role) {
                   return CheckboxListTile(
-                    title: Text(role),
+                    title: Text(
+                      role,
+                      style: TextStyle(fontSize: 16),
+                    ),
                     value: _localUser?.roles.contains(role) ?? false,
                     onChanged: (bool? value) {
                       setState(() {
@@ -89,9 +124,10 @@ class _LocalUserEditState extends State<LocalUserEdit> {
                         }
                       });
                     },
+                    activeColor: Theme.of(context).primaryColor,
                   );
                 }),
-                SizedBox(height: 16), // Add space before the submit button
+                SizedBox(height: 20), // Add space before the submit button
                 Center(
                   child: ElevatedButton(
                     onPressed: () async {
@@ -107,6 +143,9 @@ class _LocalUserEditState extends State<LocalUserEdit> {
                       padding:
                           EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                       textStyle: TextStyle(fontSize: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: const Text('Submit'),
                   ),
@@ -126,13 +165,20 @@ class _LocalUserEditState extends State<LocalUserEdit> {
         children: [
           Expanded(
             flex: 2,
-            child:
-                Text('$label:', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
           ),
           Expanded(
             flex: 3,
-            child:
-                Text(value ?? 'N/A', style: TextStyle(color: Colors.black87)),
+            child: Text(
+              value ?? 'N/A',
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
           ),
         ],
       ),
