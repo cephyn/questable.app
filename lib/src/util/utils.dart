@@ -29,4 +29,12 @@ class Utils {
         return AssetImage('assets/icons/d20x48.png');
     }
   }
+
+  static String capitalizeTitle(String? title) {
+    if (title == null) return '';
+    return title.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
 }

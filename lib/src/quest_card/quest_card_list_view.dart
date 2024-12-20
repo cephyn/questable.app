@@ -21,44 +21,59 @@ class QuestCardListView extends StatelessWidget {
     Utils.setBrowserTabTitle("List Quests");
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quests'),
+        title: Text(
+          'Quests',
+          style: TextStyle(
+            fontSize: 20, // Adjust the font size
+          ),
+        ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(10.0),
-          child: FutureBuilder<int>(
-            future: firestoreService.getQuestCardsCount(),
-            builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return CircularProgressIndicator();
-              } else if (snapshot.hasError) {
-                return Text(
-                  'Error: ${snapshot.error}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
-                );
-              } else if (snapshot.hasData) {
-                int count = snapshot.data!;
-                return Align(
+          preferredSize:
+              const Size.fromHeight(40.0), // Adjusted height for better padding
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+            child: FutureBuilder<int>(
+              future: firestoreService.getQuestCardsCount(),
+              builder: (BuildContext context, AsyncSnapshot<int> snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                  );
+                } else if (snapshot.hasData) {
+                  int count = snapshot.data!;
+                  return Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
                       "$count Quests Scribed",
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
-                    ));
-              } else {
-                return Text(
-                  'No data',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                );
-              }
-            },
+                    ),
+                  );
+                } else {
+                  return Center(
+                    child: Text(
+                      'No data',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
           ),
         ),
       ),
@@ -86,7 +101,7 @@ class QuestCardListView extends StatelessWidget {
                             Utils.getSystemIcon(data['gameSystem']),
                       ),
                       title: AutoSizeText(
-                        title,
+                        Utils.capitalizeTitle(title),
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       onTap: () {

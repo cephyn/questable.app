@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/firestore_service.dart';
 import '../util/utils.dart';
@@ -42,7 +44,7 @@ class QuestCardDetailsView extends StatelessWidget {
                       child: ListView(
                         children: [
                           Text(
-                            'Title: ${questCard.title ?? 'N/A'}',
+                            'Title: ${Utils.capitalizeTitle(questCard.title)}',
                             style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -64,7 +66,8 @@ class QuestCardDetailsView extends StatelessWidget {
                           _buildInfoRow('Setting', questCard.setting),
                           _buildInfoRow('Environments',
                               questCard.environments?.join(', ')),
-                          _buildInfoRow('Product Link', questCard.link),
+                          _buildInfoLinkRow(
+                              'Product Link', questCard.title!, questCard.link),
                           _buildInfoRow('Boss Villains',
                               questCard.bossVillains?.join(', ')),
                           _buildInfoRow('Common Monsters',
@@ -136,5 +139,58 @@ class QuestCardDetailsView extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildInfoLinkRow(String label, String text, String? url) {
+    if (url == null || url.isEmpty) {
+      return _buildInfoRow(
+          label, url); // Return an empty widget if the URL is null or empty
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  color: Colors.black,
+                  height: 1.5, // Better line height for readability
+                ),
+                children: <TextSpan>[
+                  TextSpan(
+                    text: text,
+                    style: TextStyle(
+                      color: Colors.blue,
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () {
+                        _launchURL(url);
+                      },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchURL(String url) async {
+    Uri uri = Uri.parse(url);
+    await launchUrl(uri);
   }
 }

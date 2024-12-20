@@ -1,5 +1,6 @@
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -87,7 +88,12 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Questable'),
+        title: const Text(
+          'Questable',
+          style: TextStyle(
+            fontSize: 20, // Ensure the title does not get cut off
+          ),
+        ), // Center the title
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -119,94 +125,111 @@ class _HomePageState extends State<HomePage> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SettingsView(
-                    controller: widget.settingsController,
-                  ),
-                ),
-              );
-            },
-          ),
+          // Uncomment if settings button is needed
+          // IconButton(
+          //   icon: const Icon(Icons.settings),
+          //   onPressed: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(
+          //         builder: (context) => SettingsView(
+          //           controller: widget.settingsController,
+          //         ),
+          //       ),
+          //     );
+          //   },
+          // ),
+          const SignOutButton(),
         ],
         automaticallyImplyLeading: false,
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          return Row(
-            children: [
-              SafeArea(
-                child: FutureBuilder<List<String>?>(
-                  future:
-                      firestoreService.getUserRoles(auth.getCurrentUser().uid),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else if (snapshot.hasData) {
-                      List<String>? roles = snapshot.data;
-                      return NavigationRail(
-                        extended: constraints.maxWidth >= 600,
-                        trailing: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                children: [
-                                  const SignOutButton(),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        destinations: [
-                          NavigationRailDestination(
-                            icon: Icon(Icons.home),
-                            label: Text('Quests'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.add),
-                            label: Text('Add Quest'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.upload),
-                            label: Text('Analyze Quest'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.search),
-                            label: Text('Search Quests'),
-                          ),
-                          if (roles != null && roles.contains('admin'))
-                            NavigationRailDestination(
-                              icon: Icon(Icons.people),
-                              label: Text('List Users'),
-                            ),
-                        ],
-                        selectedIndex: _selectedIndex,
-                        onDestinationSelected: (int index) {
-                          setState(() {
-                            _selectedIndex = index;
-                          });
-                        },
-                      );
-                    } else {
-                      return Center(child: Text("No roles found"));
-                    }
-                  },
-                ),
-              ),
-              Expanded(
-                child: page,
-              ),
-            ],
-          );
+          return adaptiveNav(page);
         },
       ),
     );
+  }
+
+  FutureBuilder<List<String>?> adaptiveNav(Widget page) {
+    return FutureBuilder<List<String>?>(
+        future: firestoreService.getUserRoles(auth.getCurrentUser().uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (snapshot.hasData) {
+            List<String>? roles = snapshot.data;
+            return AdaptiveScaffold(
+              // An option to override the default transition duration.
+              //transitionDuration: Duration(milliseconds: _transitionDuration),
+              // An option to override the default breakpoints used for small, medium,
+              // mediumLarge, large, and extraLarge.
+              smallBreakpoint: const Breakpoint(endWidth: 700),
+              mediumBreakpoint:
+                  const Breakpoint(beginWidth: 700, endWidth: 1000),
+              mediumLargeBreakpoint:
+                  const Breakpoint(beginWidth: 1000, endWidth: 1200),
+              largeBreakpoint:
+                  const Breakpoint(beginWidth: 1200, endWidth: 1600),
+              extraLargeBreakpoint: const Breakpoint(beginWidth: 1600),
+              useDrawer: false,
+              selectedIndex: _selectedIndex,
+              onSelectedIndexChange: (int index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+              destinations: <NavigationDestination>[
+                NavigationDestination(
+                  icon: Icon(Icons.home),
+                  label: 'Quests',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.add),
+                  label: 'Add Quest',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.upload),
+                  label: 'Analyze Quest',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.search),
+                  label: 'Search Quests',
+                ),
+                if (roles != null && roles.contains('admin'))
+                  NavigationDestination(
+                    icon: Icon(Icons.people),
+                    label: 'List Users',
+                  ),
+              ],
+              smallBody: (_) => page,
+              body: (_) => page,
+              mediumLargeBody: (_) => page,
+              largeBody: (_) => page,
+              extraLargeBody: (_) => page,
+              // Define a default secondaryBody.
+              // Override the default secondaryBody during the smallBreakpoint to be
+              // empty. Must use AdaptiveScaffold.emptyBuilder to ensure it is properly
+              // overridden.
+              // smallSecondaryBody: AdaptiveScaffold.emptyBuilder,
+              // secondaryBody: (_) => Container(
+              //   color: const Color.fromARGB(255, 234, 158, 192),
+              // ),
+              // mediumLargeSecondaryBody: (_) => Container(
+              //   color: const Color.fromARGB(255, 234, 158, 192),
+              // ),
+              // largeSecondaryBody: (_) => Container(
+              //   color: const Color.fromARGB(255, 234, 158, 192),
+              // ),
+              // extraLargeSecondaryBody: (_) => Container(
+              //   color: const Color.fromARGB(255, 234, 158, 192),
+              // ),
+            );
+          } else {
+            return Center(child: Text("No roles found"));
+          }
+        });
   }
 }

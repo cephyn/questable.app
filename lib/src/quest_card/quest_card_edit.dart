@@ -61,7 +61,7 @@ class _AddQuestCardState extends State<EditQuestCard> {
           children: <Widget>[
             _buildTextField(
               label: 'Title',
-              initialValue: _questCard.title,
+              initialValue: Utils.capitalizeTitle(_questCard.title),
               onSaved: (value) => _questCard.title = value,
             ),
             _buildTextField(

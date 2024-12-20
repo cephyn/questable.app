@@ -19,7 +19,7 @@ class FirestoreService {
     String docId = "";
     await questCards.add({
       'id': questCard.generateUniqueHash(),
-      'title': questCard.title,
+      'title': questCard.title!.toLowerCase(),
       'gameSystem': questCard.gameSystem,
       'edition': questCard.edition,
       'level': questCard.level,
@@ -71,7 +71,7 @@ class FirestoreService {
   Future<void> updateQuestCard(String docId, QuestCard questCard) {
     return questCards.doc(docId).update({
       'id': questCard.generateUniqueHash(),
-      'title': questCard.title,
+      'title': questCard.title!.toLowerCase(),
       'gameSystem': questCard.gameSystem,
       'edition': questCard.edition,
       'level': questCard.level,
@@ -97,7 +97,7 @@ class FirestoreService {
     try {
       // Perform the query and wait for the results
       var querySnapshot =
-          await questCards.where("title", isEqualTo: title).get();
+          await questCards.where("title", isEqualTo: title.toLowerCase()).get();
       String? questId;
 
       // Iterate through the query results to get the document ID

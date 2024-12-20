@@ -135,7 +135,7 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
             child: ListTile(
               leading: Icon(Icons.book, color: Colors.indigo),
               title: Text(
-                item.title!,
+                Utils.capitalizeTitle(item.title),
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               onTap: () {

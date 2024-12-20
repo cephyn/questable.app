@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -21,7 +20,7 @@ class LocalUserList extends StatelessWidget {
     Utils.setBrowserTabTitle("List Users");
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quests'),
+        title: const Text('Users'),
       ),
       body: Center(
         child: StreamBuilder<QuerySnapshot>(
