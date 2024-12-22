@@ -165,7 +165,7 @@ class FirestoreService {
 
       if (!documentSnapshot.exists) {
         await userDocRef.set({
-          'roles': ['signup'],
+          'roles': ['user'],
           'email': email
         });
         await emailService.sendSignupEmailToAdmin(email);

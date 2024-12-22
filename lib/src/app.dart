@@ -1,6 +1,7 @@
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
+import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
       listenable: settingsController,
       builder: (BuildContext context, Widget? child) {
         return MaterialApp(
-          title: "Questable",
+          title: "Questable (Beta)",
           restorationScopeId: 'app',
           localizationsDelegates: const [
             AppLocalizations.delegate,
@@ -95,6 +96,13 @@ class _HomePageState extends State<HomePage> {
           ),
         ), // Center the title
         actions: [
+          KofiButton(
+              text: 'Support us on Ko-fi',
+              kofiName: "busywyvern",
+              kofiColor: KofiColor.Blue,
+              onDonation: () {
+                //print("On donation"); // Runs after the button has been pressed
+              }),
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
