@@ -36,6 +36,11 @@
 
 <body>
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    if (location.hostname === "localhost") {
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+  </script>
 </body>
 
 </html>

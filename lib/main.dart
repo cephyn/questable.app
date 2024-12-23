@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +27,10 @@ void main() async {
   final theme = ThemeDecoder.decodeThemeData(themeJson)!;
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FirebaseAppCheck.instance.activate(
+    webProvider:
+        ReCaptchaV3Provider('6Ld0AaQqAAAAAP8E4ZBQYrRqbx-XuG96a6ZP_xsT'),
+  );
   //FirebaseUIAuth.configureProviders([
   //  EmailAuthProvider(),
   // ... other providers

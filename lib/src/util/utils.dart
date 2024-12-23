@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class Utils {
   static void setBrowserTabTitle(String title) {
@@ -36,5 +38,17 @@ class Utils {
       if (word.isEmpty) return word;
       return word[0].toUpperCase() + word.substring(1).toLowerCase();
     }).join(' ');
+  }
+
+  static TextSpan createHyperlink(String url, String linkText) {
+    return TextSpan(
+      text: linkText,
+      style:
+          TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+      recognizer: TapGestureRecognizer()
+        ..onTap = () async {
+          await launchUrl(Uri.parse(url));
+        },
+    );
   }
 }

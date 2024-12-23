@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/user/local_user_list.dart';
+
 import 'auth/auth_gate.dart';
 import 'quest_card/quest_card_analyze.dart';
 import 'quest_card/quest_card_list_view.dart';
@@ -14,7 +15,6 @@ import 'quest_card/quest_card_search.dart';
 import 'services/firebase_auth_service.dart';
 import 'services/firestore_service.dart';
 import 'settings/settings_controller.dart';
-import 'settings/settings_view.dart';
 
 class MyApp extends StatelessWidget {
   final ThemeData theme;

@@ -58,11 +58,20 @@ class AuthGate extends StatelessWidget {
               );
             },
             footerBuilder: (context, action) {
-              return const Padding(
-                padding: EdgeInsets.only(top: 16),
-                child: Text(
-                  'By signing in, you agree to our terms and conditions.',
-                  style: TextStyle(color: Colors.grey),
+              return Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: RichText(
+                  text: TextSpan(
+                    children: <TextSpan>[
+                      TextSpan(
+                          text:
+                              'By signing in, you agree to our terms and conditions. All information listed in this website is user-generated or AI-generated and may not be accurate. Please use at your own risk. We do not verify the data listed for a Quest\'s content. Please verify the information before using it in your game. If you find the information is incorrect, please correct it. Please do not maliciously alter data. We reserve the right to remove any data we find to be incorrect or malicious. We reserve the right to ban users who maliciously alter data.'),
+                      Utils.createHyperlink(
+                          'mailto: admin@questable.app', 'Contact us '),
+                      TextSpan(text: 'for any questions or concerns.'),
+                    ],
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ),
               );
             },

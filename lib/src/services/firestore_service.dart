@@ -169,6 +169,7 @@ class FirestoreService {
           'email': email
         });
         await emailService.sendSignupEmailToAdmin(email);
+        await emailService.sendActivationEmail(email);
       }
     } catch (e) {
       log('Error storing user roles $userId: $e');

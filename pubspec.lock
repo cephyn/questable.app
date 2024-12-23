@@ -210,7 +210,7 @@ packages:
     source: hosted
     version: "8.1.6"
   firebase_app_check:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: firebase_app_check
       sha256: a43785ac59b3a7dc274c80369e36568dac0cda1122f42faa6ea76149e4953737

@@ -17,7 +17,7 @@ class EmailService {
         'name': 'noreply@questable.app'
       },
       'subject': 'New Questable Signup!',
-      'html': 'New signup from $userEmail',
+      'html': 'New signup for Questable.app from $userEmail',
     }).then((DocumentReference ref) {
       docId = ref.id;
     });
@@ -45,13 +45,10 @@ class EmailService {
       'to': [
         {'email': userEmail}
       ],
-      'from': {
-        'email': 'noreply@questable.app',
-        'name': 'noreply@questable.app'
-      },
+      'from': {'email': 'admin@questable.app', 'name': 'admin@questable.app'},
       'subject': 'Questable User Account Activated',
       'html':
-          'Hello! Thank you for signing up for alpha/beta testing of <a href=https://questable.app>Questable</a>. Your user account has been activated and you may log in!'
+          'Hello! Thank you for signing up for beta testing of <a href=https://questable.app>Questable</a>. Your user account has been activated and you may log in! Please let us know what features you would like to see in the app. Test out adventure analysis and let us know how it did! <br> <br> - The Questable Team',
     }).then((DocumentReference ref) {});
   }
 }
