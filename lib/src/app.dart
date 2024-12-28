@@ -1,14 +1,18 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
 import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/user/local_user_list.dart';
 
 import 'auth/auth_gate.dart';
+import 'auth/auth_widgets.dart';
 import 'quest_card/quest_card_analyze.dart';
 import 'quest_card/quest_card_list_view.dart';
 import 'quest_card/quest_card_search.dart';
@@ -87,76 +91,84 @@ class _HomePageState extends State<HomePage> {
         page = Placeholder();
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Questable',
-          style: TextStyle(
-            fontSize: 20, // Ensure the title does not get cut off
-          ),
-        ), // Center the title
-        actions: [
-          KofiButton(
-              text: 'Support us on Ko-fi',
-              kofiName: "busywyvern",
-              kofiColor: KofiColor.Blue,
-              onDonation: () {
-                //print("On donation"); // Runs after the button has been pressed
-              }),
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute<ProfileScreen>(
-                  builder: (context) => ProfileScreen(
-                    appBar: AppBar(
-                      title: const Text('User Profile'),
-                    ),
-                    actions: [
-                      SignedOutAction((context) {
-                        Navigator.of(context).pop();
-                      })
-                    ],
-                    children: [
-                      const Divider(),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: Image.asset('assets/images/QuestableY4x4.png'),
+    return StreamBuilder<User?>(
+        stream: auth.getAuthStateChanges(),
+        builder: (context, snapshot) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text(
+                'Questable',
+                style: TextStyle(
+                  fontSize: 20, // Ensure the title does not get cut off
+                ),
+              ), // Center the title
+              actions: [
+                KofiButton(
+                    text: 'Support us on Ko-fi',
+                    kofiName: "busywyvern",
+                    kofiColor: KofiColor.Blue,
+                    onDonation: () {
+                      //print("On donation"); // Runs after the button has been pressed
+                    }),
+                IconButton(
+                  icon: const Icon(Icons.person),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute<ProfileScreen>(
+                        builder: (context) => ProfileScreen(
+                          auth: auth.auth,
+                          appBar: AppBar(
+                            title: const Text('User Profile'),
+                          ),
+                          actions: [
+                            SignedOutAction((context) {
+                              Navigator.of(context).pop();
+                            })
+                          ],
+                          children: [
+                            AuthWidgets.signOutButton(context, auth),
+                            const Divider(),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: AspectRatio(
+                                aspectRatio: 1,
+                                child: Image.asset(
+                                    'assets/images/QuestableY4x4.png'),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-          // Uncomment if settings button is needed
-          // IconButton(
-          //   icon: const Icon(Icons.settings),
-          //   onPressed: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //         builder: (context) => SettingsView(
-          //           controller: widget.settingsController,
-          //         ),
-          //       ),
-          //     );
-          //   },
-          // ),
-          const SignOutButton(),
-        ],
-        automaticallyImplyLeading: false,
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return adaptiveNav(page);
-        },
-      ),
-    );
+                // Uncomment if settings button is needed
+                // IconButton(
+                //   icon: const Icon(Icons.settings),
+                //   onPressed: () {
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(
+                //         builder: (context) => SettingsView(
+                //           controller: widget.settingsController,
+                //         ),
+                //       ),
+                //     );
+                //   },
+                // ),
+                //const SignOutButton(),
+                AuthWidgets.signOutButton(context, auth)
+              ],
+              automaticallyImplyLeading: false,
+            ),
+            body: LayoutBuilder(
+              builder: (context, constraints) {
+                return adaptiveNav(page);
+              },
+            ),
+          );
+        });
   }
 
   FutureBuilder<List<String>?> adaptiveNav(Widget page) {

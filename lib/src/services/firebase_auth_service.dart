@@ -1,4 +1,3 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FirebaseAuthService {
@@ -10,5 +9,9 @@ class FirebaseAuthService {
 
   Stream<User?> getAuthStateChanges() {
     return auth.authStateChanges();
+  }
+
+  void signOut() async {
+    await auth.signOut();
   }
 }
