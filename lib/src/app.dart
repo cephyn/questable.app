@@ -1,12 +1,11 @@
+import 'dart:developer';
+
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_ui_auth/firebase_ui_auth.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
 import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/user/local_user_list.dart';
@@ -19,6 +18,8 @@ import 'quest_card/quest_card_search.dart';
 import 'services/firebase_auth_service.dart';
 import 'services/firestore_service.dart';
 import 'settings/settings_controller.dart';
+import 'user/firebase_user_profile.dart';
+import 'user/firebase_user_metadata.dart';
 
 class MyApp extends StatelessWidget {
   final ThemeData theme;
@@ -115,29 +116,31 @@ class _HomePageState extends State<HomePage> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute<ProfileScreen>(
-                        builder: (context) => ProfileScreen(
-                          auth: auth.auth,
-                          appBar: AppBar(
-                            title: const Text('User Profile'),
+                      MaterialPageRoute<FirebaseUserProfile>(
+                        builder: (context) => FirebaseUserProfileWidget(
+                          auth: auth,
+                          userProfile: FirebaseUserProfile(
+                            displayName: auth.getCurrentUser().displayName!,
+                            email: auth.getCurrentUser().email!,
+                            isEmailVerified:
+                                auth.getCurrentUser().emailVerified,
+                            isAnonymous: auth.getCurrentUser().isAnonymous,
+                            metadata: FirebaseUserMetadata(
+                                creationTime: auth
+                                    .getCurrentUser()
+                                    .metadata
+                                    .creationTime!,
+                                lastSignInTime: auth
+                                    .getCurrentUser()
+                                    .metadata
+                                    .lastSignInTime!),
+                            phoneNumber: auth.getCurrentUser().phoneNumber,
+                            photoURL: auth.getCurrentUser().photoURL,
+                            providerData: auth.getCurrentUser().providerData,
+                            refreshToken: auth.getCurrentUser().refreshToken!,
+                            tenantId: auth.getCurrentUser().tenantId,
+                            uid: auth.getCurrentUser().uid,
                           ),
-                          actions: [
-                            SignedOutAction((context) {
-                              Navigator.of(context).pop();
-                            })
-                          ],
-                          children: [
-                            AuthWidgets.signOutButton(context, auth),
-                            const Divider(),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: AspectRatio(
-                                aspectRatio: 1,
-                                child: Image.asset(
-                                    'assets/images/QuestableY4x4.png'),
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     );

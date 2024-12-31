@@ -7,11 +7,15 @@ class FirebaseAuthService {
     return auth.currentUser!;
   }
 
+  Future<void> deleteCurrentUser() async{
+    await auth.currentUser?.delete();
+  }
+
   Stream<User?> getAuthStateChanges() {
     return auth.authStateChanges();
   }
 
-  void signOut() async {
+  Future<void> signOut() async {
     await auth.signOut();
   }
 }
