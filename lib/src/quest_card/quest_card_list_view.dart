@@ -10,11 +10,12 @@ import 'package:quest_cards/src/services/firestore_service.dart';
 import '../util/utils.dart';
 
 class QuestCardListView extends StatelessWidget {
-  QuestCardListView({super.key});
   final FirestoreService firestoreService = FirestoreService();
   final FirebaseAuthService auth = FirebaseAuthService();
   final RoleBasedDeleteDocumentsButtons rbDeleteDocumentsButtons =
       RoleBasedDeleteDocumentsButtons();
+  final List<String> questCardList;
+  QuestCardListView({super.key, required this.questCardList});
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +55,7 @@ class QuestCardListView extends StatelessWidget {
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      "$count Quests Scribed",
+                      "$count Quests in System",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -79,7 +80,7 @@ class QuestCardListView extends StatelessWidget {
       ),
       body: Center(
         child: StreamBuilder<QuerySnapshot>(
-          stream: firestoreService.getQuestCardsStream(),
+          stream: firestoreService.getQuestCardsStream(questCardList),
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               List<QueryDocumentSnapshot> queryCardList = snapshot.data!.docs;

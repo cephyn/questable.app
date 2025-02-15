@@ -1,10 +1,7 @@
-import 'dart:developer';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
 import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
@@ -18,8 +15,8 @@ import 'quest_card/quest_card_search.dart';
 import 'services/firebase_auth_service.dart';
 import 'services/firestore_service.dart';
 import 'settings/settings_controller.dart';
-import 'user/firebase_user_profile.dart';
 import 'user/firebase_user_metadata.dart';
+import 'user/firebase_user_profile.dart';
 
 class MyApp extends StatelessWidget {
   final ThemeData theme;
@@ -36,7 +33,6 @@ class MyApp extends StatelessWidget {
           title: "Questable (Beta)",
           restorationScopeId: 'app',
           localizationsDelegates: const [
-            AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
@@ -44,9 +40,6 @@ class MyApp extends StatelessWidget {
           supportedLocales: const [
             Locale('en', ''),
           ],
-          onGenerateTitle: (BuildContext context) =>
-              AppLocalizations.of(context)!.appTitle,
-          theme: theme,
           home: AuthGate(),
         );
       },
@@ -72,7 +65,7 @@ class _HomePageState extends State<HomePage> {
     Widget page;
     switch (_selectedIndex) {
       case 0:
-        page = QuestCardListView();
+        page = QuestCardListView(questCardList: []);
         break;
       case 1:
         page = EditQuestCard(

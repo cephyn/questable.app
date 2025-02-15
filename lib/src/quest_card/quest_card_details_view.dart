@@ -59,6 +59,8 @@ class QuestCardDetailsView extends StatelessWidget {
                               'Page Length', questCard.pageLength!.toString()),
                           _buildInfoRow(
                               'Authors', questCard.authors?.join(', ')),
+                          _buildInfoRow(
+                              'Product Title', questCard.productTitle),
                           _buildInfoRow('Publisher', questCard.publisher),
                           _buildInfoRow(
                               'Publication Year', questCard.publicationYear),

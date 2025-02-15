@@ -26,6 +26,7 @@ void main() async {
   final theme = ThemeDecoder.decodeThemeData(themeJson)!;
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
   // await FirebaseAppCheck.instance.activate(
   //   webProvider:
   //       ReCaptchaV3Provider('6Ld0AaQqAAAAAP8E4ZBQYrRqbx-XuG96a6ZP_xsT'),

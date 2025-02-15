@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FirebaseAuthService {
@@ -7,7 +9,12 @@ class FirebaseAuthService {
     return auth.currentUser!;
   }
 
-  Future<void> deleteCurrentUser() async{
+  Future<String> getIdToken() async {
+    String? token = await auth.currentUser!.getIdToken();
+    return token!;
+  }
+
+  Future<void> deleteCurrentUser() async {
     await auth.currentUser?.delete();
   }
 

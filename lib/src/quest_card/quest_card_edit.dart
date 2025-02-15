@@ -92,6 +92,11 @@ class _AddQuestCardState extends State<EditQuestCard> {
               onSaved: (value) => _questCard.authors = value?.split(','),
             ),
             _buildTextField(
+              label: 'Product Title',
+              initialValue: Utils.capitalizeTitle(_questCard.productTitle),
+              onSaved: (value) => _questCard.productTitle = value,
+            ),
+            _buildTextField(
               label: 'Publisher',
               initialValue: _questCard.publisher,
               onSaved: (value) => _questCard.publisher = value,

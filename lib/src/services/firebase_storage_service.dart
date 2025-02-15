@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mime/mime.dart';
+
+import '../util/utils.dart';
 
 class FirebaseStorageService {
   final storage = FirebaseStorage.instance;
@@ -20,10 +23,27 @@ class FirebaseStorageService {
     fileName = file.name;
     var mimeType = lookupMimeType(file.name);
 
+    FirebaseStorage storage = FirebaseStorage.instance;
+    Reference ref = storage.ref().child('uploads/$fileName');
+    UploadTask uploadTask =
+        ref.putData(fileBytes, SettableMetadata(contentType: mimeType));
+    await uploadTask.whenComplete(() => null);
+    return await ref.getDownloadURL();
+  }
+
+  Future<String> uploadTextFile(String text) async {
+    Uint8List fileBytes;
+    String? fileName;
+
+    fileBytes = Uint8List.fromList(utf8.encode(text));
+    String randomFilename = Utils.generateRandomString(16);
+    fileName = 'QC$randomFilename.txt';
+    var mimeType = "text/plain";
 
     FirebaseStorage storage = FirebaseStorage.instance;
     Reference ref = storage.ref().child('uploads/$fileName');
-    UploadTask uploadTask = ref.putData(fileBytes, SettableMetadata(contentType: mimeType));
+    UploadTask uploadTask =
+        ref.putData(fileBytes, SettableMetadata(contentType: mimeType));
     await uploadTask.whenComplete(() => null);
     return await ref.getDownloadURL();
   }
@@ -33,13 +53,11 @@ class FirebaseStorageService {
     return storage.refFromURL(url);
   }
 
-  String getStorageUrl(Reference fileReference){
+  String getStorageUrl(Reference fileReference) {
     final bucket = fileReference.bucket;
     final fullPath = fileReference.fullPath;
     return 'gs://$bucket/$fullPath';
   }
 
   //TODO: Delete File
-  
-
 }

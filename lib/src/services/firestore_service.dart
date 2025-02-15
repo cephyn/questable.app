@@ -46,10 +46,13 @@ class FirestoreService {
   }
 
   //read
-  Stream<QuerySnapshot> getQuestCardsStream() {
-    final questCardsStream =
-        questCards.orderBy('title', descending: true).snapshots();
-    return questCardsStream;
+  Stream<QuerySnapshot> getQuestCardsStream(List<String> docIds) {
+    if(docIds.isEmpty) {
+      return questCards.orderBy('title', descending: true).snapshots();
+    }
+    else {
+      return questCards.where(FieldPath.documentId, whereIn: docIds).snapshots();
+    }
   }
 
   Future<int> getQuestCardsCount() async {
