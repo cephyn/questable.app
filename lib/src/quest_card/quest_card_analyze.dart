@@ -14,7 +14,6 @@ import '../services/firebase_vertexai_service.dart';
 import '../services/firestore_service.dart';
 import '../util/utils.dart';
 import 'quest_card.dart';
-import 'quest_card_edit.dart';
 import 'quest_card_list_view.dart';
 
 class QuestCardAnalyze extends StatefulWidget {
@@ -35,7 +34,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   final EmailService emailService = EmailService();
   final FirebaseFunctionsService functionsService = FirebaseFunctionsService();
 
-  String? docId;
+  List<String> docIds = [];
 
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -78,7 +77,11 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
                       future: autoAnalyzeFile(),
                       builder: (context, AsyncSnapshot<List<String>> snapshot) {
                         if (snapshot.hasData) {
-                          return Container();
+                          //log(snapshot.data!);
+                          docIds = snapshot.data!;
+                          return QuestCardListView(
+                            questCardList: docIds,
+                          );
                         } else {
                           return Center(child: CircularProgressIndicator());
                         }
@@ -200,8 +203,8 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
             //AI has determined it is not an adventure, send an email to admin
             emailService.sendNonAdventureEmailToAdmin(q.toJson().toString());
           }
-          //String docId = await firestoreService.addQuestCard(q);
-          //questCards.add(docId);
+          String docId = await firestoreService.addQuestCard(q);
+          questCards.add(docId);
         }
       }
       log(jsonEncode(questCardSchema));
