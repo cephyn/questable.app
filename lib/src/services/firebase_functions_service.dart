@@ -21,4 +21,25 @@ class FirebaseFunctionsService {
       rethrow; // Rethrow the exception after logging
     }
   }
+
+  Future<String> pdfToMd(PlatformFile platformFile) async {
+    String? url;
+    try {
+      url = await firebaseStorageService.uploadFile(platformFile);
+      var x = await FirebaseFunctions.instance
+          .httpsCallable('pdf_to_md')
+          .call({'url': url});
+      return x.data.toString();
+    } catch (e) {
+      // Handle network errors or exceptions during the call
+      log("Error in pdfToMd: $e");
+      rethrow;
+    } finally {
+      // Optionally, you can add cleanup code here if needed
+      // For example, deleting the uploaded file from Firebase Storage
+      if (url != null) {
+        await firebaseStorageService.deleteFile(url);
+      }
+    }
+  }
 }

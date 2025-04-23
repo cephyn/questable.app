@@ -7,176 +7,266 @@ import 'package:flutter/foundation.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart';
 
 import 'firebase_storage_service.dart';
+import 'dart:math' hide log;
 
+/// Service to interact with Firebase Vertex AI for RPG adventure extraction
 class FirebaseVertexaiService {
   final FirebaseStorageService firebaseStorageService =
       FirebaseStorageService();
-  late GenerativeModel model;
-  final String systemInstruction =
-      'You are an expert at extracting information from text documents and producing structured data. Correct any spelling mistakes. Your task is to extract relevant details from the provided text and output it in JSON format according to the provided response schema.';
-  late Schema returnSchema;
 
+  // AI configuration
   final String aiModel = 'gemini-2.0-flash';
+  final String systemInstruction =
+      'You are an expert at extracting RPG Adventures from text documents and producing structured data. Correct any spelling mistakes. Your task is to extract relevant details from the provided text and output it in JSON format according to the provided response schema. The definition of an RPG Adventure is: An RPG adventure is a narrative-driven scenario within a role-playing game where players guide characters through challenges and exploration to advance a storyline.';
 
-  FirebaseVertexaiService() {
-    Schema returnSchema = QuestCard.aiJsonSchema();
-    model = FirebaseVertexAI.instance.generativeModel(
-        model: aiModel,
-        generationConfig: GenerationConfig(
-            responseMimeType: 'application/json', responseSchema: returnSchema),
-        systemInstruction: Content.system(systemInstruction));
+  // Model generation parameters
+  final double temperature = 0.7;
+  final double topP = 0.95;
+  final int topK = 40;
+
+  /// Creates a GenerativeModel with the specified schema
+  GenerativeModel _createModel(Schema schema,
+      {bool setSystemInstruction = true}) {
+    return FirebaseVertexAI.instance.generativeModel(
+      model: aiModel,
+      generationConfig: GenerationConfig(
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+        temperature: temperature,
+        topP: topP,
+        topK: topK,
+      ),
+      systemInstruction:
+          setSystemInstruction ? Content.system(systemInstruction) : null,
+    );
   }
 
-  //set return schema
-
+  /// Analyze a single file and extract RPG adventure data
   Future<String> analyzeFile(String fileUrl) async {
-    //get file from storage
-    Reference fileReference = firebaseStorageService.getFileReference(fileUrl);
-    //get mime file type
-    final FullMetadata metadata = await fileReference.getMetadata();
-    final String? mimeType = metadata.contentType;
-    returnSchema = QuestCard.aiJsonSchema();
-    model = FirebaseVertexAI.instance.generativeModel(
-        model: aiModel,
-        generationConfig: GenerationConfig(
-            responseMimeType: 'application/json',
-            responseSchema: returnSchema));
+    try {
+      // Get file from storage
+      Reference fileReference =
+          firebaseStorageService.getFileReference(fileUrl)!;
 
-    //set prompt
-    final TextPart prompt = TextPart(
-        "Analyze this adventure for a role-playing game. Extract the information necessary to populate the fields in the response schema. Generate an empty string for the link field.");
+      // Get file metadata
+      final FullMetadata metadata = await fileReference.getMetadata();
+      final String? mimeType = metadata.contentType;
 
-    //send to AI
-    final filePart = FileData(
-        mimeType!, firebaseStorageService.getStorageUrl(fileReference));
-    final tokenCount = await model.countTokens([
-      Content.multi([prompt, filePart])
-    ]);
-    log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+      if (mimeType == null) {
+        throw Exception('Could not determine file mimetype');
+      }
 
-    final response = await model.generateContent([
-      Content.multi([prompt, filePart])
-    ]);
-    //delete file
-    await fileReference.delete();
+      // Configure model with single adventure schema
+      final Schema adventureSchema = QuestCard.aiJsonSchema();
+      final model = _createModel(adventureSchema);
 
-    //return reponse
-    //log(response.text!);
-    return response.text!;
+      // Set prompt and prepare file data
+      final TextPart prompt = TextPart(
+          "Analyze this adventure for a role-playing game. Extract the information necessary to populate the fields in the response schema. Generate an empty string for the link field.");
+      final filePart = FileData(
+          mimeType, firebaseStorageService.getStorageUrl(fileReference));
+
+      // Count tokens for logging
+      final tokenCount = await model.countTokens([
+        Content.multi([prompt, filePart])
+      ]);
+      log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+
+      // Generate content
+      final response = await model.generateContent([
+        Content.multi([prompt, filePart])
+      ]);
+
+      // Clean up: delete file after processing
+      await fileReference.delete();
+
+      // Return response text
+      return response.text ?? '{}';
+    } catch (e) {
+      log('Error in analyzeFile: $e');
+      return '{"error": "${e.toString().replaceAll('"', '\\"')}"}';
+    }
   }
 
+  /// Determine if the provided file contains a single adventure or multiple adventures
+  Future<Map<String, dynamic>> determineAdventureType(String url) async {
+    Reference? fileReference;
+    try {
+      fileReference = firebaseStorageService.getFileReference(url);
+      FullMetadata metadata = await fileReference!.getMetadata();
+      String? mimeType = metadata.contentType;
+
+      if (mimeType == null) {
+        throw Exception('Could not determine file mimetype');
+      }
+
+      Schema typeSchema = QuestCard.adventureTypeSchema();
+      TextPart prompt = TextPart(
+          "Determine if the file contains a single adventure or a collection of adventures. Return the type as defined in the response schema.");
+
+      Map<String, dynamic> adventureType =
+          await processAiRequest(typeSchema, mimeType, fileReference, prompt);
+
+      log('Adventure type determined: ${adventureType.toString()}');
+      return adventureType;
+    } catch (e) {
+      log('Error in determineAdventureType: $e');
+      return {'type': 'unknown', 'error': e.toString()};
+    }
+    // We don't delete the file here as it's needed for subsequent processing
+    // The calling method (autoAnalyzeFile in QuestCardAnalyze) will handle deletion
+    // through analyzeSingleFile or analyzeMultiFile
+  }
+
+  /// Process multiple adventures from a single file
   Future<List<Map<String, dynamic>>> analyzeMultiFileQueries(
       String fileUrl) async {
-    Schema returnSchema = QuestCard.aiJsonSchemaMulti();
-    model = FirebaseVertexAI.instance.generativeModel(
-        model: aiModel,
-        generationConfig: GenerationConfig(
-          responseMimeType: 'application/json',
-          responseSchema: returnSchema,
-        ));
     List<Map<String, dynamic>> allAdventures = [];
-    //get file from storage
-    Reference fileReference = firebaseStorageService.getFileReference(fileUrl);
-    //get mime file type
-    FullMetadata metadata = await fileReference.getMetadata();
-    String? mimeType = metadata.contentType;
+    Reference? fileReference;
 
-    // 1. Identify Title Pages
-    Map<String, dynamic> titlesMap =
-        await extractAdventureTitles(fileReference, mimeType!);
+    try {
+      // Get file reference and metadata
+      fileReference = firebaseStorageService.getFileReference(fileUrl);
+      FullMetadata metadata = await fileReference!.getMetadata();
+      String? mimeType = metadata.contentType;
 
-    log("Titles: $titlesMap");
-    List<String> titles = [];
-    for (Map<String, dynamic> title in titlesMap['titles']) {
-      titles.add(title['title']);
-    }
-    log("Titles: $titles");
-    //Add a boundary index for the last title
-    //2. Extract global information
-    Map<String, dynamic> globalInfo =
-        await extractGlobalInformation(fileReference, mimeType);
+      if (mimeType == null) {
+        throw Exception('Could not determine file mimetype');
+      }
 
-    //need to create a file of the subset of the text
-    //process the file
-    //delete the file
+      // 1. Identify title pages (adventure boundaries)
+      Map<String, dynamic> titlesMap =
+          await extractAdventureTitles(fileReference, mimeType);
+      log("Titles identified: ${titlesMap['titles']?.length ?? 0}");
 
-    // 3. Iterate and extract specific information for each adventure
-    log("Titles: ${titles.length}");
-    for (int i = 0; i < titles.length; i++) {
-      String title = titles[i];
-      log("Processing title: $i $title");
+      List<String> adventureTitles = [];
+      for (Map<String, dynamic> title in titlesMap['titles'] ?? []) {
+        adventureTitles.add(title['title']);
+      }
+
+      if (adventureTitles.isEmpty) {
+        log("No adventure titles found in document");
+        return [];
+      }
+
+      // 2. Extract global information applicable to all adventures
+      Map<String, dynamic> globalInfo =
+          await extractGlobalInformation(fileReference, mimeType);
+      log("Global info extracted: ${globalInfo.keys.join(', ')}");
+
+      // 3. Process each individual adventure
       Uint8List? downloadedText = await fileReference.getData();
-      String text = utf8.decode(downloadedText!);
-
-      log("searching for: $title");
-      int startIndex = text
-          .toLowerCase()
-          .lastIndexOf(title.toLowerCase()); //text.indexOf(startPhrase);
-
-      int endIndex = text.length - 1;
-
-      if (i != (titles.length - 1)) {
-        log("searching for: ${titles[i + 1]}");
-        endIndex = text.toLowerCase().lastIndexOf(titles[i + 1].toLowerCase());
+      if (downloadedText == null) {
+        throw Exception('Could not download file data');
       }
 
-      log("final indices: $startIndex $endIndex");
-      if (startIndex >= endIndex || startIndex == -1 || endIndex == -1) {
-        //skip
-        log("Skipping title: $title - $startIndex greater than $endIndex");
-      } else {
-        String subText = text.substring(startIndex, endIndex);
-        //log("Subtext: $subText");
-        String subUrl = await firebaseStorageService.uploadTextFile(subText);
+      String fullText = utf8.decode(downloadedText);
+      List<String> lines;
+      lines = fullText.split(RegExp(r'\r?\n'));
+      if (lines.isNotEmpty && lines.last.isEmpty) {
+        lines.removeLast();
+      }
+      // --- Find Adventure Starts ---
+      final adventureStarts = _findAdventureStarts(lines, adventureTitles);
+      final numAdventures = adventureStarts.length;
+
+      for (int i = 0; i < numAdventures; i++) {
+        final startLineNum = adventureStarts[i].key;
+        final title = adventureStarts[i].value;
+
+        // Determine the end line number for the current adventure
+        final int endLineNum;
+        if (i < numAdventures - 1) {
+          // End line is the line *before* the next adventure starts
+          endLineNum = adventureStarts[i + 1].key;
+        } else {
+          // This is the last adventure, so it goes to the end of the file
+          endLineNum = lines.length;
+        }
+        if (startLineNum >= endLineNum) {
+          log("  Warning: No content found for '$title' (start line ${startLineNum + 1} >= end line $endLineNum). Skipping.");
+          continue;
+        }
+        final adventureContentLines = lines.sublist(startLineNum, endLineNum);
+        final adventureContent = adventureContentLines.join('\n');
+
+        String subUrl =
+            await firebaseStorageService.uploadTextFile(adventureContent);
         Reference subFileReference =
-            firebaseStorageService.getFileReference(subUrl);
+            firebaseStorageService.getFileReference(subUrl)!;
 
-        Map<String, dynamic> adventureObject = {
-          "id": "", //You may set a specific method of id generation here
-          "title": title,
-          "productTitle": globalInfo["productTitle"],
-          "gameSystem": globalInfo["gameSystem"],
-          "publisher": globalInfo["publisher"],
-          "edition": globalInfo["edition"],
-          "publicationYear": globalInfo["publicationYear"],
-          "link":
-              "" //You would extract this with an additional step based on the link pattern within the document
-        };
+        try {
+          // Create adventure object with global info
+          Map<String, dynamic> adventureObject = {
+            "id": "", // ID generation would happen elsewhere
+            "title": title,
+            "productTitle": globalInfo["productTitle"] ?? "",
+            "gameSystem": globalInfo["gameSystem"] ?? "",
+            "publisher": globalInfo["publisher"] ?? "",
+            "edition": globalInfo["edition"] ?? "",
+            "publicationYear": globalInfo["publicationYear"] ?? "",
+            "link": ""
+          };
 
-        Map<String, dynamic> individualData =
-            await extractIndividualInformation(subFileReference, mimeType,
-                title); //Extract individual information
-        adventureObject.addAll(individualData);
-        //await subFileReference.delete();
-        allAdventures.add(adventureObject);
+          // Extract adventure-specific information
+          Map<String, dynamic> individualData =
+              await extractIndividualInformation(
+                  subFileReference, mimeType, title);
+
+          // Use global authors if individual authors aren't specified
+          if ((individualData['authors'] ?? "").isEmpty) {
+            individualData['authors'] = globalInfo['authors'] ?? "";
+          }
+
+          // Merge global and individual data
+          adventureObject.addAll(individualData);
+          allAdventures.add(adventureObject);
+        } catch (e) {
+          log("Error processing adventure '$title': $e");
+        } finally {
+          // Clean up temporary files
+          await subFileReference
+              .delete()
+              .catchError((e) => log("Error deleting temp file: $e"));
+        }
+      }
+
+      log("Successfully processed ${allAdventures.length} adventures");
+      return allAdventures;
+    } catch (e) {
+      log("Error in analyzeMultiFileQueries: $e");
+      return [];
+    } finally {
+      // Clean up the original file
+      if (fileReference != null) {
+        await fileReference
+            .delete()
+            .catchError((e) => log("Error deleting file: $e"));
       }
     }
-    //delete file
-
-    await fileReference.delete();
-    log(allAdventures.toString());
-    return allAdventures;
   }
 
+  /// Extract titles of all adventures in the document
   Future<Map<String, dynamic>> extractAdventureTitles(
       Reference fileReference, String mimeType) async {
-    TextPart prompt = TextPart('''
-Your task is to identify individual adventure scenarios within the provided text. For each adventure, extract the following information: title: The title of the adventure scenario. This is typically a short phrase in all caps or title case, often followed by a level range indication (e.g., "FOUR 1ST- TO 2ND-LEVEL PCS").
-''');
-    Schema returnSchema = Schema.object(properties: {
+    Schema titleSchema = Schema.object(properties: {
       'titles': Schema.array(
           items: Schema.object(properties: {
         'title': Schema.string(description: 'Title of a specific adventure.'),
       }))
     });
 
-    return await processAiRequest(returnSchema, mimeType, fileReference,
-        prompt); //Return a list of adventure titles.
+    TextPart prompt = TextPart('''
+Your task is to identify individual adventure scenarios within the provided text. For each adventure, extract the following information: title: The title of the adventure scenario. This is typically a short phrase in all caps or title case, often followed by a level range indication (e.g., "FOUR 1ST- TO 2ND-LEVEL PCS").
+''');
+
+    return await processAiRequest(titleSchema, mimeType, fileReference, prompt);
   }
 
+  /// Extract global information applicable to all adventures in the document
   Future<Map<String, dynamic>> extractGlobalInformation(
       Reference fileReference, String mimeType) async {
-    Schema returnSchema = QuestCard.globalQuestData();
+    Schema globalSchema = QuestCard.globalQuestData();
     TextPart prompt = TextPart('''
 Extract and format key game information from the provided document.
 
@@ -189,6 +279,7 @@ Instructions:
     *   **Product Title:** The title of the document or product.
     *   **Publication Year:** The year the document was published or released. Extract only the year as a four-digit number (e.g., 2023, not "Copyright 2023").
     *   **Link:** The URL or web address of the document, if available. Ensure it is a valid URL.
+    *   **Authors:** The names of the adventure's authors or creators.
 
 2. **Handle missing or ambiguous information:**
 
@@ -203,13 +294,14 @@ Instructions:
 4. **Return a JSON object according to the provided response schema. Provide *only* the JSON output. Do not include any additional explanations or commentary.**
         ''');
 
-    return await processAiRequest(returnSchema, mimeType, fileReference,
-        prompt); // return those keys with their values in a map object
+    return await processAiRequest(
+        globalSchema, mimeType, fileReference, prompt);
   }
 
+  /// Extract information specific to an individual adventure
   Future<Map<String, dynamic>> extractIndividualInformation(
       Reference fileReference, String mimeType, String title) async {
-    Schema returnSchema = QuestCard.individualQuestData();
+    Schema individualSchema = QuestCard.individualQuestData();
     TextPart prompt = TextPart('''
 Extract and format key information about the adventure titled "$title" from the provided document.
 
@@ -241,51 +333,104 @@ Instructions:
 4. **Return a JSON object according to the provided schema: Provide *only* the JSON output. Do not include any additional explanations or commentary.**
 ''');
 
-    return await processAiRequest(returnSchema, mimeType, fileReference,
-        prompt); // return those keys with their values in a map object
+    return await processAiRequest(
+        individualSchema, mimeType, fileReference, prompt);
   }
 
-  Future<Map<String, dynamic>> determineAdventureType(String url) async {
-    //get file from storage
-    Reference fileReference = firebaseStorageService.getFileReference(url);
-    //get mime file type
-    FullMetadata metadata = await fileReference.getMetadata();
-    String? mimeType = metadata.contentType;
-    returnSchema = QuestCard.adventureTypeSchema();
-    TextPart prompt = TextPart(
-        "Determine if the file contains a single adventure or a collection of adventures. Return the type as defined in the response schema.");
-    Map<String, dynamic> adventureType =
-        await processAiRequest(returnSchema, mimeType!, fileReference, prompt);
-    log(adventureType.toString());
-    return adventureType;
-  }
-
-  Future<dynamic> processAiRequest(Schema returnSchema, String mimeType,
+  /// Generic method to make AI requests with proper error handling
+  Future<Map<String, dynamic>> processAiRequest(Schema schema, String mimeType,
       Reference fileReference, TextPart prompt) async {
-    model = FirebaseVertexAI.instance.generativeModel(
-      model: aiModel,
-      generationConfig: GenerationConfig(
-        responseMimeType: 'application/json',
-        responseSchema: returnSchema,
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-      ),
-      systemInstruction: Content.system(systemInstruction),
-    );
-    //Make an API call to classify the document segment.
-    FileData filePart =
-        FileData(mimeType, firebaseStorageService.getStorageUrl(fileReference));
-    var tokenCount = await model.countTokens([
-      Content.multi([prompt, filePart])
-    ]);
+    try {
+      GenerativeModel requestModel = _createModel(schema);
 
-    log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+      // Create file part for the model
+      FileData filePart = FileData(
+          mimeType, firebaseStorageService.getStorageUrl(fileReference));
 
-    var response = await model.generateContent([
-      Content.multi([prompt, filePart])
-    ]);
-    //log(response.text!);
-    return jsonDecode(response.text!);
+      // Get token counts for monitoring/logging
+      var tokenCount = await requestModel.countTokens([
+        Content.multi([prompt, filePart])
+      ]);
+
+      log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+
+      // Make the actual API request
+      var response = await requestModel.generateContent([
+        Content.multi([prompt, filePart])
+      ]);
+
+      if (response.text == null || response.text!.isEmpty) {
+        return {'error': 'Empty response from AI model'};
+      }
+
+      return jsonDecode(response.text!);
+    } catch (e) {
+      log('Error in AI request processing: $e');
+      return {'error': e.toString()};
+    }
+  }
+
+  // --- Helper Function to Find Adventure Start Lines ---
+  List<MapEntry<int, String>> _findAdventureStarts(
+      List<String> lines, List<String> adventureTitles) {
+    // Map: Original Title -> List of line numbers where it was found
+    final foundOccurrences = <String, List<int>>{};
+    // Map: Normalized Title (lowercase, trimmed) -> Original Title
+    final normalizedTitles = <String, String>{};
+
+    for (final title in adventureTitles) {
+      normalizedTitles[title.trim().toLowerCase()] = title;
+      // Initialize occurrence list for each expected title
+      foundOccurrences[title] = [];
+    }
+
+    log("Scanning file for titles...");
+    for (int i = 0; i < lines.length; i++) {
+      final normalizedLine = lines[i].trim().toLowerCase();
+
+      // Check if the normalized line exactly matches a normalized title
+      if (normalizedTitles.containsKey(normalizedLine)) {
+        final originalTitle = normalizedTitles[normalizedLine]!;
+        foundOccurrences[originalTitle]!.add(i);
+        // print("  Found potential title '$originalTitle' on line ${i + 1}");
+      }
+      // Optional: Add more sophisticated matching here if needed
+    }
+
+    log("\nDetermining likely start lines based on last occurrence...");
+    final potentialStarts = <MapEntry<int, String>>[];
+    final foundTitles = <String>{};
+
+    foundOccurrences.forEach((title, lineNumbers) {
+      if (lineNumbers.isNotEmpty) {
+        // Heuristic: Assume the *last* occurrence marks the start
+        final startLine = lineNumbers.reduce(max); // Find the max line number
+        potentialStarts.add(MapEntry(startLine, title));
+        foundTitles.add(title);
+        log("  Selected line ${startLine + 1} as start for '$title'");
+      }
+    });
+
+    // Report any titles that were *never* found
+    for (final expectedTitle in adventureTitles) {
+      if (!foundTitles.contains(expectedTitle)) {
+        log("  WARNING: Title '$expectedTitle' not found in the text.");
+      }
+    }
+
+    if (potentialStarts.isEmpty) {
+      log("ERROR: No adventure titles were found matching the heuristic in the file.");
+      return [];
+    }
+
+    // Sort the identified starts by line number (the MapEntry key)
+    potentialStarts.sort((a, b) => a.key.compareTo(b.key));
+
+    log("\nIdentified adventure start points (sorted):");
+    for (final entry in potentialStarts) {
+      log("  Line ${entry.key + 1}: ${entry.value}");
+    }
+
+    return potentialStarts;
   }
 }

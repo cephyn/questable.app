@@ -79,11 +79,13 @@ class QuestCardListView extends StatelessWidget {
         ),
       ),
       body: Center(
-        child: StreamBuilder<QuerySnapshot>(
+        child: StreamBuilder<List<QueryDocumentSnapshot>>(
+          // Updated type argument
           stream: firestoreService.getQuestCardsStream(questCardList),
           builder: (context, snapshot) {
             if (snapshot.hasData) {
-              List<QueryDocumentSnapshot> queryCardList = snapshot.data!.docs;
+              List<QueryDocumentSnapshot> queryCardList =
+                  snapshot.data!; // Directly use snapshot.data
               return ListView.builder(
                 padding: const EdgeInsets.all(8),
                 itemCount: queryCardList.length,

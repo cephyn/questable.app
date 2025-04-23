@@ -5,6 +5,7 @@ import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
+import 'package:quest_cards/src/quest_card/quest_card_details_view.dart'; // Import the details view
 import 'package:quest_cards/src/user/local_user_list.dart';
 
 import 'auth/auth_gate.dart';
@@ -41,6 +42,16 @@ class MyApp extends StatelessWidget {
             Locale('en', ''),
           ],
           home: AuthGate(),
+          // Define routes for navigation
+          routes: {
+            '/questCardDetails': (context) {
+              // Extract arguments and pass to details view
+              final args = ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+              final docId = args['docId'] as String;
+              return QuestCardDetailsView(docId: docId);
+            },
+          },
         );
       },
     );

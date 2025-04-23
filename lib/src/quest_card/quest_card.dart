@@ -211,6 +211,9 @@ class QuestCard {
       'link': Schema.string(
           //format: 'uri',
           description: 'The URL or web address of the document, if available.'),
+      'authors': Schema.array(
+          items: Schema.string(),
+          description: 'The author(s) of the adventure.'),
     });
   }
 
