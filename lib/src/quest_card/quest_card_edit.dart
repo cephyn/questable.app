@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
@@ -18,142 +20,269 @@ class EditQuestCard extends StatefulWidget {
 
 class _AddQuestCardState extends State<EditQuestCard> {
   final _formKey = GlobalKey<FormState>();
-  QuestCard _questCard = QuestCard();
+  late QuestCard
+      _questCard; // Changed from nullable to non-nullable with late initialization
+  bool _isLoading = true;
   final FirestoreService firestoreService = FirestoreService();
 
   @override
   void initState() {
     super.initState();
+    // Initialize with an empty quest card to avoid null issues
+    _questCard = QuestCard();
+
+    // Load data from Firestore if editing an existing card
+    if (widget.docId.isNotEmpty) {
+      _loadQuestCardData();
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Separate method to load quest card data
+  void _loadQuestCardData() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('questCards')
+          .doc(widget.docId)
+          .get();
+
+      if (snapshot.exists) {
+        Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
+        setState(() {
+          _questCard = QuestCard.fromJson(data);
+          _questCard.id = data['id']; // Ensure ID is preserved
+          _isLoading = false;
+          log('Loaded quest card: ${_questCard.toJson()}');
+        });
+      } else {
+        log('Document does not exist: ${widget.docId}');
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      log('Error loading quest card: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     Utils.setBrowserTabTitle("Edit Quest");
-    if (widget.docId != '') {
-      return StreamBuilder<DocumentSnapshot>(
-          stream: firestoreService.getQuestCardStream(widget.docId),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              Map<String, dynamic> data =
-                  snapshot.data!.data() as Map<String, dynamic>;
-              _questCard = QuestCard.fromJson(data);
-            } else {
-              return const CircularProgressIndicator();
-            }
-            return Scaffold(
-                appBar: AppBar(
-                  title: Text('Edit Quest Card'),
-                ),
-                body: getQuestCardForm(context, widget.docId));
-          });
-    } else {
-      return Scaffold(body: getQuestCardForm(context, null));
+
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Edit Quest Card'),
+      ),
+      body: getQuestCardForm(context, widget.docId),
+    );
   }
 
-  Form getQuestCardForm(BuildContext context, String? docId) {
-    //final settingsController = Provider.of<SettingsController>(context);
+  Form getQuestCardForm(BuildContext context, String docId) {
+    // Important: We now use a local controller for each field to track changes
+    final titleController =
+        TextEditingController(text: Utils.capitalizeTitle(_questCard.title));
+    final gameSystemController =
+        TextEditingController(text: _questCard.gameSystem);
+    final editionController = TextEditingController(text: _questCard.edition);
+    final levelController = TextEditingController(text: _questCard.level);
+    final pageLengthController =
+        TextEditingController(text: _questCard.pageLength?.toString() ?? '');
+    final authorsController =
+        TextEditingController(text: _questCard.authors?.join(", ") ?? '');
+    final productTitleController = TextEditingController(
+        text: Utils.capitalizeTitle(_questCard.productTitle));
+    final publisherController =
+        TextEditingController(text: _questCard.publisher);
+    final yearController =
+        TextEditingController(text: _questCard.publicationYear);
+    final genreController = TextEditingController(text: _questCard.genre);
+    final settingController = TextEditingController(text: _questCard.setting);
+    final environmentsController =
+        TextEditingController(text: _questCard.environments?.join(", ") ?? '');
+    final linkController = TextEditingController(text: _questCard.link ?? '');
+    final bossVillainsController =
+        TextEditingController(text: _questCard.bossVillains?.join(", ") ?? '');
+    final commonMonstersController = TextEditingController(
+        text: _questCard.commonMonsters?.join(", ") ?? '');
+    final notableItemsController =
+        TextEditingController(text: _questCard.notableItems?.join(", ") ?? '');
+    final summaryController = TextEditingController(text: _questCard.summary);
+
+    // Add disposal of controllers
+    Future.microtask(() {
+      // Add disposal of controllers when widget is removed from tree
+      for (final controller in [
+        titleController,
+        gameSystemController,
+        editionController,
+        levelController,
+        pageLengthController,
+        authorsController,
+        productTitleController,
+        publisherController,
+        yearController,
+        genreController,
+        settingController,
+        environmentsController,
+        linkController,
+        bossVillainsController,
+        commonMonstersController,
+        notableItemsController,
+        summaryController
+      ]) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) controller.dispose();
+        });
+      }
+    });
+
     return Form(
       key: _formKey,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: <Widget>[
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Title',
-              initialValue: Utils.capitalizeTitle(_questCard.title),
-              onSaved: (value) => _questCard.title = value,
+              controller: titleController,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a title';
+                }
+                return null;
+              },
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Game System',
-              initialValue: _questCard.gameSystem,
-              onSaved: (value) => _questCard.gameSystem = value,
+              controller: gameSystemController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Edition',
-              initialValue: _questCard.edition,
-              onSaved: (value) => _questCard.edition = value,
+              controller: editionController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Level',
-              initialValue: _questCard.level,
-              onSaved: (value) => _questCard.level = value,
+              controller: levelController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Page Length',
-              initialValue: _questCard.pageLength?.toString(),
+              controller: pageLengthController,
               keyboardType: TextInputType.number,
-              onSaved: (value) =>
-                  _questCard.pageLength = int.tryParse(value ?? ''),
             ),
-            _buildTextField(
-              label: 'Authors',
-              initialValue: _questCard.authors?.join(", "),
-              onSaved: (value) => _questCard.authors = value?.split(','),
+            _buildTextFieldWithController(
+              label: 'Authors (comma-separated)',
+              controller: authorsController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
+              label: 'Product Title',
+              controller: productTitleController,
+            ),
+            _buildTextFieldWithController(
               label: 'Publisher',
-              initialValue: _questCard.publisher,
-              onSaved: (value) => _questCard.publisher = value,
+              controller: publisherController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Publication Year',
-              initialValue: _questCard.publicationYear,
-              onSaved: (value) => _questCard.publicationYear = value,
+              controller: yearController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Genre',
-              initialValue: _questCard.genre,
-              onSaved: (value) => _questCard.genre = value,
+              controller: genreController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Setting',
-              initialValue: _questCard.setting,
-              onSaved: (value) => _questCard.setting = value,
+              controller: settingController,
             ),
-            _buildTextField(
-              label: 'Environments',
-              initialValue: _questCard.environments?.join(", "),
-              onSaved: (value) => _questCard.environments = value?.split(','),
+            _buildTextFieldWithController(
+              label: 'Environments (comma-separated)',
+              controller: environmentsController,
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Product Link',
-              initialValue: _questCard.link,
-              onSaved: (value) => _questCard.link = value,
+              controller: linkController,
             ),
-            _buildTextField(
-              label: 'Boss Villains',
-              initialValue: _questCard.bossVillains?.join(", "),
-              onSaved: (value) => _questCard.bossVillains = value?.split(','),
+            _buildTextFieldWithController(
+              label: 'Boss Villains (comma-separated)',
+              controller: bossVillainsController,
             ),
-            _buildTextField(
-              label: 'Common Monsters',
-              initialValue: _questCard.commonMonsters?.join(", "),
-              onSaved: (value) => _questCard.commonMonsters = value?.split(','),
+            _buildTextFieldWithController(
+              label: 'Common Monsters (comma-separated)',
+              controller: commonMonstersController,
             ),
-            _buildTextField(
-              label: 'Notable Items',
-              initialValue: _questCard.notableItems?.join(", "),
+            _buildTextFieldWithController(
+              label: 'Notable Items (comma-separated)',
+              controller: notableItemsController,
               maxLines: null,
-              onSaved: (value) => _questCard.notableItems = value?.split(','),
             ),
-            _buildTextField(
+            _buildTextFieldWithController(
               label: 'Summary',
-              initialValue: _questCard.summary,
+              controller: summaryController,
               maxLines: null,
-              onSaved: (value) => _questCard.summary = value,
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: ElevatedButton(
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
-                    _formKey.currentState?.save();
-                    if (docId == null) {
+                    // Debug values before update
+                    log('Before update - Title: ${_questCard.title}');
+
+                    // Directly update the quest card from controllers
+                    _questCard.title = titleController.text;
+                    _questCard.gameSystem = gameSystemController.text;
+                    _questCard.edition = editionController.text;
+                    _questCard.level = levelController.text;
+                    _questCard.pageLength =
+                        int.tryParse(pageLengthController.text);
+                    _questCard.authors =
+                        _processListField(authorsController.text);
+                    _questCard.productTitle = productTitleController.text;
+                    _questCard.publisher = publisherController.text;
+                    _questCard.publicationYear = yearController.text;
+                    _questCard.genre = genreController.text;
+                    _questCard.setting = settingController.text;
+                    _questCard.environments =
+                        _processListField(environmentsController.text);
+                    _questCard.link = linkController.text;
+                    _questCard.bossVillains =
+                        _processListField(bossVillainsController.text);
+                    _questCard.commonMonsters =
+                        _processListField(commonMonstersController.text);
+                    _questCard.notableItems =
+                        _processListField(notableItemsController.text);
+                    _questCard.summary = summaryController.text;
+
+                    // Debug values after update to confirm changes
+                    log('After update - Title: ${_questCard.title}');
+                    log('After update - Game System: ${_questCard.gameSystem}');
+                    log('After update - Authors: ${_questCard.authors}');
+
+                    // Full card logging for debugging
+                    log('Saving updated quest card: ${_questCard.toJson()}');
+
+                    // Save to Firestore
+                    if (docId.isEmpty) {
                       firestoreService.addQuestCard(_questCard);
                     } else {
+                      log('Updating card with docId: $docId');
                       firestoreService.updateQuestCard(docId, _questCard);
                     }
+
+                    // Navigate with the correct docId
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -172,12 +301,25 @@ class _AddQuestCardState extends State<EditQuestCard> {
     );
   }
 
-  Widget _buildTextField({
+  // Helper method to process comma-separated list fields
+  List<String>? _processListField(String? value) {
+    if (value == null || value.isEmpty) {
+      return [];
+    }
+    return value
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  // Updated to use TextEditingController instead of initialValue and onSaved
+  Widget _buildTextFieldWithController({
     required String label,
-    String? initialValue,
+    required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     int? maxLines = 1,
-    required FormFieldSetter<String?> onSaved,
+    String? Function(String?)? validator,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -186,10 +328,10 @@ class _AddQuestCardState extends State<EditQuestCard> {
           labelText: label,
           border: OutlineInputBorder(),
         ),
-        initialValue: initialValue,
+        controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
-        onSaved: onSaved,
+        validator: validator,
       ),
     );
   }

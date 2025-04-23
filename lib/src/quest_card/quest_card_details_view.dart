@@ -8,9 +8,11 @@ import '../util/utils.dart';
 import 'quest_card.dart';
 import 'quest_card_edit.dart';
 
-/// Displays detailed information about a SampleItem.
+/// Displays detailed information about a QuestCard.
 class QuestCardDetailsView extends StatelessWidget {
-  const QuestCardDetailsView({super.key});
+  final String? docId;
+
+  const QuestCardDetailsView({super.key, this.docId});
 
   @override
   Widget build(BuildContext context) {
@@ -18,100 +20,105 @@ class QuestCardDetailsView extends StatelessWidget {
     QuestCard questCard = QuestCard();
     final FirestoreService firestoreService = FirestoreService();
 
-    if (ModalRoute.of(context)?.settings.arguments != null) {
+    // Use docId from constructor if provided, otherwise try to get from route arguments
+    String? questDocId = docId;
+
+    if (questDocId == null &&
+        ModalRoute.of(context)?.settings.arguments != null) {
       final Map<String, dynamic> args =
           ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-      if (args['docId'] != null) {
-        return StreamBuilder<DocumentSnapshot>(
-            stream: firestoreService.getQuestCardStream(args['docId']),
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                Map<String, dynamic> data =
-                    snapshot.data!.data() as Map<String, dynamic>;
-                questCard = QuestCard.fromJson(data);
-              } else {
-                return const CircularProgressIndicator();
-              }
-              return Scaffold(
-                appBar: AppBar(
-                  title: Text('Quest Card Details'),
-                ),
-                body: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: ListView(
-                        children: [
-                          Text(
-                            'Title: ${Utils.capitalizeTitle(questCard.title)}',
-                            style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.indigo),
-                          ),
-                          SizedBox(height: 16),
-                          Divider(),
-                          _buildInfoRow('Game System', questCard.gameSystem),
-                          _buildInfoRow('Edition', questCard.edition),
-                          _buildInfoRow('Level', questCard.level),
-                          _buildInfoRow(
-                              'Page Length', questCard.pageLength!.toString()),
-                          _buildInfoRow(
-                              'Authors', questCard.authors?.join(', ')),
-                          _buildInfoRow('Publisher', questCard.publisher),
-                          _buildInfoRow(
-                              'Publication Year', questCard.publicationYear),
-                          _buildInfoRow('Genre', questCard.genre),
-                          _buildInfoRow('Setting', questCard.setting),
-                          _buildInfoRow('Environments',
-                              questCard.environments?.join(', ')),
-                          _buildInfoLinkRow(
-                              'Product Link', questCard.title!, questCard.link),
-                          _buildInfoRow('Boss Villains',
-                              questCard.bossVillains?.join(', ')),
-                          _buildInfoRow('Common Monsters',
-                              questCard.commonMonsters?.join(', ')),
-                          _buildInfoRow('Notable Items',
-                              questCard.notableItems?.join(', ')),
-                          SizedBox(height: 16),
-                          Text(
-                            'Summary:',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.indigo),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            questCard.summary ?? 'N/A',
-                            style:
-                                TextStyle(fontSize: 16, color: Colors.black87),
-                          ),
-                        ],
-                      ),
+      questDocId = args['docId'] as String?;
+    }
+
+    if (questDocId != null) {
+      return StreamBuilder<DocumentSnapshot>(
+          stream: firestoreService.getQuestCardStream(questDocId),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              Map<String, dynamic> data =
+                  snapshot.data!.data() as Map<String, dynamic>;
+              questCard = QuestCard.fromJson(data);
+            } else {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return Scaffold(
+              appBar: AppBar(
+                title: Text('Quest Card Details'),
+              ),
+              body: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ListView(
+                      children: [
+                        Text(
+                          'Title: ${Utils.capitalizeTitle(questCard.title)}',
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.indigo),
+                        ),
+                        SizedBox(height: 16),
+                        Divider(),
+                        _buildInfoRow('Game System', questCard.gameSystem),
+                        _buildInfoRow('Edition', questCard.edition),
+                        _buildInfoRow('Level', questCard.level),
+                        _buildInfoRow(
+                            'Page Length', questCard.pageLength!.toString()),
+                        _buildInfoRow('Authors', questCard.authors?.join(', ')),
+                        _buildInfoRow('Product Title', questCard.productTitle),
+                        _buildInfoRow('Publisher', questCard.publisher),
+                        _buildInfoRow(
+                            'Publication Year', questCard.publicationYear),
+                        _buildInfoRow('Genre', questCard.genre),
+                        _buildInfoRow('Setting', questCard.setting),
+                        _buildInfoRow(
+                            'Environments', questCard.environments?.join(', ')),
+                        _buildInfoLinkRow(
+                            'Product Link', questCard.title!, questCard.link),
+                        _buildInfoRow('Boss Villains',
+                            questCard.bossVillains?.join(', ')),
+                        _buildInfoRow('Common Monsters',
+                            questCard.commonMonsters?.join(', ')),
+                        _buildInfoRow('Notable Items',
+                            questCard.notableItems?.join(', ')),
+                        SizedBox(height: 16),
+                        Text(
+                          'Summary:',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.indigo),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          questCard.summary ?? 'N/A',
+                          style: TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                floatingActionButton: FloatingActionButton(
-                  tooltip: 'Edit',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditQuestCard(
-                          docId: args['docId'],
-                        ),
+              ),
+              floatingActionButton: FloatingActionButton(
+                tooltip: 'Edit',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditQuestCard(
+                        docId: questDocId!,
                       ),
-                    );
-                  },
-                  child: const Icon(Icons.edit),
-                ),
-              );
-            });
-      } else {
-        return Scaffold(body: Placeholder());
-      }
+                    ),
+                  );
+                },
+                child: const Icon(Icons.edit),
+              ),
+            );
+          });
     } else {
       return Scaffold(body: Placeholder());
     }

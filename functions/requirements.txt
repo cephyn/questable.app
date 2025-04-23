@@ -1,0 +1,5 @@
+firebase_functions~=0.1.0
+pypdf
+google.api_core
+google.cloud
+markitdown[pdf,docx]

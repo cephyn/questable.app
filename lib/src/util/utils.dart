@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:html' as html;
@@ -10,6 +12,15 @@ class Utils {
     if (kIsWeb) {
       html.document.title = title;
     }
+  }
+
+  static String generateRandomString(int length) {
+    const characters =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    return List.generate(
+            length, (index) => characters[random.nextInt(characters.length)])
+        .join();
   }
 
   static AssetImage getSystemIcon(String systemName) {
