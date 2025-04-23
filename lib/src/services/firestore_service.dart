@@ -106,6 +106,30 @@ class FirestoreService {
     }
   }
 
+  /// Gets a stream of all quest cards for public access without requiring authentication.
+  /// Returns all cards sorted by title.
+  Stream<List<QueryDocumentSnapshot<Object?>>> getPublicQuestCardsStream() {
+    // For public access, we simply return all cards sorted by title
+    // Future security rules will control what fields are accessible
+    return questCards
+        .orderBy('title')
+        .snapshots()
+        .map((snapshot) => snapshot.docs);
+  }
+
+  /// Gets the count of all quest cards for public access without requiring authentication.
+  Future<int> getPublicQuestCardCount() async {
+    try {
+      // This method is identical to getQuestCardsCount but kept separate
+      // to allow for future differentiation between public vs. authenticated counts
+      var res = await questCards.count().get();
+      return res.count!;
+    } catch (e) {
+      log("Error getting public quest card count: $e");
+      return 0;
+    }
+  }
+
   Future<int> getQuestCardsCount() async {
     try {
       var res = await questCards.count().get();
@@ -351,5 +375,45 @@ class FirestoreService {
     }
 
     return newDocIds;
+  }
+
+  /// Gets a batch of quest cards for pagination in the public view
+  /// @param limit The maximum number of documents to fetch
+  /// @param lastDocument The last document from the previous batch (for pagination)
+  /// @return A list of document snapshots
+  Future<List<QueryDocumentSnapshot>> getPublicQuestCardsBatch(
+      int limit, DocumentSnapshot? lastDocument) async {
+    try {
+      Query query = questCards.orderBy('title').limit(limit);
+
+      // If we have a last document, start after it for pagination
+      if (lastDocument != null) {
+        query = query.startAfterDocument(lastDocument);
+      }
+
+      final querySnapshot = await query.get();
+      return querySnapshot.docs;
+    } catch (e) {
+      log("Error getting quest card batch: $e");
+      return [];
+    }
+  }
+
+  /// Get a quest card by its document ID
+  /// @param docId The Firestore document ID
+  /// @return A Map containing the quest card data, or null if not found
+  Future<Map<String, dynamic>?> getQuestCardById(String docId) async {
+    try {
+      DocumentSnapshot documentSnapshot = await questCards.doc(docId).get();
+      if (documentSnapshot.exists) {
+        return documentSnapshot.data() as Map<String, dynamic>;
+      } else {
+        log("Quest card not found: $docId");
+        return null;
+      }
+    } catch (e) {
+      log("Error getting quest card: $e");
+      throw Exception("Failed to load quest card: $e");
+    }
   }
 }

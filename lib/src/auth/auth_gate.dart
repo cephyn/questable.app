@@ -13,7 +13,10 @@ import '../settings/settings_controller.dart';
 import '../util/utils.dart';
 
 class AuthGate extends StatelessWidget {
-  AuthGate({super.key});
+  /// Callback that is called when authentication is successful
+  final VoidCallback? onAuthenticated;
+
+  AuthGate({super.key, this.onAuthenticated});
   final FirestoreService firestoreService = FirestoreService();
   final FirebaseAuthService auth = FirebaseAuthService();
 
@@ -88,6 +91,21 @@ class AuthGate extends StatelessWidget {
             },
           );
         } else {
+          // If onAuthenticated callback is provided, call it and return to previous screen
+          if (onAuthenticated != null) {
+            // Use a post-frame callback to ensure the UI is ready before navigating
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              onAuthenticated!();
+              Navigator.of(context).pop(); // Return to the previous screen
+            });
+            // Show a loading indicator while transitioning
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
           return FutureBuilder<void>(
             future: firestoreService.storeInitialUserRole(
                 auth.getCurrentUser().uid, auth.getCurrentUser().email!),

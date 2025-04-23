@@ -4,6 +4,8 @@ import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
 import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:quest_cards/src/auth/user_context.dart';
+import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart'; // Import the details view
 import 'package:quest_cards/src/user/local_user_list.dart';
@@ -27,31 +29,43 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settingsController = Provider.of<SettingsController>(context);
+
+    // Create UserContext instance
+    final userContext = UserContext();
+
     return ListenableBuilder(
       listenable: settingsController,
       builder: (BuildContext context, Widget? child) {
-        return MaterialApp(
-          title: "Questable (Beta)",
-          restorationScopeId: 'app',
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: const [
-            Locale('en', ''),
-          ],
-          home: AuthGate(),
-          // Define routes for navigation
-          routes: {
-            '/questCardDetails': (context) {
-              // Extract arguments and pass to details view
-              final args = ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-              final docId = args['docId'] as String;
-              return QuestCardDetailsView(docId: docId);
+        return UserContextProvider(
+          userContext: userContext,
+          child: MaterialApp(
+            title: "Questable (Beta)",
+            restorationScopeId: 'app',
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('en', ''),
+            ],
+            // Use RootNavigator with a builder to avoid circular dependency
+            home: RootNavigator(
+              homePageBuilder: (controller) =>
+                  HomePage(settingsController: controller),
+            ),
+            theme: theme,
+            // Define routes for navigation
+            routes: {
+              '/questCardDetails': (context) {
+                // Extract arguments and pass to details view
+                final args = ModalRoute.of(context)!.settings.arguments
+                    as Map<String, dynamic>;
+                final docId = args['docId'] as String;
+                return QuestCardDetailsView(docId: docId);
+              },
             },
-          },
+          ),
         );
       },
     );

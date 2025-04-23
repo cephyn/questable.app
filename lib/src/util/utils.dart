@@ -2,7 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,7 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 class Utils {
   static void setBrowserTabTitle(String title) {
     if (kIsWeb) {
-      html.document.title = title;
+      web.document.title = title;
     }
   }
 
@@ -61,5 +62,34 @@ class Utils {
           await launchUrl(Uri.parse(url));
         },
     );
+  }
+
+  static String formatTimestamp(Timestamp timestamp) {
+    final DateTime dateTime = timestamp.toDate();
+    final now = DateTime.now();
+
+    // Format date differently based on how recent it is
+    if (dateTime.year == now.year &&
+        dateTime.month == now.month &&
+        dateTime.day == now.day) {
+      // Today - just show time
+      return 'Today at ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else if (now.difference(dateTime).inDays < 7) {
+      // Within the last week - show day name and time
+      final weekdays = [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday'
+      ];
+      final weekday = weekdays[dateTime.weekday - 1];
+      return '$weekday at ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else {
+      // Older - show full date
+      return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
+    }
   }
 }
