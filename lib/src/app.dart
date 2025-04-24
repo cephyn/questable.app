@@ -4,7 +4,9 @@ import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
 import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:quest_cards/src/admin/migration_tools.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
+import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart'; // Import the details view
@@ -23,51 +25,57 @@ import 'user/firebase_user_profile.dart';
 
 class MyApp extends StatelessWidget {
   final ThemeData theme;
+  final SettingsController settingsController;
+  final String initialRoute;
+  final bool darkMode;
 
-  const MyApp({super.key, required this.theme});
+  const MyApp({
+    super.key,
+    required this.theme,
+    required this.settingsController,
+    this.initialRoute = '/', // Default to root route
+    this.darkMode = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final settingsController = Provider.of<SettingsController>(context);
-
-    // Create UserContext instance
-    final userContext = UserContext();
-
-    return ListenableBuilder(
-      listenable: settingsController,
-      builder: (BuildContext context, Widget? child) {
-        return UserContextProvider(
-          userContext: userContext,
-          child: MaterialApp(
-            title: "Questable (Beta)",
-            restorationScopeId: 'app',
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [
-              Locale('en', ''),
-            ],
-            // Use RootNavigator with a builder to avoid circular dependency
-            home: RootNavigator(
-              homePageBuilder: (controller) =>
-                  HomePage(settingsController: controller),
-            ),
-            theme: theme,
-            // Define routes for navigation
-            routes: {
-              '/questCardDetails': (context) {
-                // Extract arguments and pass to details view
-                final args = ModalRoute.of(context)!.settings.arguments
-                    as Map<String, dynamic>;
-                final docId = args['docId'] as String;
-                return QuestCardDetailsView(docId: docId);
-              },
-            },
-          ),
-        );
-      },
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<UserContext>(
+          create: (_) => UserContext(),
+        ),
+        ChangeNotifierProvider<FilterProvider>(
+          create: (_) => FilterProvider(),
+        ),
+      ],
+      child: MaterialApp(
+        title: "Questable (Beta)",
+        restorationScopeId: 'app',
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en', ''),
+        ],
+        // Use RootNavigator with a builder to avoid circular dependency
+        home: RootNavigator(
+          homePageBuilder: (controller) =>
+              HomePage(settingsController: controller),
+        ),
+        theme: theme,
+        // Define routes for navigation
+        routes: {
+          '/questCardDetails': (context) {
+            // Extract arguments and pass to details view
+            final args = ModalRoute.of(context)!.settings.arguments
+                as Map<String, dynamic>;
+            final docId = args['docId'] as String;
+            return QuestCardDetailsView(docId: docId);
+          },
+        },
+      ),
     );
   }
 }
@@ -105,6 +113,9 @@ class _HomePageState extends State<HomePage> {
         break;
       case 4:
         page = LocalUserList();
+        break;
+      case 5:
+        page = MigrationTools(); // Admin-only migration tools
         break;
       default:
         page = Placeholder();
@@ -243,6 +254,11 @@ class _HomePageState extends State<HomePage> {
                   NavigationDestination(
                     icon: Icon(Icons.people),
                     label: 'List Users',
+                  ),
+                if (roles != null && roles.contains('admin'))
+                  NavigationDestination(
+                    icon: Icon(Icons.build),
+                    label: 'Migration Tools',
                   ),
               ],
               smallBody: (_) => page,

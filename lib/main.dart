@@ -45,7 +45,7 @@ void main() async {
     providers: [
       ChangeNotifierProvider(create: (_) => settingsController),
     ],
-    child: MyApp(theme: theme),
+    child: MyApp(settingsController: settingsController, theme: theme),
   ));
   //runApp(MyApp(theme: theme));
 }

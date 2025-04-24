@@ -1,7 +1,11 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:quest_cards/src/auth/auth_dialog_helper.dart';
+import 'package:quest_cards/src/filters/active_filter_chips.dart';
+import 'package:quest_cards/src/filters/filter_drawer.dart';
+import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
@@ -22,7 +26,7 @@ class PublicQuestCardListView extends StatefulWidget {
 
 class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
   final FirestoreService _firestoreService = FirestoreService();
-  // Removed unused _auth variable
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Cache for quest data to improve performance
   final Map<String, dynamic> _questCache = {};
@@ -67,7 +71,12 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
   // Load the total count of quests
   Future<void> _loadTotalCount() async {
     try {
-      _totalQuestCount = await _firestoreService.getPublicQuestCardCount();
+      final filterProvider =
+          Provider.of<FilterProvider>(context, listen: false);
+      _totalQuestCount = await _firestoreService.getPublicQuestCardCount(
+        filterState: filterProvider.filterState,
+      );
+
       if (mounted) {
         setState(() {});
       }
@@ -94,9 +103,18 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
     });
 
     try {
+      final filterProvider =
+          Provider.of<FilterProvider>(context, listen: false);
+
+      // Track filter usage with analytics when loading more cards with filters
+      if (filterProvider.filterState.hasFilters) {
+        await filterProvider.trackFilterUsage();
+      }
+
       final snapshots = await _firestoreService.getPublicQuestCardsBatch(
         _pageSize,
         _lastDocument,
+        filterState: filterProvider.filterState,
       );
 
       if (snapshots.isEmpty) {
@@ -162,10 +180,21 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
+
       // Convert Firestore documents to serializable maps
       final List<Map<String, dynamic>> serializableData =
           _questCards.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        Map<String, dynamic> data =
+            Map<String, dynamic>.from(doc.data() as Map<String, dynamic>);
+
+        // Handle Timestamp conversion
+        data.forEach((key, value) {
+          if (value is Timestamp) {
+            // Convert Timestamp to millisecondsSinceEpoch (int) for JSON serialization
+            data[key] = value.millisecondsSinceEpoch;
+          }
+        });
+
         // Include document ID in the cached data
         data['_documentId'] = doc.id;
         return data;
@@ -190,13 +219,26 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
         if (!useCache) {
           _questCards.clear();
           _hasMoreQuests = true;
+          _lastDocument = null;
         }
       });
 
+      final filterProvider =
+          Provider.of<FilterProvider>(context, listen: false);
+
+      // Track filter usage when refreshing the quest list with filters
+      if (filterProvider.filterState.hasFilters) {
+        await filterProvider.trackFilterUsage();
+      }
+
       final cards = await _firestoreService.getPublicQuestCardsBatch(
         _pageSize,
-        _lastDocument,
+        null, // Reset pagination when refreshing
+        filterState: filterProvider.filterState,
       );
+
+      // Update the total count when filters change
+      _loadTotalCount();
 
       if (mounted) {
         setState(() {
@@ -204,6 +246,9 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
             _questCards.clear();
           }
           _questCards.addAll(cards);
+          if (cards.isNotEmpty) {
+            _lastDocument = cards.last;
+          }
           _isLoading = false;
           _hasMoreQuests = cards.length >= _pageSize;
         });
@@ -234,7 +279,10 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
   @override
   Widget build(BuildContext context) {
     Utils.setBrowserTabTitle("Browse Quests");
+    final filterProvider = Provider.of<FilterProvider>(context);
+
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: const Text(
           'Browse Quests',
@@ -243,6 +291,42 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
           ),
         ),
         actions: [
+          // Add filter button to app bar
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.filter_list),
+                if (filterProvider.filterState.hasFilters)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '${filterProvider.filterState.filterCount}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+            tooltip: 'Filter Quests',
+          ),
+
           // Add login button to app bar
           ElevatedButton.icon(
             icon: const Icon(Icons.login),
@@ -264,25 +348,57 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
           child: Padding(
             padding:
                 const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _totalQuestCount != null
-                    ? "$_totalQuestCount Quests in System"
-                    : "Loading quests...",
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _totalQuestCount != null
+                      ? "$_totalQuestCount Quests${filterProvider.filterState.hasFilters ? ' (Filtered)' : ''}"
+                      : "Loading quests...",
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
+                if (filterProvider.filterState.hasFilters)
+                  TextButton.icon(
+                    icon: const Icon(Icons.clear_all, size: 16),
+                    label: const Text('Clear Filters'),
+                    onPressed: () {
+                      filterProvider.clearFilters();
+                      _refreshQuestCards();
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
       ),
+      endDrawer: FilterDrawer(isAuthenticated: false),
+      onEndDrawerChanged: (isOpen) {
+        if (!isOpen) {
+          // When drawer closes, refresh the quest list with new filters
+          _refreshQuestCards();
+        }
+      },
       body: Column(
         children: [
           // Welcome banner for non-authenticated users
           _buildWelcomeBanner(context),
+
+          // Show active filters if any
+          Consumer<FilterProvider>(
+            builder: (context, filterProvider, child) {
+              return filterProvider.filterState.hasFilters
+                  ? const ActiveFilterChips()
+                  : const SizedBox.shrink();
+            },
+          ),
 
           // Quest list takes remaining space
           Expanded(

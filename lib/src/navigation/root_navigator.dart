@@ -100,7 +100,7 @@ class RootNavigatorState extends State<RootNavigator>
           bool isAuthenticated = false;
 
           try {
-            userContext = UserContextProvider.of(context);
+            userContext = Provider.of<UserContext>(context, listen: true);
             // Check if the user is authenticated with a valid role
             isAuthenticated =
                 userContext.isAuthenticated && userContext.hasValidRole;
