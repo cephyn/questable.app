@@ -286,8 +286,8 @@ class _AddQuestCardState extends State<EditQuestCard> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const QuestCardDetailsView(),
-                        settings: RouteSettings(arguments: {'docId': docId}),
+                        builder: (context) =>
+                            QuestCardDetailsView(docId: docId),
                       ),
                     );
                   }

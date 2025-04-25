@@ -1,203 +1,553 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:quest_cards/src/navigation/root_navigator.dart';
+import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
+import 'package:quest_cards/src/services/firestore_service.dart';
+import 'package:quest_cards/src/util/utils.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
-import '../services/firestore_service.dart';
-import '../util/utils.dart';
-import 'quest_card.dart';
-import 'quest_card_edit.dart';
+class QuestCardDetailsView extends StatefulWidget {
+  final String docId;
 
-/// Displays detailed information about a QuestCard.
-class QuestCardDetailsView extends StatelessWidget {
-  final String? docId;
-
-  const QuestCardDetailsView({super.key, this.docId});
+  const QuestCardDetailsView({super.key, required this.docId});
 
   @override
-  Widget build(BuildContext context) {
-    Utils.setBrowserTabTitle("Quest Details");
-    QuestCard questCard = QuestCard();
-    final FirestoreService firestoreService = FirestoreService();
+  State<QuestCardDetailsView> createState() => _QuestCardDetailsViewState();
+}
 
-    // Use docId from constructor if provided, otherwise try to get from route arguments
-    String? questDocId = docId;
+class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
+  final FirestoreService _firestoreService = FirestoreService();
+  Map<String, dynamic>? _questCardData;
+  bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
-    if (questDocId == null &&
-        ModalRoute.of(context)?.settings.arguments != null) {
-      final Map<String, dynamic> args =
-          ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-      questDocId = args['docId'] as String?;
+  // Separate tap gesture recognizer for each clickable element
+  // to avoid memory leaks
+  final Map<String, GestureRecognizer> _recognizers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestCardData();
+  }
+
+  @override
+  void dispose() {
+    // Dispose of all gesture recognizers to prevent memory leaks
+    for (final recognizer in _recognizers.values) {
+      recognizer.dispose();
     }
+    _recognizers.clear();
+    super.dispose();
+  }
 
-    if (questDocId != null) {
-      return StreamBuilder<DocumentSnapshot>(
-          stream: firestoreService.getQuestCardStream(questDocId),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              Map<String, dynamic> data =
-                  snapshot.data!.data() as Map<String, dynamic>;
-              questCard = QuestCard.fromJson(data);
-            } else {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return Scaffold(
-              appBar: AppBar(
-                title: Text('Quest Card Details'),
-              ),
-              body: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ListView(
-                      children: [
-                        Text(
-                          'Title: ${Utils.capitalizeTitle(questCard.title)}',
-                          style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.indigo),
-                        ),
-                        SizedBox(height: 16),
-                        Divider(),
-                        _buildInfoRow('Game System', questCard.gameSystem),
-                        _buildInfoRow('Edition', questCard.edition),
-                        _buildInfoRow('Level', questCard.level),
-                        _buildInfoRow(
-                            'Page Length', questCard.pageLength!.toString()),
-                        _buildInfoRow('Authors', questCard.authors?.join(', ')),
-                        _buildInfoRow('Product Title', questCard.productTitle),
-                        _buildInfoRow('Publisher', questCard.publisher),
-                        _buildInfoRow(
-                            'Publication Year', questCard.publicationYear),
-                        _buildInfoRow('Genre', questCard.genre),
-                        _buildInfoRow('Setting', questCard.setting),
-                        _buildInfoRow(
-                            'Environments', questCard.environments?.join(', ')),
-                        _buildInfoLinkRow(
-                            'Product Link', questCard.title!, questCard.link),
-                        _buildInfoRow('Boss Villains',
-                            questCard.bossVillains?.join(', ')),
-                        _buildInfoRow('Common Monsters',
-                            questCard.commonMonsters?.join(', ')),
-                        _buildInfoRow('Notable Items',
-                            questCard.notableItems?.join(', ')),
-                        SizedBox(height: 16),
-                        Text(
-                          'Summary:',
-                          style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.indigo),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          questCard.summary ?? 'N/A',
-                          style: TextStyle(fontSize: 16, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              floatingActionButton: FloatingActionButton(
-                tooltip: 'Edit',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EditQuestCard(
-                        docId: questDocId!,
-                      ),
-                    ),
-                  );
-                },
-                child: const Icon(Icons.edit),
-              ),
-            );
-          });
-    } else {
-      return Scaffold(body: Placeholder());
+  Future<void> _loadQuestCardData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+      });
+
+      final data = await _firestoreService.getQuestCardById(widget.docId);
+
+      if (mounted) {
+        setState(() {
+          if (data != null) {
+            _questCardData = data;
+            // Log data to help with debugging
+            debugPrint('Loaded quest card data: ${data['title']}');
+          } else {
+            _hasError = true;
+            _errorMessage = 'Quest card not found';
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Failed to load quest details: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Widget _buildInfoRow(String label, String? value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+  @override
+  Widget build(BuildContext context) {
+    Utils.setBrowserTabTitle(_questCardData?['title'] ?? 'Quest Details');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _isLoading
+              ? 'Loading Quest...'
+              : (_questCardData?['title'] ?? 'Quest Details'),
+          style: const TextStyle(fontSize: 20),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          // Show edit button if we have quest data
+          if (!_isLoading && !_hasError)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Edit Quest',
+              onPressed: () {
+                // Get root navigator for authentication handling
+                final navigator = RootNavigator.of(context);
+                if (navigator != null) {
+                  navigator.showLoginPrompt(context, 'edit',
+                      docId: widget.docId);
+                } else {
+                  // Fallback to direct navigation for authenticated users
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditQuestCard(docId: widget.docId),
+                    ),
+                  );
+                }
+              },
             ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value ?? 'N/A',
-              //style: TextStyle(color: Colors.black87),
-            ),
-          ),
         ],
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading quest details...'),
+          ],
+        ),
+      );
+    }
+
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(_errorMessage),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loadQuestCardData,
+              child: const Text('Try Again'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_questCardData == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 48, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Quest not found'),
+          ],
+        ),
+      );
+    }
+
+    // Display quest details with optimization for large content
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildQuestHeader(),
+            const Divider(height: 32),
+            _buildQuestDescription(),
+            const Divider(height: 32),
+            _buildQuestProperties(),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildInfoLinkRow(String label, String text, String? url) {
-    if (url == null || url.isEmpty) {
-      return _buildInfoRow(
-          label, url); // Return an empty widget if the URL is null or empty
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: TextStyle(
+  Widget _buildQuestHeader() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              Utils.capitalizeTitle(
+                  _questCardData!['title'] ?? 'Untitled Quest'),
+              style: const TextStyle(
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          Expanded(
-            flex: 3,
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(
-                  color: Colors.black,
-                  height: 1.5, // Better line height for readability
-                ),
-                children: <TextSpan>[
-                  TextSpan(
-                    text: text,
-                    style: TextStyle(
-                      color: Colors.blue,
-                      decoration: TextDecoration.underline,
-                    ),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () {
-                        _launchURL(url);
-                      },
+            const SizedBox(height: 8),
+            // Game system with icon
+            Row(
+              children: [
+                const Icon(Icons.casino, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'System: ${_questCardData!['gameSystem'] ?? 'Any System'}',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.secondary,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // Level range
+            Row(
+              children: [
+                const Icon(Icons.trending_up, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Level: ${_questCardData!['level'] ?? 'Any Level'}',
+                ),
+              ],
+            ),
+            if (_questCardData!['edition'] != null &&
+                _questCardData!['edition'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.bookmark, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Edition: ${_questCardData!['edition']}',
+                    ),
+                  ],
+                ),
+              ),
+            // Page length if available
+            if (_questCardData!['pageLength'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.description, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Pages: ${_questCardData!['pageLength']}',
+                    ),
+                  ],
+                ),
+              ),
+            // Publication info
+            if (_questCardData!['publicationYear'] != null &&
+                _questCardData!['publicationYear'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Published: ${_questCardData!['publicationYear']}',
+                    ),
+                  ],
+                ),
+              ),
+            // Last updated timestamp
+            if (_questCardData!['timestamp'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.update, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Added: ${Utils.formatTimestamp(_questCardData!['timestamp'])}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuestDescription() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Summary',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            MarkdownBody(
+              data: _questCardData!['summary'] ?? 'No summary available.',
+              onTapLink: (text, href, title) {
+                if (href != null) {
+                  _launchURL(href);
+                }
+              },
+              styleSheet: MarkdownStyleSheet(
+                p: const TextStyle(fontSize: 16),
+                h1: TextStyle(
+                  fontSize: 22,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+                h2: TextStyle(
+                  fontSize: 20,
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontWeight: FontWeight.bold,
+                ),
+                blockquote: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade700,
+                  fontStyle: FontStyle.italic,
+                ),
+                code: TextStyle(
+                  backgroundColor: Colors.grey.shade200,
+                  fontFamily: 'monospace',
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildQuestProperties() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Quest Details',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Authors
+            _buildDetailSection(
+              'Authors',
+              _questCardData!['authors'] ?? [],
+              Icons.person,
+            ),
+            const SizedBox(height: 12),
+            // Publisher
+            if (_questCardData!['publisher'] != null &&
+                _questCardData!['publisher'].toString().isNotEmpty)
+              _buildDetailRow(
+                'Publisher',
+                _questCardData!['publisher'],
+                Icons.business,
+              ),
+            const SizedBox(height: 12),
+            // Product title
+            if (_questCardData!['productTitle'] != null &&
+                _questCardData!['productTitle'].toString().isNotEmpty)
+              _buildDetailRow(
+                'Product',
+                Utils.capitalizeTitle(_questCardData!['productTitle']),
+                Icons.book,
+              ),
+            const SizedBox(height: 12),
+            // Setting
+            if (_questCardData!['setting'] != null &&
+                _questCardData!['setting'].toString().isNotEmpty)
+              _buildDetailRow(
+                'Setting',
+                _questCardData!['setting'],
+                Icons.location_city,
+              ),
+            const SizedBox(height: 12),
+            // Environments
+            _buildDetailSection(
+              'Environments',
+              _questCardData!['environments'] ?? [],
+              Icons.terrain,
+            ),
+            const SizedBox(height: 12),
+            // Boss/Villains
+            _buildDetailSection(
+              'Boss Villains',
+              _questCardData!['bossVillains'] ?? [],
+              Icons.face,
+            ),
+            const SizedBox(height: 12),
+            // Common monsters
+            _buildDetailSection(
+              'Common Monsters',
+              _questCardData!['commonMonsters'] ?? [],
+              Icons.pest_control,
+            ),
+            const SizedBox(height: 12),
+            // Notable items
+            _buildDetailSection(
+              'Notable Items',
+              _questCardData!['notableItems'] ?? [],
+              Icons.card_giftcard,
+            ),
+            const SizedBox(height: 12),
+            // Link
+            if (_questCardData!['link'] != null &&
+                _questCardData!['link'].toString().isNotEmpty)
+              GestureDetector(
+                onTap: () => _launchURL(_questCardData!['link']),
+                child: Row(
+                  children: [
+                    Icon(Icons.link,
+                        size: 16, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Link: ${_questCardData!['link']}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 12),
+            // Classification if available
+            if (_questCardData!['classification'] != null &&
+                _questCardData!['classification'].toString().isNotEmpty)
+              _buildDetailRow(
+                'Classification',
+                _questCardData!['classification'],
+                Icons.category,
+              ),
+            const SizedBox(height: 12),
+            // Genre if available
+            if (_questCardData!['genre'] != null &&
+                _questCardData!['genre'].toString().isNotEmpty)
+              _buildDetailRow(
+                'Genre',
+                _questCardData!['genre'],
+                Icons.theater_comedy,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailSection(String title, List<dynamic> items, IconData icon) {
+    if (items.isEmpty) {
+      return _buildDetailRow(title, 'None', icon);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: items
+              .map(
+                (item) => Chip(
+                  label: Text(item),
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                  labelStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(String title, String value, IconData icon) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(value),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   Future<void> _launchURL(String url) async {
-    Uri uri = Uri.parse(url);
-    await launchUrl(uri);
+    final uri = Uri.parse(url);
+    if (await url_launcher.canLaunchUrl(uri)) {
+      await url_launcher.launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open URL: $url')),
+        );
+      }
+    }
   }
 }

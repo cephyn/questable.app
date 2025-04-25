@@ -24,6 +24,7 @@ class QuestCard {
   String? objectId;
   String? classification;
   String? uploadedBy;
+  bool isPublic = true; // Default to true for public access
 
   QuestCard(
       {this.id,
@@ -45,7 +46,8 @@ class QuestCard {
       this.summary,
       this.genre,
       this.classification,
-      this.uploadedBy});
+      this.uploadedBy,
+      this.isPublic = true}); // Default to true for public access
 
   QuestCard.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -68,6 +70,8 @@ class QuestCard {
     genre = json['genre'];
     classification = json['classification'];
     uploadedBy = json['uploadedBy'];
+    // Handle isPublic with fallback to true if not present in document
+    isPublic = json['isPublic'] ?? true;
   }
 
   QuestCard.fromSearchJson(Map<String, dynamic> json) {
@@ -92,6 +96,8 @@ class QuestCard {
     classification = json['classification'];
     objectId = json['objectID'];
     uploadedBy = json['uploadedBy'];
+    // Handle isPublic with fallback to true if not present in document
+    isPublic = json['isPublic'] ?? true;
   }
 
   String generateUniqueHash() {
@@ -122,7 +128,8 @@ class QuestCard {
       'genre': genre,
       'classification': classification,
       'objectId': objectId,
-      'uploadedBy': uploadedBy
+      'uploadedBy': uploadedBy,
+      'isPublic': isPublic, // Include in JSON output
     };
   }
 
