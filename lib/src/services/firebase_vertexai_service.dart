@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:developer';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_vertexai/firebase_vertexai.dart';
 import 'package:flutter/foundation.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart';
+import 'package:quest_cards/src/services/purchase_link_service.dart';
 
 import 'firebase_storage_service.dart';
 import 'dart:math' hide log;
@@ -64,7 +66,7 @@ class FirebaseVertexaiService {
       final TextPart prompt = TextPart(
           "Analyze this adventure for a role-playing game. Extract the information necessary to populate the fields in the response schema. Generate an empty string for the link field.");
       final filePart = FileData(
-          mimeType, firebaseStorageService.getStorageUrl(fileReference));
+          mimeType, await firebaseStorageService.getStorageUrl(fileReference));
 
       // Count tokens for logging
       final tokenCount = await model.countTokens([
@@ -154,6 +156,13 @@ class FirebaseVertexaiService {
           await extractGlobalInformation(fileReference, mimeType);
       log("Global info extracted: ${globalInfo.keys.join(', ')}");
 
+      var purchaseLinkFuture = _searchForPurchaseLink(globalInfo);
+      String? purchaseLink = await purchaseLinkFuture;
+      if (purchaseLink!.isNotEmpty) {
+        globalInfo['link'] = purchaseLink;
+        log('Purchase link found: ${globalInfo['link']}');
+      }
+
       // 3. Process each individual adventure
       Uint8List? downloadedText = await fileReference.getData();
       if (downloadedText == null) {
@@ -205,7 +214,7 @@ class FirebaseVertexaiService {
             "publisher": globalInfo["publisher"] ?? "",
             "edition": globalInfo["edition"] ?? "",
             "publicationYear": globalInfo["publicationYear"] ?? "",
-            "link": ""
+            "link": globalInfo["link"] ?? "",
           };
 
           // Extract adventure-specific information
@@ -341,18 +350,37 @@ Instructions:
   Future<Map<String, dynamic>> processAiRequest(Schema schema, String mimeType,
       Reference fileReference, TextPart prompt) async {
     try {
+      // Check if user is authenticated
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        log('Error: User is not authenticated');
+        return {
+          'error':
+              'User is not authenticated. Please sign in to access this feature.'
+        };
+      }
+
       GenerativeModel requestModel = _createModel(schema);
 
+      // Get an authenticated URL for the file
+      String fileUrl =
+          await firebaseStorageService.getStorageUrl(fileReference);
+      log('Using authenticated URL for file access: $fileUrl');
+
       // Create file part for the model
-      FileData filePart = FileData(
-          mimeType, firebaseStorageService.getStorageUrl(fileReference));
+      FileData filePart = FileData(mimeType, fileUrl);
 
-      // Get token counts for monitoring/logging
-      var tokenCount = await requestModel.countTokens([
-        Content.multi([prompt, filePart])
-      ]);
+      try {
+        // Get token counts for monitoring/logging
+        var tokenCount = await requestModel.countTokens([
+          Content.multi([prompt, filePart])
+        ]);
 
-      log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+        log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+      } catch (tokenCountError) {
+        // Continue even if token counting fails
+        log('Warning: Failed to count tokens: $tokenCountError');
+      }
 
       // Make the actual API request
       var response = await requestModel.generateContent([
@@ -366,6 +394,13 @@ Instructions:
       return jsonDecode(response.text!);
     } catch (e) {
       log('Error in AI request processing: $e');
+      if (e.toString().contains('permission')) {
+        log('Permission error details: This may be due to insufficient Firebase permissions.');
+        // Try to get the current user email for debugging
+        final email =
+            FirebaseAuth.instance.currentUser?.email ?? 'Not signed in';
+        log('Current user email: $email');
+      }
       return {'error': e.toString()};
     }
   }
@@ -432,5 +467,36 @@ Instructions:
     }
 
     return potentialStarts;
+  }
+
+  /// Searches for a purchase link based on metadata
+  Future<String?> _searchForPurchaseLink(Map<String, dynamic> metadata) async {
+    if (metadata['productTitle']?.isEmpty ?? true) {
+      return null;
+    }
+
+    try {
+      log('Searching for purchase link for ${metadata['productTitle']}');
+
+      // Use the PurchaseLinkService to find a purchase link
+      //final purchaseLinkService = PurchaseLinkService();
+
+      // Run in a separate isolate to avoid blocking the main thread
+      return compute(_isolatedPurchaseLinkSearch, metadata);
+    } catch (e) {
+      log('Error in purchase link search: $e');
+      return null;
+    }
+  }
+
+  // This static method runs in a separate isolate
+  static Future<String?> _isolatedPurchaseLinkSearch(
+      Map<String, dynamic> metadata) async {
+    final purchaseLinkService = PurchaseLinkService();
+    try {
+      return await purchaseLinkService.findPurchaseLink(metadata);
+    } finally {
+      purchaseLinkService.dispose();
+    }
   }
 }

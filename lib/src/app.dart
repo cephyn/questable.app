@@ -12,7 +12,6 @@ import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart'; // Import the details view
 import 'package:quest_cards/src/user/local_user_list.dart';
 
-import 'auth/auth_gate.dart';
 import 'auth/auth_widgets.dart';
 import 'quest_card/quest_card_analyze.dart';
 import 'quest_card/quest_card_list_view.dart';

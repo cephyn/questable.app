@@ -3,11 +3,13 @@ import 'dart:developer';
 // Import needed for WriteBatch
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:quest_cards/src/services/email_service.dart';
 import 'package:quest_cards/src/services/firebase_functions_service.dart';
 import 'package:quest_cards/src/services/firebase_storage_service.dart';
+import 'package:quest_cards/src/services/purchase_link_service.dart';
 
 import '../services/firebase_auth_service.dart';
 import '../services/firebase_vertexai_service.dart';
@@ -224,19 +226,26 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
     }
   }
 
-  // Renamed analyzeFile to analyzeSingleFile for clarity and added url parameter
   Future<List<String>> analyzeSingleFile(String fileUrl) async {
     log("Analyze single quest file from URL: $fileUrl");
     try {
-      // REMOVED redundant file upload
-
-      // Analyze the file using AI service and decode the result
+      // Start AI metadata extraction
       log('Calling AI service for single file analysis...');
-      Map<String, dynamic> questCardSchema =
-          jsonDecode(await aiService.analyzeFile(fileUrl)); // Use passed URL
+      var metadataFuture = aiService.analyzeFile(fileUrl);
+
+      // Wait for the AI service to complete metadata extraction
+      Map<String, dynamic> questCardSchema = jsonDecode(await metadataFuture);
+      var purchaseLinkFuture = _searchForPurchaseLink(questCardSchema);
       QuestCard questCard = QuestCard.fromJson(questCardSchema);
       questCard.uploadedBy = auth.getCurrentUser().email;
       log('AI analysis complete. Title: ${questCard.title}');
+
+      // Wait for purchase link search to complete and add to QuestCard if found
+      String? purchaseLink = await purchaseLinkFuture;
+      if (purchaseLink != null && purchaseLink.isNotEmpty) {
+        questCard.link = purchaseLink;
+        log('Purchase link found: ${questCard.link}');
+      }
 
       // Check for duplicates
       log('Checking for duplicate title: ${questCard.title}');
@@ -270,7 +279,6 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
     }
   }
 
-  // Added url parameter and refactored for batch operations
   Future<List<String>> analyzeMultiFile(String fileUrl) async {
     log("Analyze multiple quest file from URL: $fileUrl");
     List<String> resultingDocIds = [];
@@ -284,12 +292,6 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       log('Calling AI service for multi-file analysis...');
       List<Map<String, dynamic>> questCardSchemas =
           await aiService.analyzeMultiFileQueries(fileUrl); // Use passed URL
-      log('AI analysis complete. Found ${questCardSchemas.length} potential quests.');
-
-      if (questCardSchemas.isEmpty) {
-        log('No quest data extracted by AI.');
-        return [];
-      }
 
       // --- Batch Duplicate Check ---
       List<String> titlesToCheck = questCardSchemas
@@ -308,9 +310,10 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           auth.getCurrentUser().email ?? 'unknown@example.com';
 
       // Process results: identify duplicates and prepare new cards
-      for (var schema in questCardSchemas) {
-        QuestCard q = QuestCard.fromJson(schema);
+      for (int i = 0; i < questCardSchemas.length; i++) {
+        QuestCard q = QuestCard.fromJson(questCardSchemas[i]);
         q.uploadedBy = currentUserEmail;
+
         String? titleLower = q.title?.toLowerCase();
 
         if (titleLower != null && existingTitles.containsKey(titleLower)) {
@@ -358,6 +361,98 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       log("Error in analyzeMultiFile: $e");
       log("Stacktrace: $s");
       rethrow; // Rethrow the exception after logging
+    }
+  }
+
+  /// Extracts basic metadata for search from a file
+  // Future<Map<String, String>> _extractBasicMetadataForSearch(
+  //     String fileUrl) async {
+  //   try {
+  //     // Use a simplified AI request to extract just title, publisher, and game system
+  //     log('Extracting basic metadata for search');
+
+  //     // Check if fileUrl is a storage path or a download URL
+  //     String fileNameToUse;
+  //     if (fileUrl.startsWith('http')) {
+  //       // For download URLs
+  //       final uri = Uri.parse(fileUrl);
+  //       final pathSegments = uri.pathSegments;
+  //       if (pathSegments.isNotEmpty) {
+  //         fileNameToUse = pathSegments.last;
+  //         // Handle Firebase Storage URL encoding
+  //         if (fileNameToUse.contains('%2F')) {
+  //           fileNameToUse = Uri.decodeComponent(fileNameToUse);
+  //         }
+  //       } else {
+  //         fileNameToUse = 'unknown';
+  //       }
+  //     } else if (fileUrl.contains('/')) {
+  //       // For storage paths like 'uploads/filename.txt'
+  //       final segments = fileUrl.split('/');
+  //       fileNameToUse = segments.last;
+  //     } else {
+  //       // Fallback
+  //       fileNameToUse = fileUrl;
+  //     }
+
+  //     // Remove file extension if present
+  //     final fileNameWithoutExtension = fileNameToUse.split('.').first;
+
+  //     // For QC prefixed filenames, strip that prefix
+  //     final cleanName = fileNameWithoutExtension.startsWith('QC')
+  //         ? fileNameWithoutExtension.substring(2)
+  //         : fileNameWithoutExtension;
+
+  //     return {
+  //       'title': cleanName,
+  //       'publisher': '',
+  //       'gameSystem': '',
+  //     };
+  //   } catch (e) {
+  //     log('Error extracting basic metadata: $e');
+  //     return {
+  //       'title': '',
+  //       'publisher': '',
+  //       'gameSystem': '',
+  //     };
+  //   }
+  // }
+
+  /// Searches for a purchase link based on metadata
+  Future<String?> _searchForPurchaseLink(Map<String, dynamic> metadata) async {
+    if (metadata['productTitle']?.isEmpty ?? true) {
+      log('No product title in metadata, skipping purchase link search');
+      return null;
+    }
+
+    try {
+      log('Searching for purchase link for ${metadata['productTitle']}');
+      log('Search metadata: ${metadata['publisher'] ?? 'unknown publisher'}, ${metadata['gameSystem'] ?? 'unknown system'}');
+
+      // Run in a separate isolate to avoid blocking the main thread
+      var result = await compute(_isolatedPurchaseLinkSearch, metadata);
+
+      if (result == null) {
+        log('No purchase link found for ${metadata['productTitle']}');
+      } else {
+        log('Purchase link found: $result');
+      }
+
+      return result;
+    } catch (e) {
+      log('Error in purchase link search: $e');
+      return null;
+    }
+  }
+
+  // This static method runs in a separate isolate
+  static Future<String?> _isolatedPurchaseLinkSearch(
+      Map<String, dynamic> metadata) async {
+    final purchaseLinkService = PurchaseLinkService();
+    try {
+      return await purchaseLinkService.findPurchaseLink(metadata);
+    } finally {
+      purchaseLinkService.dispose();
     }
   }
 

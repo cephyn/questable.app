@@ -79,10 +79,20 @@ class FirebaseStorageService {
     }
   }
 
-  String getStorageUrl(Reference fileReference) {
-    final bucket = fileReference.bucket;
-    final fullPath = fileReference.fullPath;
-    return 'gs://$bucket/$fullPath';
+  /// Get a properly authenticated URL for a file reference
+  /// This method generates an authenticated URL that can be used with Vertex AI
+  Future<String> getStorageUrl(Reference fileReference) async {
+    try {
+      // First try to get a download URL with authentication token
+      String downloadUrl = await fileReference.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('Error getting download URL: $e, falling back to gs:// URL');
+      // Fall back to gs:// URL format
+      final bucket = fileReference.bucket;
+      final fullPath = fileReference.fullPath;
+      return 'gs://$bucket/$fullPath';
+    }
   }
 
   // Delete a file from Firebase Storage
