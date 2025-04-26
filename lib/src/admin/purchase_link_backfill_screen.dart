@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import '../controllers/purchase_link_backfill_controller.dart';
 import '../models/backfill_stats.dart';
+import '../config/config.dart'; // Added to access API keys
 
 /// Screen for backfilling purchase links for existing QuestCards
 class PurchaseLinkBackfillScreen extends StatefulWidget {
@@ -20,6 +21,8 @@ class _PurchaseLinkBackfillScreenState
   bool _isProcessing = false;
   String _statusMessage = '';
   int _batchSize = 20;
+  String _errorDetails = ''; // Added to display error details
+  bool _showDebugInfo = false; // Toggle for debugging info
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +43,50 @@ class _PurchaseLinkBackfillScreenState
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 24),
+
+            // Debug configuration checker
+            Card(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Configuration Status',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: Icon(_showDebugInfo
+                              ? Icons.visibility_off
+                              : Icons.visibility),
+                          onPressed: () {
+                            setState(() {
+                              _showDebugInfo = !_showDebugInfo;
+                            });
+                          },
+                          tooltip: _showDebugInfo
+                              ? 'Hide Debug Info'
+                              : 'Show Debug Info',
+                        ),
+                      ],
+                    ),
+                    if (_showDebugInfo) ...[
+                      Text(
+                          'Google API Key: ${Config.googleApiKey.isEmpty ? "❌ Not configured" : "✅ Configured"}'),
+                      Text(
+                          'Google Search Engine ID: ${Config.googleSearchEngineId.isEmpty ? "❌ Not configured" : "✅ Configured"}'),
+                      const SizedBox(height: 8),
+                      const Text(
+                          'If either of these are not configured, the purchase link search will fail.',
+                          style: TextStyle(fontStyle: FontStyle.italic)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Batch size selector
             Row(
@@ -72,6 +119,17 @@ class _PurchaseLinkBackfillScreenState
               Padding(
                 padding: const EdgeInsets.only(bottom: 16.0),
                 child: Text(_statusMessage),
+              ),
+
+            // Display error details if any
+            if (_errorDetails.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                color: Colors.red.shade50,
+                child: Text(
+                  'Error details: $_errorDetails',
+                  style: TextStyle(color: Colors.red.shade800),
+                ),
               ),
 
             if (_stats != null) ...[
@@ -120,9 +178,16 @@ class _PurchaseLinkBackfillScreenState
     setState(() {
       _isProcessing = true;
       _statusMessage = 'Starting backfill process...';
+      _errorDetails = ''; // Clear previous errors
     });
 
     try {
+      // Validate configuration before starting
+      if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
+        throw Exception(
+            'Google API Key or Search Engine ID is not configured.');
+      }
+
       await for (var stats
           in _controller.processBackfill(batchSize: _batchSize)) {
         if (mounted) {
@@ -144,7 +209,8 @@ class _PurchaseLinkBackfillScreenState
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _statusMessage = 'Error: ${e.toString()}';
+          _statusMessage = 'Error occurred. See details below.';
+          _errorDetails = e.toString();
         });
       }
     }
@@ -161,6 +227,11 @@ class _PurchaseLinkBackfillScreenState
       }
     } catch (e) {
       log('Error pausing backfill: $e');
+      if (mounted) {
+        setState(() {
+          _errorDetails = e.toString();
+        });
+      }
     }
   }
 
@@ -181,7 +252,8 @@ class _PurchaseLinkBackfillScreenState
       log('Error checking stats: $e');
       if (mounted) {
         setState(() {
-          _statusMessage = 'Error checking status: ${e.toString()}';
+          _statusMessage = 'Error checking status.';
+          _errorDetails = e.toString();
         });
       }
     }

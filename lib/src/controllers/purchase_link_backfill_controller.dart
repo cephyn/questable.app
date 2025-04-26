@@ -2,233 +2,198 @@ import 'dart:async';
 import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/backfill_stats.dart';
-import '../quest_card/quest_card.dart';
-import '../services/firestore_service.dart';
 import '../services/purchase_link_service.dart';
+import '../config/config.dart';
 
-/// Controller for managing purchase link backfill operations
+/// Controller for handling the purchase link backfill process
 class PurchaseLinkBackfillController {
-  final FirestoreService _firestoreService;
-  final PurchaseLinkService _purchaseLinkService;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final PurchaseLinkService _purchaseLinkService = PurchaseLinkService();
 
-  /// Document ID for storing backfill state in Firestore
-  static const String backfillStateDocId = 'purchase_link_backfill_state';
+  StreamController<BackfillStats>? _statsStreamController;
+  BackfillStats _currentStats = BackfillStats.empty();
+  bool _isPaused = false;
 
-  /// Collection name for backfill state
-  static const String backfillStateCollection = 'admin';
-
-  /// Whether the backfill is currently running
-  bool _isRunning = false;
-
-  /// Whether the backfill should be paused
-  bool _shouldPause = false;
-
-  /// Create a new backfill controller
-  PurchaseLinkBackfillController({
-    FirestoreService? firestoreService,
-    PurchaseLinkService? purchaseLinkService,
-  })  : _firestoreService = firestoreService ?? FirestoreService(),
-        _purchaseLinkService = purchaseLinkService ?? PurchaseLinkService();
-
-  /// Process backfill of purchase links in batches
-  ///
-  /// [batchSize] is the number of records to process in each batch
-  /// Returns a stream of BackfillStats for progress tracking
+  /// Process a batch of quest cards that need purchase links
   Stream<BackfillStats> processBackfill({int batchSize = 20}) async* {
-    if (_isRunning) {
-      throw Exception('Backfill process is already running');
-    }
-
-    _isRunning = true;
-    _shouldPause = false;
+    _isPaused = false;
+    _statsStreamController = StreamController<BackfillStats>();
 
     try {
-      // Get or create backfill state
-      BackfillStats stats = await _getBackfillState();
-
-      // If we're starting fresh, count total records
-      if (stats.total == 0 || stats.processed >= stats.total) {
-        final total = await _countQuestCardsWithoutLinks();
-        stats = stats.copyWith(total: total, processed: 0);
-        await _saveBackfillState(stats);
+      // Validate configuration before starting
+      if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
+        log('ERROR: Google API Key or Search Engine ID is missing');
+        throw Exception(
+            'Google API configuration is incomplete. Please set up your API keys in Firebase Remote Config.');
       }
 
-      // No records to process
-      if (stats.total == 0) {
-        yield stats;
+      // First approach: Get documents with null link field
+      final QuerySnapshot nullLinkSnapshot = await _firestore
+          .collection('questCards')
+          .where('link', isNull: true)
+          .get();
+
+      // Second approach: Get documents with empty string link
+      final QuerySnapshot emptyLinkSnapshot = await _firestore
+          .collection('questCards')
+          .where('link', isEqualTo: '')
+          .get();
+
+      // Third approach: Get a sample of documents to check for missing link field
+      // Note: This is a workaround since Firestore doesn't support "field does not exist" queries
+      final QuerySnapshot allDocsSnapshot = await _firestore
+          .collection('questCards')
+          .limit(500) // Limit to avoid excessive reads
+          .get();
+
+      // Filter locally for documents missing the link field entirely
+      final missingLinkDocs = allDocsSnapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>?;
+        return data != null && !data.containsKey('link');
+      }).toList();
+
+      // Combine all documents (avoiding duplicates)
+      final Set<String> allDocIds = {};
+      final List<QueryDocumentSnapshot> allDocsToProcess = [];
+
+      // Helper function to add docs to our processing list
+      void addDocsToProcess(List<QueryDocumentSnapshot> docs) {
+        for (final doc in docs) {
+          if (!allDocIds.contains(doc.id)) {
+            allDocIds.add(doc.id);
+            allDocsToProcess.add(doc);
+          }
+        }
+      }
+
+      // Add all docs from the three queries
+      addDocsToProcess(nullLinkSnapshot.docs);
+      addDocsToProcess(emptyLinkSnapshot.docs);
+      addDocsToProcess(missingLinkDocs);
+
+      final int totalDocsNeeding = allDocsToProcess.length;
+
+      log('Found $totalDocsNeeding documents needing purchase links');
+      log('- ${nullLinkSnapshot.docs.length} documents with null links');
+      log('- ${emptyLinkSnapshot.docs.length} documents with empty links');
+      log('- ${missingLinkDocs.length} documents without a link field (from sample)');
+
+      // Update total count in stats
+      _currentStats = _currentStats.copyWith(
+        total: totalDocsNeeding,
+      );
+
+      // Yield initial stats
+      yield _currentStats;
+
+      if (totalDocsNeeding == 0) {
+        log('No documents found that need purchase links');
         return;
       }
 
-      // Report initial stats
-      yield stats;
+      // Process all documents in batches
+      for (int i = 0; i < allDocsToProcess.length; i += batchSize) {
+        if (_isPaused) break;
 
-      // Process in batches
-      while (stats.processed < stats.total) {
-        // Check if paused
-        if (_shouldPause) {
-          break;
-        }
+        final int currentBatch = (i ~/ batchSize) + 1;
+        final int totalBatches = (allDocsToProcess.length / batchSize).ceil();
+        log('Processing batch $currentBatch of $totalBatches');
 
-        // Get a batch of QuestCards without links
-        final batch = await _getQuestCardsWithoutLinks(
-          limit: batchSize,
-          offset: stats.processed,
-        );
+        // Get the current batch
+        final int endIdx = i + batchSize > allDocsToProcess.length
+            ? allDocsToProcess.length
+            : i + batchSize;
+        final currentBatchDocs = allDocsToProcess.sublist(i, endIdx);
 
-        if (batch.isEmpty) {
-          // No more records to process
-          break;
-        }
+        log('Processing ${currentBatchDocs.length} documents in this batch');
 
-        // Process each QuestCard in the batch
-        var batchStats = stats;
-        for (final questCard in batch) {
-          // Check if paused
-          if (_shouldPause) {
-            break;
-          }
+        // Process each document in the batch
+        for (final doc in currentBatchDocs) {
+          if (_isPaused) break;
 
           try {
-            // Skip if already has a link
-            if (questCard.link != null && questCard.link!.isNotEmpty) {
-              batchStats = batchStats.copyWith(
-                processed: batchStats.processed + 1,
-                skipped: batchStats.skipped + 1,
+            final questCardData = doc.data() as Map<String, dynamic>;
+            final String title = questCardData['productTitle'] ?? '';
+            final String subtitle = questCardData['title'] ?? '';
+
+            log('Processing document: ${doc.id}, title: $title, subtitle: $subtitle');
+
+            // Skip if we don't have enough data
+            if (title.isEmpty && subtitle.isEmpty) {
+              log('Skipping document due to empty title and subtitle: ${doc.id}');
+              _currentStats = _currentStats.copyWith(
+                processed: _currentStats.processed + 1,
+                skipped: _currentStats.skipped + 1,
               );
+              yield _currentStats;
               continue;
             }
 
-            // Extract metadata for search
-            final metadata = {
-              'title': questCard.title ?? '',
-              'publisher': questCard.publisher ?? '',
-              'gameSystem': questCard.gameSystem ?? '',
-            };
-
             // Search for purchase link
-            final purchaseLink =
-                await _purchaseLinkService.findPurchaseLink(metadata);
+            log('Searching for purchase link for: $title');
+            final String? purchaseLink =
+                await _purchaseLinkService.findPurchaseLink(questCardData);
 
-            // Update API calls count
-            batchStats = batchStats.copyWith(apiCalls: batchStats.apiCalls + 1);
-
-            // Update QuestCard if link found
+            // Update firestore with link if found
             if (purchaseLink != null && purchaseLink.isNotEmpty) {
-              questCard.link = purchaseLink;
-              await _firestoreService.updateQuestCard(questCard.id!, questCard);
+              log('Found purchase link for ${doc.id}: $purchaseLink');
+              await _firestore
+                  .collection('questCards')
+                  .doc(doc.id)
+                  .update({'link': purchaseLink});
 
-              batchStats = batchStats.copyWith(
-                processed: batchStats.processed + 1,
-                successful: batchStats.successful + 1,
+              // Update stats
+              _currentStats = _currentStats.copyWith(
+                processed: _currentStats.processed + 1,
+                successful: _currentStats.successful + 1,
+                apiCalls: _currentStats.apiCalls + 1,
               );
             } else {
-              batchStats = batchStats.copyWith(
-                processed: batchStats.processed + 1,
-                failed: batchStats.failed + 1,
+              // Link not found
+              log('No purchase link found for ${doc.id}');
+              _currentStats = _currentStats.copyWith(
+                processed: _currentStats.processed + 1,
+                failed: _currentStats.failed + 1,
+                apiCalls: _currentStats.apiCalls + 1,
               );
             }
-          } catch (e) {
-            log('Error processing QuestCard ${questCard.id}: $e');
-            batchStats = batchStats.copyWith(
-              processed: batchStats.processed + 1,
-              failed: batchStats.failed + 1,
-            );
-          }
 
-          // Update and save state after each record
-          stats = batchStats;
-          await _saveBackfillState(stats);
-          yield stats;
+            // Yield updated stats
+            yield _currentStats;
+          } catch (e) {
+            // Handle individual document error
+            log('Error processing document ${doc.id}: $e');
+            _currentStats = _currentStats.copyWith(
+              processed: _currentStats.processed + 1,
+              failed: _currentStats.failed + 1,
+            );
+            yield _currentStats;
+          }
         }
 
-        // Add a small delay between batches to avoid overloading
+        // Brief delay to avoid hitting API rate limits
+        log('Completed batch. Taking a short break to avoid rate limits.');
         await Future.delayed(const Duration(milliseconds: 500));
       }
+    } catch (e) {
+      // Handle overall process error
+      log('Error in processBackfill: $e');
+      rethrow;
     } finally {
-      _isRunning = false;
+      log('Backfill process completed or paused');
+      await _statsStreamController?.close();
     }
   }
 
   /// Pause the backfill process
   Future<void> pauseBackfill() async {
-    _shouldPause = true;
+    log('Pausing backfill process');
+    _isPaused = true;
+    await _statsStreamController?.close();
   }
 
-  /// Get the current backfill stats
+  /// Get the current processing stats
   Future<BackfillStats> getCurrentStats() async {
-    return _getBackfillState();
-  }
-
-  /// Reset the backfill process
-  Future<void> resetBackfill() async {
-    await _saveBackfillState(BackfillStats.empty());
-  }
-
-  /// Get the current backfill state from Firestore
-  Future<BackfillStats> _getBackfillState() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection(backfillStateCollection)
-          .doc(backfillStateDocId)
-          .get();
-
-      if (doc.exists && doc.data() != null) {
-        return BackfillStats.fromMap(doc.data()!);
-      }
-    } catch (e) {
-      log('Error getting backfill state: $e');
-    }
-
-    return BackfillStats.empty();
-  }
-
-  /// Save the current backfill state to Firestore
-  Future<void> _saveBackfillState(BackfillStats stats) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection(backfillStateCollection)
-          .doc(backfillStateDocId)
-          .set(stats.toMap());
-    } catch (e) {
-      log('Error saving backfill state: $e');
-    }
-  }
-
-  /// Count QuestCards without purchase links
-  Future<int> _countQuestCardsWithoutLinks() async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('questCards')
-          .where('link', isNull: true)
-          .count()
-          .get();
-
-      return snapshot.count ?? 0;
-    } catch (e) {
-      log('Error counting QuestCards without links: $e');
-      return 0;
-    }
-  }
-
-  /// Get a batch of QuestCards without purchase links
-  Future<List<QuestCard>> _getQuestCardsWithoutLinks({
-    required int limit,
-    required int offset,
-  }) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('questCards')
-          .where('link', isNull: true)
-          .orderBy('title')
-          .limit(limit)
-          .get();
-
-      return snapshot.docs
-          .map((doc) => QuestCard.fromJson(doc.data())..id = doc.id)
-          .toList();
-    } catch (e) {
-      log('Error getting QuestCards without links: $e');
-      return [];
-    }
+    return _currentStats;
   }
 }

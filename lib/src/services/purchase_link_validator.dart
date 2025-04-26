@@ -61,6 +61,18 @@ class PurchaseLinkValidator {
     try {
       log('Validating URL: $url');
 
+      // Check if the URL uses HTTP/HTTPS protocol
+      final urlLower = url.toLowerCase();
+      if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
+        log('URL rejected: Not an HTTP/HTTPS link: $url');
+        return ValidationResult(
+          url: url,
+          priority: DomainPriority.unknown,
+          isValid: false,
+          confidenceScore: 0,
+        );
+      }
+
       // Get domain priority
       int priority = getDomainPriority(url);
       log('Domain priority: $priority');
@@ -73,28 +85,31 @@ class PurchaseLinkValidator {
       bool isAccessible = await isUrlAccessible(url);
       log('URL accessible: $isAccessible');
 
-      // Check if URL content likely matches the product
-      bool likelyMatches = checkUrlLikelyMatches(url, metadata);
-      log('URL likely matches product: $likelyMatches');
+      // Check if URL matches title and publisher
+      bool titleMatches = checkUrlMatchesTitle(url, metadata);
+      bool publisherMatches = checkUrlMatchesPublisher(url, metadata);
+      log('URL matches title: $titleMatches');
+      log('URL matches publisher: $publisherMatches');
 
       // Calculate confidence score (0-100)
-      int confidenceScore = calculateConfidenceScore(
+      int confidenceScore = calculateDetailedConfidenceScore(
           priority: priority,
           structureScore: structureScore,
           isAccessible: isAccessible,
-          likelyMatches: likelyMatches);
+          titleMatches: titleMatches,
+          publisherMatches: publisherMatches);
       log('Final confidence score: $confidenceScore');
 
       // Modified validation logic: URL is valid if confidence score is high enough,
       // even if the accessibility check fails when other indicators are strong
       bool isValid =
-          (isAccessible || (confidenceScore > 60)) && confidenceScore > 30;
+          (isAccessible || (confidenceScore >= 60)) && confidenceScore > 30;
       log('URL validation result: ${isValid ? 'Valid' : 'Invalid'} (score: $confidenceScore)');
 
       return ValidationResult(
         url: url,
         priority: priority,
-        isValid: isValid, // Minimum confidence threshold
+        isValid: isValid,
         confidenceScore: confidenceScore,
       );
     } catch (e) {
@@ -231,50 +246,161 @@ class PurchaseLinkValidator {
     }
   }
 
-  /// Checks if a URL likely matches the product
+  /// Checks if a URL likely matches the product title
   ///
   /// [url] is the URL to check
   /// [metadata] contains the quest card metadata
-  /// Returns true if the URL likely matches the product
-  bool checkUrlLikelyMatches(String url, Map<String, String> metadata) {
+  /// Returns true if the URL likely matches the title
+  bool checkUrlMatchesTitle(String url, Map<String, String> metadata) {
     try {
       final urlLower = url.toLowerCase();
-      final title = metadata['productTitle']?.toLowerCase() ?? '';
+
+      // Check both productTitle and title fields (one might be empty)
+      final title = metadata['productTitle']?.toLowerCase() ??
+          metadata['title']?.toLowerCase() ??
+          '';
+
+      log('DEBUG: checkUrlMatchesTitle');
+      log('DEBUG: URL: $urlLower');
+      log('DEBUG: Title: $title');
+
+      if (title.isEmpty) {
+        log('DEBUG: Title is empty');
+        return false;
+      }
+
+      // Check if title is in the URL
+      // Split into words and check if major words appear in URL
+      final titleWords = title
+          .split(' ')
+          .where((word) => word.length > 3) // Skip short words
+          .toList();
+
+      log('DEBUG: Title words to match: $titleWords');
+
+      if (titleWords.isEmpty) {
+        log('DEBUG: No significant title words found (all words are too short)');
+        return false;
+      }
+
+      int matchCount = 0;
+      log('DEBUG: Checking title words in URL:');
+      for (final word in titleWords) {
+        final wordInUrl = urlLower.contains(word);
+        log('DEBUG:   "$word" in URL: ${wordInUrl ? "YES" : "NO"}');
+        if (wordInUrl) {
+          matchCount++;
+        }
+      }
+
+      // Calculate threshold for matching
+      final threshold = titleWords.length / 2;
+      log('DEBUG: Match count: $matchCount out of ${titleWords.length}');
+      log('DEBUG: Threshold: $threshold');
+
+      // If more than half of the significant title words are in the URL,
+      // it's likely a match
+      final isMatch = matchCount >= threshold;
+      log('DEBUG: Title words match is ${isMatch ? "ABOVE" : "BELOW"} threshold');
+      return isMatch;
+    } catch (e) {
+      log('DEBUG: Error in checkUrlMatchesTitle: $e');
+      return false;
+    }
+  }
+
+  /// Checks if a URL likely matches the publisher
+  ///
+  /// [url] is the URL to check
+  /// [metadata] contains the quest card metadata
+  /// Returns true if the URL likely matches the publisher
+  bool checkUrlMatchesPublisher(String url, Map<String, String> metadata) {
+    try {
+      final urlLower = url.toLowerCase();
       final publisher = metadata['publisher']?.toLowerCase() ?? '';
 
-      if (title.isNotEmpty) {
-        // Check if title is in the URL
-        // Split into words and check if major words appear in URL
-        final titleWords = title
+      log('DEBUG: checkUrlMatchesPublisher');
+      log('DEBUG: URL: $urlLower');
+      log('DEBUG: Publisher: $publisher');
+
+      if (publisher.isEmpty) {
+        log('DEBUG: Publisher is empty');
+        return false;
+      }
+
+      // First try direct string match
+      final publisherInUrl = urlLower.contains(publisher);
+      log('DEBUG: Publisher "$publisher" in URL (direct match): ${publisherInUrl ? "YES" : "NO"}');
+
+      if (publisherInUrl) {
+        log('DEBUG: Publisher match is TRUE (direct)');
+        return true;
+      }
+
+      // If direct match failed, normalize publisher by removing spaces and try again
+      final normalizedPublisher =
+          publisher.replaceAll(' ', '').replaceAll('-', '');
+      final normalizedUrl = urlLower.replaceAll('-', '');
+      final normalizedMatch = normalizedUrl.contains(normalizedPublisher);
+
+      log('DEBUG: Normalized publisher: "$normalizedPublisher"');
+      log('DEBUG: Normalized URL: "$normalizedUrl"');
+      log('DEBUG: Publisher in URL (normalized): ${normalizedMatch ? "YES" : "NO"}');
+
+      if (normalizedMatch) {
+        log('DEBUG: Publisher match is TRUE (normalized)');
+        return true;
+      }
+
+      // Try matching parts of multi-word publishers
+      if (publisher.contains(' ')) {
+        final publisherWords = publisher
             .split(' ')
             .where((word) => word.length > 3) // Skip short words
             .toList();
 
-        if (titleWords.isNotEmpty) {
+        log('DEBUG: Publisher words to match: $publisherWords');
+
+        if (publisherWords.isNotEmpty) {
           int matchCount = 0;
-          for (final word in titleWords) {
+          for (final word in publisherWords) {
             if (urlLower.contains(word)) {
+              log('DEBUG: Publisher word "$word" found in URL');
               matchCount++;
             }
           }
 
-          // If more than half of the significant title words are in the URL,
-          // it's likely a match
-          if (matchCount >= titleWords.length / 2) {
+          // If we match at least half of the publisher words, it's likely a match
+          final wordThreshold = publisherWords.length / 2;
+          log('DEBUG: Publisher word match count: $matchCount out of ${publisherWords.length}');
+          log('DEBUG: Publisher word threshold: $wordThreshold');
+
+          if (matchCount >= wordThreshold) {
+            log('DEBUG: Publisher words match is ABOVE threshold');
             return true;
           }
         }
       }
 
-      // If publisher is in URL, it's also a good sign
-      if (publisher.isNotEmpty && urlLower.contains(publisher)) {
-        return true;
-      }
-
+      log('DEBUG: No publisher match found');
       return false;
-    } catch (_) {
+    } catch (e) {
+      log('DEBUG: Error in checkUrlMatchesPublisher: $e');
       return false;
     }
+  }
+
+  /// Legacy method that calls both title and publisher matching
+  ///
+  /// [url] is the URL to check
+  /// [metadata] contains the quest card metadata
+  /// Returns true if either the title or publisher likely matches
+  @Deprecated(
+      'Use checkUrlMatchesTitle and checkUrlMatchesPublisher separately')
+  bool checkUrlLikelyMatches(String url, Map<String, String> metadata) {
+    final titleMatches = checkUrlMatchesTitle(url, metadata);
+    final publisherMatches = checkUrlMatchesPublisher(url, metadata);
+    return titleMatches || publisherMatches;
   }
 
   /// Calculates a confidence score for a purchase link
@@ -290,15 +416,40 @@ class PurchaseLinkValidator {
     required bool isAccessible,
     required bool likelyMatches,
   }) {
+    // Legacy method using combined likelyMatches
+    // Use the new calculateDetailedConfidenceScore instead
+    return calculateDetailedConfidenceScore(
+        priority: priority,
+        structureScore: structureScore,
+        isAccessible: isAccessible,
+        titleMatches: likelyMatches,
+        publisherMatches: likelyMatches);
+  }
+
+  /// Calculates a detailed confidence score for a purchase link
+  ///
+  /// [priority] is the domain priority
+  /// [structureScore] is the URL structure score
+  /// [isAccessible] is whether the URL is accessible
+  /// [titleMatches] is whether the URL matches the title
+  /// [publisherMatches] is whether the URL matches the publisher
+  /// Returns a confidence score (0-100)
+  int calculateDetailedConfidenceScore({
+    required int priority,
+    required int structureScore,
+    required bool isAccessible,
+    required bool titleMatches,
+    required bool publisherMatches,
+  }) {
     int score = 0;
 
-    // Domain priority (0-40 points)
+    // Domain priority (0-30 points)
     switch (priority) {
       case DomainPriority.publisher:
-        score += 40;
+        score += 30;
         break;
       case DomainPriority.marketplace:
-        score += 30;
+        score += 25;
         break;
       case DomainPriority.retailer:
         score += 20;
@@ -308,15 +459,18 @@ class PurchaseLinkValidator {
         break;
     }
 
-    // URL structure (0-30 points)
-    // Normalize structureScore to 0-30 range
-    score += (structureScore.clamp(-20, 40) + 20) * 30 ~/ 60;
+    // URL structure (0-20 points)
+    // Normalize structureScore to 0-20 range
+    score += (structureScore.clamp(-20, 40) + 20) * 20 ~/ 60;
 
-    // Accessibility (0-15 points)
-    if (isAccessible) score += 15;
+    // Accessibility (0 points)
+    if (isAccessible) score += 0;
 
-    // Likely matches (0-15 points)
-    if (likelyMatches) score += 15;
+    // Title matches (0-25 points)
+    if (titleMatches) score += 25;
+
+    // Publisher matches (0-25 points)
+    if (publisherMatches) score += 25;
 
     return score.clamp(0, 100);
   }

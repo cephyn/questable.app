@@ -5,6 +5,7 @@ import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/admin/migration_tools.dart';
+import 'package:quest_cards/src/admin/purchase_link_backfill.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/navigation/root_navigator.dart';
@@ -115,6 +116,9 @@ class _HomePageState extends State<HomePage> {
         break;
       case 5:
         page = MigrationTools(); // Admin-only migration tools
+        break;
+      case 6:
+        page = PurchaseLinkBackfill(); // Admin-only purchase link backfill
         break;
       default:
         page = Placeholder();
@@ -258,6 +262,11 @@ class _HomePageState extends State<HomePage> {
                   NavigationDestination(
                     icon: Icon(Icons.build),
                     label: 'Migration Tools',
+                  ),
+                if (roles != null && roles.contains('admin'))
+                  NavigationDestination(
+                    icon: Icon(Icons.link),
+                    label: 'Purchase Link Backfill',
                   ),
               ],
               smallBody: (_) => page,

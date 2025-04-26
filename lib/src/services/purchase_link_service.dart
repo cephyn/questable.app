@@ -25,32 +25,46 @@ class PurchaseLinkService {
     PurchaseLinkCache? cache,
   })  : _searchClient = searchClient ??
             GooglePSEClient(
-              // FOR TESTING: Replace with your actual Google API key and Search Engine ID
-              apiKey: Config.googleApiKey.isEmpty
-                  ? "YOUR_API_KEY_HERE"
-                  : Config.googleApiKey,
-              searchEngineId: Config.googleSearchEngineId.isEmpty
-                  ? "YOUR_SEARCH_ENGINE_ID_HERE"
-                  : Config.googleSearchEngineId,
+              apiKey: Config.googleApiKey,
+              searchEngineId: Config.googleSearchEngineId,
             ),
         _validator = validator ??
             PurchaseLinkValidator(
               publisherDomains: Config.publisherDomains,
               marketplaceDomains: Config.marketplaceDomains,
             ),
-        _cache = cache ?? PurchaseLinkCache();
+        _cache = cache ?? PurchaseLinkCache() {
+    // Validate configuration on initialization
+    if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
+      log('WARNING: Google API Key or Search Engine ID is not configured properly');
+    }
+  }
 
   /// Finds a purchase link for an RPG adventure
   ///
   /// [metadata] contains the quest card metadata to search for
   /// Returns the best purchase link URL or null if none found
   Future<String?> findPurchaseLink(Map<String, dynamic> metadata) async {
-    if (metadata['productTitle']?.isEmpty ?? true) {
+    if (metadata['productTitle']?.isEmpty ??
+        true && metadata['title']?.isEmpty ??
+        true) {
+      log('Cannot search without a product title');
       return null;
     }
 
     try {
+      // Validate configuration
+      if (Config.googleApiKey.isEmpty ||
+          Config.googleApiKey.contains("YOUR_API_KEY") ||
+          Config.googleSearchEngineId.isEmpty ||
+          Config.googleSearchEngineId.contains("YOUR_SEARCH_ENGINE_ID")) {
+        throw Exception('Google API credentials are missing or invalid');
+      }
+
       String title = metadata['productTitle'] ?? '';
+      if (title.isEmpty) {
+        title = metadata['title'] ?? '';
+      }
       String publisher = metadata['publisher'] ?? '';
       String gameSystem = metadata['gameSystem'] ?? '';
 
@@ -90,8 +104,8 @@ class PurchaseLinkService {
       return link;
     } catch (e) {
       log('Error in findPurchaseLink: $e');
-      // Don't fail the entire analysis if purchase link search fails
-      return null;
+      // Rethrow to make errors visible
+      rethrow;
     }
   }
 
@@ -155,6 +169,10 @@ class PurchaseLinkService {
       return null;
     }
 
+    // Limit to top 5 results
+    final topResults = results.length > 5 ? results.sublist(0, 5) : results;
+    log('Processing only top ${topResults.length} search results');
+
     // Process each result and get validation data
     final validationResults = <ValidationResult>[];
     final metadata = {
@@ -162,7 +180,7 @@ class PurchaseLinkService {
       'publisher': publisher,
     };
 
-    for (final result in results) {
+    for (final result in topResults) {
       try {
         final validationResult =
             await _validator.validate(result.link, metadata);
