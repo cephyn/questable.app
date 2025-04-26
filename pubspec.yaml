@@ -31,7 +31,6 @@ dependencies:
   flutter_donation_buttons: ^0.4.10
   flutter_localizations:
     sdk: flutter
-  flutter_markdown: ^0.6.21
   flutter_web_plugins: 
     sdk: flutter
   fluttertoast: ^8.2.10
@@ -45,6 +44,8 @@ dependencies:
   rxdart: ^0.28.0
   web: ^1.1.1
   shared_preferences: ^2.5.3
+  http: ^1.3.0
+  gpt_markdown: ^1.0.17
 
 dev_dependencies:
   flutter_test:

@@ -540,21 +540,6 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
                     },
                     tooltip: 'Edit (requires login)',
                   ),
-                  // Delete button with login prompt
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      final navigator = RootNavigator.of(context);
-                      if (navigator != null) {
-                        navigator.showLoginPrompt(context, 'delete',
-                            docId: docId);
-                      } else {
-                        AuthDialogHelper.showLoginPrompt(
-                            context, 'delete quests');
-                      }
-                    },
-                    tooltip: 'Delete (requires login)',
-                  ),
                 ],
               ),
             ),

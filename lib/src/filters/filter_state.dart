@@ -395,7 +395,7 @@ class FilterProvider extends ChangeNotifier {
     'classification',
     'genre',
     'setting',
-    'environment' // Changed from 'environments' to 'environment'
+    'environments' // Changed from 'environments' to 'environment'
   ];
   static const List<String> publicationFields = [
     'publisher',
@@ -414,7 +414,7 @@ class FilterProvider extends ChangeNotifier {
     'classification': 'Type',
     'genre': 'Genre',
     'setting': 'Setting',
-    'environment':
+    'environments':
         'Environments', // Changed from 'environments' to 'environment'
     'publisher': 'Publisher',
     'publicationYear': 'Year Published',
@@ -475,7 +475,7 @@ class FilterProvider extends ChangeNotifier {
             .where((item) => item != null && item.toString().isNotEmpty)
             .toList(),
         // Store the environment values in the 'environment' key for the UI to access
-        'environment': environments
+        'environments': environments
             .where((item) => item != null && item.toString().isNotEmpty)
             .toList(),
         'setting': settings

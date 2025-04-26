@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
@@ -306,38 +306,11 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
               ),
             ),
             const SizedBox(height: 8),
-            MarkdownBody(
-              data: _questCardData!['summary'] ?? 'No summary available.',
-              onTapLink: (text, href, title) {
-                if (href != null) {
-                  _launchURL(href);
-                }
-              },
-              styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(fontSize: 16),
-                h1: TextStyle(
-                  fontSize: 22,
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-                h2: TextStyle(
-                  fontSize: 20,
-                  color: Theme.of(context).colorScheme.secondary,
-                  fontWeight: FontWeight.bold,
-                ),
-                blockquote: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
-                ),
-                code: TextStyle(
-                  backgroundColor: Colors.grey.shade200,
-                  fontFamily: 'monospace',
-                ),
-                codeblockDecoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+            GptMarkdown(
+              _questCardData!['summary'] ?? 'No summary available.',
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],

@@ -401,9 +401,9 @@ class _FilterDrawerState extends State<FilterDrawer> {
       // Environment Filter (multi-select)
       _buildMultiSelectFilter(
         provider: provider,
-        field: 'environment',
-        label: 'Environment',
-        options: provider.filterOptions['environment'] ?? [],
+        field: 'environments',
+        label: 'Environments',
+        options: provider.filterOptions['environments'] ?? [],
         placeholder: 'Select Environments',
       ),
       const SizedBox(height: 16),
