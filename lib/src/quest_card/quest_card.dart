@@ -7,6 +7,7 @@ class QuestCard {
   String? productTitle;
   String? title;
   String? gameSystem;
+  String? standardizedGameSystem; // New field for standardized game system name
   String? edition;
   String? level;
   int? pageLength;
@@ -25,12 +26,16 @@ class QuestCard {
   String? classification;
   String? uploadedBy;
   bool isPublic = true; // Default to true for public access
+  String? systemMigrationStatus; // New field to track migration status
+  DateTime?
+      systemMigrationTimestamp; // New field to track when migration occurred
 
   QuestCard(
       {this.id,
       this.productTitle,
       this.title,
       this.gameSystem,
+      this.standardizedGameSystem,
       this.edition,
       this.level,
       this.pageLength,
@@ -47,31 +52,39 @@ class QuestCard {
       this.genre,
       this.classification,
       this.uploadedBy,
-      this.isPublic = true}); // Default to true for public access
+      this.isPublic = true,
+      this.systemMigrationStatus,
+      this.systemMigrationTimestamp}); // Default to true for public access
 
   QuestCard.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     productTitle = json['productTitle'];
     title = json['title'];
     gameSystem = json['gameSystem'];
+    standardizedGameSystem = json['standardizedGameSystem'];
     edition = json['edition'];
     level = json['level'];
     pageLength = json['pageLength'];
-    authors = json['authors'].cast<String>();
+    authors = json['authors']?.cast<String>();
     publisher = json['publisher'];
     publicationYear = json['publicationYear'];
     setting = json['setting'];
-    environments = json['environments'].cast<String>();
+    environments = json['environments']?.cast<String>();
     link = json['link'];
-    bossVillains = json['bossVillains'].cast<String>();
-    commonMonsters = json['commonMonsters'].cast<String>();
-    notableItems = json['notableItems'].cast<String>();
+    bossVillains = json['bossVillains']?.cast<String>();
+    commonMonsters = json['commonMonsters']?.cast<String>();
+    notableItems = json['notableItems']?.cast<String>();
     summary = json['summary'];
     genre = json['genre'];
     classification = json['classification'];
     uploadedBy = json['uploadedBy'];
     // Handle isPublic with fallback to true if not present in document
     isPublic = json['isPublic'] ?? true;
+    // Migration status fields
+    systemMigrationStatus = json['systemMigrationStatus'];
+    systemMigrationTimestamp = json['systemMigrationTimestamp'] != null
+        ? (json['systemMigrationTimestamp'] as dynamic).toDate()
+        : null;
   }
 
   QuestCard.fromSearchJson(Map<String, dynamic> json) {
@@ -79,18 +92,19 @@ class QuestCard {
     productTitle = json['productTitle'];
     title = json['title'];
     gameSystem = json['gameSystem'];
+    standardizedGameSystem = json['standardizedGameSystem'];
     edition = json['edition'];
     level = json['level'];
     pageLength = json['pageLength'];
-    authors = json['authors'].cast<String>();
+    authors = json['authors']?.cast<String>();
     publisher = json['publisher'];
     publicationYear = json['publicationYear'];
     setting = json['setting'];
-    environments = json['environments'].cast<String>();
+    environments = json['environments']?.cast<String>();
     link = json['link'];
-    bossVillains = json['bossVillains'].cast<String>();
-    commonMonsters = json['commonMonsters'].cast<String>();
-    notableItems = json['notableItems'].cast<String>();
+    bossVillains = json['bossVillains']?.cast<String>();
+    commonMonsters = json['commonMonsters']?.cast<String>();
+    notableItems = json['notableItems']?.cast<String>();
     summary = json['summary'];
     genre = json['genre'];
     classification = json['classification'];
@@ -98,6 +112,12 @@ class QuestCard {
     uploadedBy = json['uploadedBy'];
     // Handle isPublic with fallback to true if not present in document
     isPublic = json['isPublic'] ?? true;
+    // Migration status fields
+    systemMigrationStatus = json['systemMigrationStatus'];
+    // Note: Search results may format timestamps differently
+    systemMigrationTimestamp = json['systemMigrationTimestamp'] != null
+        ? (json['systemMigrationTimestamp'] as dynamic).toDate()
+        : null;
   }
 
   String generateUniqueHash() {
@@ -112,6 +132,7 @@ class QuestCard {
       'productTitle': productTitle,
       'title': title,
       'gameSystem': gameSystem,
+      'standardizedGameSystem': standardizedGameSystem,
       'edition': edition,
       'level': level,
       'pageLength': pageLength,
@@ -130,6 +151,8 @@ class QuestCard {
       'objectId': objectId,
       'uploadedBy': uploadedBy,
       'isPublic': isPublic, // Include in JSON output
+      'systemMigrationStatus': systemMigrationStatus,
+      'systemMigrationTimestamp': systemMigrationTimestamp,
     };
   }
 
@@ -147,6 +170,8 @@ class QuestCard {
       'gameSystem': Schema.string(
           description:
               'The role-playing game system name adventure is intended for.'),
+      'standardizedGameSystem': Schema.string(
+          description: 'Standardized name of the game system.'), // New field
       'edition': Schema.string(description: 'The edition of the game system.'),
       'level': Schema.string(
           description:
@@ -210,6 +235,8 @@ class QuestCard {
       'gameSystem': Schema.string(
           description:
               'The role-playing game system name adventure is intended for.'),
+      'standardizedGameSystem': Schema.string(
+          description: 'Standardized name of the game system.'), // New field
       'edition': Schema.string(description: 'The edition of the game system.'),
       'publisher':
           Schema.string(description: 'The publisher of the adventure.'),
@@ -281,6 +308,8 @@ class QuestCard {
       'gameSystem': Schema.string(
           description:
               'The role-playing game system name adventure is intended for.'),
+      'standardizedGameSystem': Schema.string(
+          description: 'Standardized name of the game system.'), // New field
       'edition': Schema.string(description: 'The edition of the game system.'),
       'level': Schema.string(
           description:
@@ -325,104 +354,4 @@ class QuestCard {
               'A short summary of the adventure, without spoilers. Limit to around 100 words.'),
     }));
   }
-
-  // static Schema getPropertySchema(String property) {
-  //   switch (property) {
-  //     case 'id':
-  //       return Schema.object(properties: {
-  //         'id': Schema.string(
-  //             description: 'Will be set by system at time of storage')
-  //       });
-  //     case 'productTitle':
-  //       return Schema.object(properties: {
-  //         'productTitle': Schema.string(
-  //             description: 'Title of the book containing the adventure.')
-  //       });
-  //     case 'title':
-  //       return Schema.object(properties: {
-  //         'title':
-  //             Schema.string(description: 'Title of the specific adventure.')
-  //       });
-  //     case 'classification':
-  //       return Schema.object(properties: {
-  //         'classification': Schema.enumString(
-  //             enumValues: ['Adventure', 'Rulebook', 'Supplement', 'Other'],
-  //             description:
-  //                 'Classify the file as an RPG Adventure meant to be played at the table, a Rulebook describing how to play an RPG system, a Supplement of new features for an RPG system, or Other if it cannot be determined.')
-  //       });
-  //     case 'gameSystem':
-  //       return Schema.object(properties: {
-  //         'gameSystem': Schema.string(
-  //             description:
-  //                 'The role-playing game system name adventure is intended for.')
-  //       });
-  //     case 'edition':
-  //       return Schema.object(properties: {
-  //         'edition':
-  //             Schema.string(description: 'The edition of the game system.')
-  //       });
-  //     case 'level':
-  //       return Schema.object(properties: {
-  //         'level': Schema.string(
-  //             description:
-  //                 'The character level or tier the adventure is intended to support.')
-  //       });
-  //     case 'pageLength':
-  //       return Schema.object(properties: {
-  //         'pageLength': Schema.integer(
-  //             description: 'The number of pages in the adventure.')
-  //       });
-  //     case 'authors':
-  //       return Schema.object(properties: {
-  //         'authors': Schema.array(
-  //             items: Schema.string(),
-  //             description: 'The author(s) of the adventure.')
-  //       });
-  //     case 'publisher':
-  //       return Schema.object(properties: {
-  //         'publisher':
-  //             Schema.string(description: 'The publisher of the adventure.')
-  //       });
-  //     case 'publicationYear':
-  //       return Schema.object(properties: {
-  //         'publicationYear': Schema.string(
-  //             description: 'The year in which the adventure was published.')
-  //       });
-  //     case 'genre':
-  //       return Schema.object(properties: {
-  //         'genre': Schema.string(
-  //             description:
-  //                 'The genre the adventure best fits in. Examples include fantasy, science fiction, etc.')
-  //       });
-  //     case 'setting':
-  //       return Schema.object(properties: {
-  //         'setting': Schema.string(
-  //             description:
-  //                 'The fictional world the adventure is set in, or the type of fictional world if one is not declared.')
-  //       });
-  //     case 'environments':
-  //       return Schema.object(properties: {
-  //         'environments': Schema.array(
-  //             items: Schema.string(),
-  //             description:
-  //                 'The environment(s), biomes, structures in which the adventure takes place, both outdoor and indoor.')
-  //       });
-  //     case 'link':
-  //       return Schema.object(properties: {
-  //         'link': Schema.string(
-  //             //format: 'uri',
-  //             description:
-  //                 'A web link to where the adventure may be purchased or downloaded. Validate the web site exists, otherwise generate an empty string.')
-  //       });
-  //     case 'bossVillains':
-  //       return Schema.object(properties: {
-  //         'bossVillains': Schema.array(
-  //             items: Schema.string(),
-  //             description:
-  //                 'The final adversary (or adversaries) that must be overcome in the adventure.')
-  //       });
-  //     default:
-  //       return Schema.object(properties: {'items': Schema.string()});
-  //   }
-  // }
 }

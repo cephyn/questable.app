@@ -81,7 +81,7 @@ class _QuestCardListViewState extends State<QuestCardListView> {
       }
 
       // Notify listeners to update UI
-      provider.notifyListeners();
+      //provider.notifyListeners();
     } catch (e) {
       debugPrint('Error loading filter options: $e');
     }

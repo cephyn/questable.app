@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:json_theme/json_theme.dart';
 
 import 'package:quest_cards/firebase_options.dart';
+import 'package:quest_cards/src/config/config.dart';
 
 import 'src/app.dart';
 import 'src/settings/settings_controller.dart';
@@ -27,6 +28,9 @@ void main() async {
   final theme = ThemeDecoder.decodeThemeData(themeJson)!;
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Firebase Remote Config for secure access to API keys
+  await Config.initializeRemoteConfig();
 
   // await FirebaseAppCheck.instance.activate(
   //   webProvider:
