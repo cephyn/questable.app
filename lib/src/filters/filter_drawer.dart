@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'filter_state.dart';
+import 'game_system_filter_widget.dart';
 
 /// A drawer widget that allows users to apply filters to quest cards
 class FilterDrawer extends StatefulWidget {
@@ -366,25 +367,9 @@ class _FilterDrawerState extends State<FilterDrawer> {
   }
 
   List<Widget> _buildGameSystemFilters(FilterProvider provider) {
+    // Use the specialized GameSystemFilterWidget
     return [
-      // Game System Filter
-      _buildDropdownFilter(
-        provider: provider,
-        field: 'gameSystem',
-        label: 'Game System',
-        options: provider.filterOptions['gameSystem'] ?? [],
-        placeholder: 'All Game Systems',
-      ),
-      const SizedBox(height: 16),
-
-      // Edition Filter
-      _buildDropdownFilter(
-        provider: provider,
-        field: 'edition',
-        label: 'Edition',
-        options: provider.filterOptions['edition'] ?? [],
-        placeholder: 'All Editions',
-      ),
+      const GameSystemFilterWidget(),
     ];
   }
 

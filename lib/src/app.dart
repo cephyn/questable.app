@@ -4,6 +4,7 @@ import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
 import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:quest_cards/src/admin/game_system_admin_view.dart';
 import 'package:quest_cards/src/admin/migration_tools.dart';
 import 'package:quest_cards/src/admin/purchase_link_backfill.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
@@ -119,6 +120,9 @@ class _HomePageState extends State<HomePage> {
         break;
       case 6:
         page = PurchaseLinkBackfill(); // Admin-only purchase link backfill
+        break;
+      case 7:
+        page = GameSystemAdminView(); // Admin-only game system admin view
         break;
       default:
         page = Placeholder();
@@ -267,6 +271,11 @@ class _HomePageState extends State<HomePage> {
                   NavigationDestination(
                     icon: Icon(Icons.link),
                     label: 'Purchase Link Backfill',
+                  ),
+                if (roles != null && roles.contains('admin'))
+                  NavigationDestination(
+                    icon: Icon(Icons.admin_panel_settings),
+                    label: 'Game System Admin',
                   ),
               ],
               smallBody: (_) => page,

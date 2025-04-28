@@ -5,6 +5,7 @@ import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 import 'package:quest_cards/src/util/utils.dart';
+import 'package:quest_cards/src/widgets/game_system_feedback_widget.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 class QuestCardDetailsView extends StatefulWidget {
@@ -178,6 +179,8 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
             _buildQuestDescription(),
             const Divider(height: 32),
             _buildQuestProperties(),
+            const Divider(height: 32),
+            _buildGameSystemFeedback(),
           ],
         ),
       ),
@@ -215,6 +218,20 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
                 ),
               ],
             ),
+            // Display standardized game system if available
+            if (_questCardData!['standardizedGameSystem'] != null &&
+                _questCardData!['standardizedGameSystem'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0, left: 24.0),
+                child: Text(
+                  'Standardized as: ${_questCardData!['standardizedGameSystem']}',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.tertiary,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
             const SizedBox(height: 4),
             // Level range
             Row(
@@ -441,6 +458,20 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
           ],
         ),
       ),
+    );
+  }
+
+  // New method to build the game system feedback section
+  Widget _buildGameSystemFeedback() {
+    // Only show this section if we have game system data
+    if (_questCardData == null || _questCardData!['gameSystem'] == null) {
+      return const SizedBox.shrink();
+    }
+
+    return GameSystemFeedbackWidget(
+      questId: widget.docId,
+      originalSystem: _questCardData!['gameSystem'],
+      standardizedSystem: _questCardData!['standardizedGameSystem'],
     );
   }
 

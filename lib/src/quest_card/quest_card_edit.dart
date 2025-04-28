@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
+import 'package:quest_cards/src/widgets/game_system_autocomplete.dart';
 
 import '../util/utils.dart';
 import 'quest_card.dart';
@@ -95,8 +96,6 @@ class _AddQuestCardState extends State<EditQuestCard> {
     // Important: We now use a local controller for each field to track changes
     final titleController =
         TextEditingController(text: Utils.capitalizeTitle(_questCard.title));
-    final gameSystemController =
-        TextEditingController(text: _questCard.gameSystem);
     final editionController = TextEditingController(text: _questCard.edition);
     final levelController = TextEditingController(text: _questCard.level);
     final pageLengthController =
@@ -122,12 +121,14 @@ class _AddQuestCardState extends State<EditQuestCard> {
         TextEditingController(text: _questCard.notableItems?.join(", ") ?? '');
     final summaryController = TextEditingController(text: _questCard.summary);
 
+    // Track standardized game system
+    String? standardizedGameSystem = _questCard.standardizedGameSystem;
+
     // Add disposal of controllers
     Future.microtask(() {
       // Add disposal of controllers when widget is removed from tree
       for (final controller in [
         titleController,
-        gameSystemController,
         editionController,
         levelController,
         pageLengthController,
@@ -166,9 +167,18 @@ class _AddQuestCardState extends State<EditQuestCard> {
                 return null;
               },
             ),
-            _buildTextFieldWithController(
-              label: 'Game System',
-              controller: gameSystemController,
+            // Replace the game system text field with our autocomplete widget
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: GameSystemAutocompleteField(
+                initialValue: _questCard.gameSystem,
+                isRequired: false,
+                onChanged: (value, standardized) {
+                  // Update the standardized game system
+                  standardizedGameSystem = standardized;
+                  log('Game system changed to: $value, standardized as: $standardized');
+                },
+              ),
             ),
             _buildTextFieldWithController(
               label: 'Edition',
@@ -243,7 +253,11 @@ class _AddQuestCardState extends State<EditQuestCard> {
 
                     // Directly update the quest card from controllers
                     _questCard.title = titleController.text;
-                    _questCard.gameSystem = gameSystemController.text;
+                    // Game system is updated via the GameSystemAutocompleteField
+                    _questCard.gameSystem = _questCard
+                        .gameSystem; // Will be updated through the autocomplete
+                    _questCard.standardizedGameSystem =
+                        standardizedGameSystem; // Set from autocomplete
                     _questCard.edition = editionController.text;
                     _questCard.level = levelController.text;
                     _questCard.pageLength =
@@ -266,9 +280,16 @@ class _AddQuestCardState extends State<EditQuestCard> {
                         _processListField(notableItemsController.text);
                     _questCard.summary = summaryController.text;
 
+                    // Set migration status if a standardized system was found
+                    if (standardizedGameSystem != null) {
+                      _questCard.systemMigrationStatus = 'completed';
+                      _questCard.systemMigrationTimestamp = DateTime.now();
+                    }
+
                     // Debug values after update to confirm changes
                     log('After update - Title: ${_questCard.title}');
                     log('After update - Game System: ${_questCard.gameSystem}');
+                    log('After update - Standardized Game System: ${_questCard.standardizedGameSystem}');
                     log('After update - Authors: ${_questCard.authors}');
 
                     // Full card logging for debugging

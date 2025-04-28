@@ -1,0 +1,53 @@
+{
+  "Shadowdark": [
+    {
+      "name": "Shadowdark",
+      "count": 33,
+      "matchType": "primary"
+    },
+    {
+      "name": "Shadowdark RPG",
+      "count": 22,
+      "matchType": "variation"
+    },
+    {
+      "name": "ShadowDark RPG",
+      "count": 2,
+      "matchType": "variation"
+    }
+  ],
+  "Pathfinder": [
+    {
+      "name": "Pathfinder",
+      "count": 6,
+      "matchType": "primary"
+    },
+    {
+      "name": "Pathfinder Roleplaying Game",
+      "count": 4,
+      "matchType": "variation"
+    }
+  ],
+  "Dungeons & Dragons": [
+    {
+      "name": "Dungeons & Dragons",
+      "count": 6,
+      "matchType": "primary"
+    },
+    {
+      "name": "Dungeons and Dragons",
+      "count": 5,
+      "matchType": "variation"
+    },
+    {
+      "name": "D&D",
+      "count": 0,
+      "matchType": "variation"
+    },
+    {
+      "name": "dnd",
+      "count": 1,
+      "matchType": "variation"
+    }
+  ]
+}

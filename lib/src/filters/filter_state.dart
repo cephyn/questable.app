@@ -9,7 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 import 'package:quest_cards/src/filters/saved_filters_manager.dart';
 import 'package:quest_cards/src/filters/filter_analytics.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:quest_cards/src/services/game_system_service.dart';
+import 'package:quest_cards/src/models/standard_game_system.dart';
 
 /// Represents a filter criteria that can be applied to quest cards.
 class FilterCriteria {
@@ -221,6 +222,12 @@ class FilterState extends ChangeNotifier {
 
     try {
       for (var filter in _filters) {
+        // Special handling for game system filters to support standardized systems
+        if (filter.field == 'gameSystem') {
+          filteredQuery = _applyGameSystemFilter(filteredQuery, filter);
+          continue;
+        }
+
         switch (filter.operator) {
           case FilterOperator.equals:
             filteredQuery =
@@ -300,6 +307,31 @@ class FilterState extends ChangeNotifier {
     return filteredQuery;
   }
 
+  /// Special handling for game system filters to support standardization
+  Query _applyGameSystemFilter(Query query, FilterCriteria filter) {
+    // For transition period, search both original and standardized fields
+    switch (filter.operator) {
+      case FilterOperator.equals:
+        // Get the standardId for the selected game system
+        String systemValue = filter.value.toString();
+
+        // For exact match, create a compound query that checks both fields
+        return query.where(Filter.or(
+            Filter('gameSystem', isEqualTo: systemValue),
+            Filter('standardizedGameSystem', isEqualTo: systemValue)));
+
+      case FilterOperator.whereIn:
+        // For whereIn operations (multiple systems selected)
+        List<dynamic> systems = filter.value as List;
+        return query.where(Filter.or(Filter('gameSystem', whereIn: systems),
+            Filter('standardizedGameSystem', whereIn: systems)));
+
+      default:
+        // Fallback to just using the standardized field for other operators
+        return query.where('standardizedGameSystem', isEqualTo: filter.value);
+    }
+  }
+
   /// Show an error dialog with clickable URL if one is present in the error message
   void showErrorDialog(String errorMessage, String? url) {
     // We don't have reliable access to a context here, so we'll focus on:
@@ -373,7 +405,9 @@ class FilterProvider extends ChangeNotifier {
   final FilterAnalytics _analytics = FilterAnalytics.instance;
   bool _initialized = false;
   final FirestoreService _firestoreService = FirestoreService();
+  final GameSystemService _gameSystemService = GameSystemService();
   bool _isLoadingFilterOptions = false;
+  List<StandardGameSystem> _standardGameSystems = [];
 
   FilterProvider() {
     _initializeFilters();
@@ -389,7 +423,10 @@ class FilterProvider extends ChangeNotifier {
   }
 
   /// Common filter fields for quest cards - used for UI organization
-  static const List<String> gameSystemFields = ['gameSystem', 'edition'];
+  static const List<String> gameSystemFields = [
+    'standardizedGameSystem',
+    'edition'
+  ];
   static const List<String> difficultyFields = ['level'];
   static const List<String> contentFields = [
     'classification',
@@ -425,11 +462,15 @@ class FilterProvider extends ChangeNotifier {
   /// Initialize common filter options that may be provided from Firestore
   Map<String, List<dynamic>> filterOptions = {
     'gameSystem': [],
+    'standardizedGameSystem': [],
     'edition': [],
     'classification': ['Adventure', 'Rulebook', 'Supplement', 'Other'],
     'publisher': [],
     'genre': [],
   };
+
+  /// Get standard game systems for filtering
+  List<StandardGameSystem> get standardGameSystems => _standardGameSystems;
 
   /// Whether filter options are currently being loaded
   bool get isLoadingFilterOptions => _isLoadingFilterOptions;
@@ -445,9 +486,18 @@ class FilterProvider extends ChangeNotifier {
       // Keep the static classification options and load the rest from Firestore
       final staticClassifications = filterOptions['classification']!;
 
+      // Load standard game systems
+      _standardGameSystems = await _gameSystemService.getAllGameSystems();
+
+      // Extract standard system names for filtering
+      final standardSystemNames =
+          _standardGameSystems.map((system) => system.standardName).toList();
+
       // Load distinct field values from Firestore for relevant fields
       final gameSystems =
           await _firestoreService.getDistinctFieldValues('gameSystem');
+      // Get standardized game systems but don't use directly - we already have better data
+      await _firestoreService.getDistinctFieldValues('standardizedGameSystem');
       final editions =
           await _firestoreService.getDistinctFieldValues('edition');
       final publishers =
@@ -464,6 +514,7 @@ class FilterProvider extends ChangeNotifier {
         'gameSystem': gameSystems
             .where((item) => item != null && item.toString().isNotEmpty)
             .toList(),
+        'standardizedGameSystem': standardSystemNames,
         'edition': editions
             .where((item) => item != null && item.toString().isNotEmpty)
             .toList(),
@@ -488,6 +539,29 @@ class FilterProvider extends ChangeNotifier {
       _isLoadingFilterOptions = false;
       notifyListeners();
     }
+  }
+
+  /// Get a StandardGameSystem by name
+  StandardGameSystem? getSystemByName(String name) {
+    try {
+      return _standardGameSystems.firstWhere(
+        (system) =>
+            system.standardName == name || system.aliases.contains(name),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Get editions for a specific game system
+  List<String> getEditionsForSystem(String systemName) {
+    final system = getSystemByName(systemName);
+    if (system != null && system.editions.isNotEmpty) {
+      // Extract just the name strings from the GameSystemEdition objects
+      return system.editions.map((edition) => edition.name).toList();
+    }
+    // Fall back to generic editions from Firestore if no system-specific editions
+    return List<String>.from(filterOptions['edition'] ?? []);
   }
 
   /// Save current filters as a named set
