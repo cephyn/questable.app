@@ -504,7 +504,8 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
             elevation: 2,
             child: ListTile(
               leading: CircleAvatar(
-                backgroundImage: Utils.getSystemIcon(data['gameSystem']),
+                backgroundImage: Utils.getSystemIcon(
+                    data['standardizedGameSystem'] ?? data['gameSystem']),
               ),
               title: AutoSizeText(
                 Utils.capitalizeTitle(title),

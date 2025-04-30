@@ -14,8 +14,8 @@ void main() {
 
   setUp(() {
     mockGameSystemService = MockGameSystemService();
-    // Use reflection to set the private _gameSystemService field
-    // This is just for testing - not ideal, but necessary to mock the service
+    // Initialize the mapper with the mock service
+    mapper = GameSystemMapper(gameSystemService: mockGameSystemService);
   });
 
   group('GameSystemMapper', () {

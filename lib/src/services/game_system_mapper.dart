@@ -25,7 +25,11 @@ class MappingResult {
 /// - Confidence scoring for suggested matches
 /// - Learning from manual mappings
 class GameSystemMapper {
-  final GameSystemService _gameSystemService = GameSystemService();
+  final GameSystemService _gameSystemService;
+
+  // Constructor with dependency injection
+  GameSystemMapper({GameSystemService? gameSystemService})
+      : _gameSystemService = gameSystemService ?? GameSystemService();
 
   // Cache of standard game systems to avoid repeated Firestore calls
   List<StandardGameSystem>? _cachedSystems;

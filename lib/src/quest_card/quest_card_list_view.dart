@@ -327,7 +327,8 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                     const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundImage: Utils.getSystemIcon(data['gameSystem']),
+                    backgroundImage: Utils.getSystemIcon(
+                        data['standardizedGameSystem'] ?? data['gameSystem']),
                   ),
                   title: AutoSizeText(
                     Utils.capitalizeTitle(title),

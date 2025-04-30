@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:json_theme/json_theme.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:quest_cards/firebase_options.dart';
 import 'package:quest_cards/src/config/config.dart';
@@ -27,10 +29,20 @@ void main() async {
   final themeJson = jsonDecode(themeStr);
   final theme = ThemeDecoder.decodeThemeData(themeJson)!;
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    // Initialize Firebase with platform-specific options
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-  // Initialize Firebase Remote Config for secure access to API keys
-  await Config.initializeRemoteConfig();
+    // Initialize Firebase Remote Config for secure access to API keys
+    if (!kIsWeb) {
+      await Config.initializeRemoteConfig();
+    }
+  } catch (e) {
+    log('Firebase initialization error: $e');
+    // Continue with app initialization even if Firebase fails
+  }
 
   // await FirebaseAppCheck.instance.activate(
   //   webProvider:
