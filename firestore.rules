@@ -65,6 +65,14 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
     
+    // Migration Metrics collection - for tracking standardization analytics
+    match /migration_metrics/{metricId} {
+      // Only admin users can read and write migration metrics
+      allow read, write: if request.auth != null &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
     // Default rule - deny all other access
     match /{document=**} {
       allow read, write: if false;

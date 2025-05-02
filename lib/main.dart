@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:json_theme/json_theme.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:quest_cards/firebase_options.dart';
 import 'package:quest_cards/src/config/config.dart';
@@ -36,9 +35,7 @@ void main() async {
     );
 
     // Initialize Firebase Remote Config for secure access to API keys
-    if (!kIsWeb) {
-      await Config.initializeRemoteConfig();
-    }
+    await Config.initializeRemoteConfig();
   } catch (e) {
     log('Firebase initialization error: $e');
     // Continue with app initialization even if Firebase fails

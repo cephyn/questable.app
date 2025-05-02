@@ -76,7 +76,7 @@ The strategy involves a multi-pronged approach:
 
 ### Step 4: Local Execution and Debugging
 
-**Status: Completed (Local)**
+**Status: Completed**
 
 *   **Action:** Trigger the `scheduled_game_system_cleanup` function against the local emulator. (This might require temporarily adding an `https_fn.on_call` trigger to the function for easy invocation during testing, or using `firebase functions:shell`).
 *   **Action:** Use a Python debugger (e.g., VS Code debugger attached to the functions emulator) to step through the code execution.
@@ -114,49 +114,38 @@ The strategy involves a multi-pronged approach:
 *   User **corrected** earlier report: Firestore `migration_logs` documents showed `status: "completed"`.
 *   Counts reported: Run 1 (`processed: 9`, `successful: 5`, `failed: 2`), Run 2 (`processed: 2`, `successful: 0`, `failed: 0`). Total processed = 11. Final `questCard` statuses verified as correct.
 
-**Conclusion for Step 4:**
-*   The core processing logic of `scheduled_game_system_cleanup` (querying, matching, batching, updating) functions correctly locally when the problematic call is removed.
-*   The `TypeError: get_standardization_stats() missing 1 required positional argument: 'request'` is confirmed as the sole cause of the failure.
-*   The error persists in the emulator even with `req=None` in the function definition, suggesting an emulator-specific issue when a scheduled function calls a callable function.
-*   The original production error is highly likely due to an older deployment where `get_standardization_stats` did *not* have `req=None`.
+**Findings (Attempt 4 - Refactored Stats Calculation):**
+*   Executed `scheduled_game_system_cleanup()` via `firebase functions:shell` after refactoring stats logic into `_calculate_standardization_stats()` and fixing aggregation result access (`.get()[0][0].value`).
+*   Emulator logs showed **no errors**. `migration_logs` status was `completed`.
+*   `standardization_reports` document was successfully created with correct stats.
 
-**Action Taken:** Code calling `get_standardization_stats()` was restored in `main.py`.
+**Conclusion for Step 4:**
+*   The refactored code works correctly in the local emulator environment.
+*   The original production error was likely due to the previously deployed code lacking `req=None`.
+*   The refactoring provides a more robust solution, separating concerns.
 
 ### Step 5: Analyze Potential Failure Points (Hypothesize)
 
 **Status: Completed**
 
-Based on observations from logs and local testing, consider these potential causes:
-
-*   ~~Query Logic: Issues with querying `None` values, unexpected `systemMigrationStatus` values not included in the `in` clause.~~ (Ruled out by successful local run)
-*   ~~Data Issues: Malformed data in `gameSystem` field causing errors in `normalize_game_system_name` or `find_matching_standard_system`. `doc.to_dict()` failing for specific documents.~~ (Ruled out by successful local run)
-*   ~~`find_matching_standard_system`: Inefficiency (especially alias check) leading to timeouts on large datasets. Logic errors handling edge cases (special characters, empty strings).~~ (Logic seems okay for test data, efficiency not tested)
-*   ~~Batch Writes: Exceeding Firestore batch size or count limits (unlikely with size 100, but possible). Errors during `batch.commit()`.~~ (Ruled out by successful local run)
-*   ~~Pagination: Errors in the `start_after()` logic, potentially skipping documents or causing infinite loops if `last_doc` handling is flawed under certain conditions.~~ (Ruled out by successful local run)
-*   ~~Permissions: Service account lacking necessary Firestore read/write permissions (less likely if other functions work).~~ (Ruled out by successful local run)
-*   ~~Function Timeouts: Execution time exceeding the configured Cloud Function timeout limit due to processing a large number of documents or inefficient lookups.~~ (Not observed locally)
-*   ~~Memory Limits: Exceeding allocated memory, especially if large amounts of data are loaded.~~ (Not observed locally)
-*   ~~External Dependencies: Transient issues connecting to Firestore.~~ (Not observed locally)
-*   **Confirmed Cause:** Function signature mismatch (`get_standardization_stats` missing `request` argument) in the *previously deployed* production code. The current code has the fix (`req=None`).
+*   **Confirmed Cause:** Function signature mismatch (`get_standardization_stats` missing `request` argument) in the *previously deployed* production code. The current code has the fix (`req=None`), and further refactoring makes this more robust.
+*   **Secondary Issue:** Incorrect access method for Firestore aggregation query results (`.count` vs `.value`, and `.get()[0]` vs `.get()[0][0]`) identified and fixed during local testing.
 
 ### Step 6: Staging Environment Testing / Production Deployment & Monitoring
 
-**Status: Pending**
+**Status: Pending Deployment**
 
-*   **Action:** Deploy the current version of the function (with `req=None` fix and restored report generation) to a staging or production environment.
+*   **Action:** Deploy the **latest refactored version** of the function to a staging or production environment.
 *   **Action:** Monitor Cloud Logging for the `scheduled_game_system_cleanup` function after deployment, specifically around its next scheduled execution time.
-*   **Verify:** Confirm that the `TypeError: get_standardization_stats() missing 1 required positional argument: 'request'` no longer occurs in the live environment.
+*   **Verify:** Confirm that no errors occur in the live environment.
 *   **Verify:** Check the `migration_logs` and `standardization_reports` collections in the live Firestore database to ensure the function completes successfully and generates the expected report.
 
 ### Step 7: Analyze Results, Fix, and Verify
 
-**Status: Pending**
+**Status: Pending Post-Deployment Monitoring**
 
-*   **Action:** Consolidate findings from production logs, local debugging, and staging tests.
-*   **Action:** Identify the most likely cause(s) of the failure.
-*   **Action:** Implement the necessary code changes to fix the identified issues.
-*   **Action:** Repeat relevant testing steps (local, staging) to verify that the fix resolves the problem and doesn't introduce regressions.
-*   **Action:** Once confident, deploy the fix to production and monitor its execution.
+*   **Action:** Consolidate findings from production logs after deploying the refactored code.
+*   **Action:** If successful, re-enable the temporarily disabled Firestore triggers (`standardize_new_quest_card` and `handle_quest_card_update`) in `main.py` and deploy again.
 
 ## 5. Deliverable
 

@@ -1,5 +1,5 @@
+import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 
 import '../models/standard_game_system.dart';
 import 'game_system_service.dart';
@@ -80,8 +80,12 @@ class GameSystemMigrationService {
     WriteBatch batch = _firestore.batch();
     final timestamp = FieldValue.serverTimestamp();
     final migrationId = DateTime.now().millisecondsSinceEpoch.toString();
+    final logName = 'GameSystemMigrationService.applyStandardToQuests';
 
-    // Create a migration log
+    developer.log('Starting batch process for migration ID: $migrationId',
+        name: logName);
+
+    // Create a migration log entry in the batch
     final logRef = migrationLogs.doc(migrationId);
     batch.set(logRef, {
       'timestamp': timestamp,
@@ -90,6 +94,7 @@ class GameSystemMigrationService {
       'affectedCount': questCards.length,
       'status': 'in_progress',
     });
+    developer.log('Added migration log set to batch.', name: logName);
 
     // Process quest cards in batches (max 500 per batch)
     for (var i = 0; i < questCards.length; i++) {
@@ -97,42 +102,88 @@ class GameSystemMigrationService {
       final data = questCard.data() as Map<String, dynamic>?;
 
       if (data != null) {
-        final originalGameSystem = data['gameSystem'];
-
         batch.update(questCard.reference, {
           'standardizedGameSystem': standardSystem.standardName,
           'systemMigrationStatus': 'completed',
           'systemMigrationTimestamp': timestamp,
           'migrationId': migrationId,
         });
-
         successCount++;
 
-        // Firestore batches limited to 500 operations
-        if (i > 0 && i % 499 == 0) {
-          await batch.commit();
-
+        // Firestore batches limited to 500 operations (set + updates)
+        // Check if batch is full (499 updates + 1 set = 500)
+        if (successCount % 499 == 0 && i < questCards.length - 1) {
+          developer.log(
+              'Committing intermediate batch (count: $successCount)...',
+              name: logName);
+          try {
+            await batch.commit();
+            developer.log('Intermediate batch committed successfully.',
+                name: logName);
+          } catch (e, s) {
+            developer.log('Error committing intermediate batch.',
+                name: logName, error: e, stackTrace: s);
+            rethrow; // Rethrow to be caught by the outer catch block
+          }
           // Start a new batch
           batch = _firestore.batch();
+          developer.log('Started new batch.', name: logName);
         }
       }
     }
+    developer.log(
+        'Finished adding quest card updates to batch (total: $successCount).',
+        name: logName);
 
-    // Commit any remaining operations
+    // Commit any remaining operations in the final batch
     if (successCount > 0) {
-      await batch.commit();
+      developer.log('Committing final batch...', name: logName);
+      try {
+        await batch.commit();
+        developer.log('Final batch committed successfully.', name: logName);
+      } catch (e, s) {
+        developer.log('Error committing final batch.',
+            name: logName, error: e, stackTrace: s);
+        rethrow; // Rethrow to be caught by the outer catch block
+      }
 
-      // Update the migration log
-      await logRef.update({
-        'status': 'completed',
-        'successCount': successCount,
-        'completedAt': FieldValue.serverTimestamp(),
-      });
+      // Update the migration log status
+      developer.log('Updating migration log status to completed...',
+          name: logName);
+      try {
+        await logRef.update({
+          'status': 'completed',
+          'successCount': successCount,
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+        developer.log('Migration log updated successfully.', name: logName);
+      } catch (e, s) {
+        developer.log('Error updating migration log.',
+            name: logName, error: e, stackTrace: s);
+        // Decide if you want to rethrow here or just log the error
+        // If this fails, the main operation succeeded, but logging failed.
+        // For now, let's just log it and continue.
+        // rethrow;
+      }
 
       // Record metrics for this migration
-      await _recordMigrationMetrics(standardSystem.standardName, successCount);
+      developer.log('Recording migration metrics...', name: logName);
+      try {
+        await _recordMigrationMetrics(
+            standardSystem.standardName, successCount);
+        developer.log('Migration metrics recorded successfully.',
+            name: logName);
+      } catch (e, s) {
+        developer.log('Error recording migration metrics.',
+            name: logName, error: e, stackTrace: s);
+        // Similar to log update, decide if this error should stop the process
+        // For now, just log it.
+        // rethrow;
+      }
     }
 
+    developer.log('Finished applyStandardToQuests successfully.',
+        name: logName);
     return successCount;
   }
 
@@ -346,7 +397,9 @@ class GameSystemMigrationService {
         'lowConfidence': lowConfidence,
       });
 
-      debugPrint('Error in automated migration: $e');
+      developer.log('Error in automated migration',
+          name: 'GameSystemMigrationService.runAutomatedMigration',
+          error: e); // Fixed debugPrint
       rethrow;
     }
   }
@@ -532,30 +585,21 @@ class GameSystemMigrationService {
 
   /// Record metrics about a migration for analytics
   Future<void> _recordMigrationMetrics(String standardName, int count) async {
-    final dateStr =
-        DateTime.now().toIso8601String().split('T')[0]; // YYYY-MM-DD
-
-    // Update migration metrics for this date and system
-    await migrationMetrics.doc(dateStr).set({
-      'date': dateStr,
-      'lastUpdated': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    // Update the count for this standard system
-    await migrationMetrics
-        .doc(dateStr)
-        .collection('systems')
-        .doc(standardName)
-        .set({
-      'standardName': standardName,
-      'count': FieldValue.increment(count),
-      'lastUpdated': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    // Update total metrics
-    await migrationMetrics.doc(dateStr).update({
-      'totalMigrated': FieldValue.increment(count),
-    });
+    final logName = 'GameSystemMigrationService._recordMigrationMetrics';
+    developer.log('Recording metrics for $standardName - count: $count',
+        name: logName);
+    try {
+      await migrationMetrics.add({
+        'standardName': standardName,
+        'updatedCount': count,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      developer.log('Successfully added metrics document.', name: logName);
+    } catch (e, s) {
+      developer.log('Failed to add metrics document.',
+          name: logName, error: e, stackTrace: s);
+      rethrow; // Rethrow so the caller knows metrics failed
+    }
   }
 
   /// Count quest cards with and without standardization

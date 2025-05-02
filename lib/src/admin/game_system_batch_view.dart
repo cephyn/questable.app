@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -30,7 +31,6 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
   String _errorMessage = '';
   bool _isMigrating = false;
   int _processedCount = 0;
-  int _totalCount = 0;
   List<String> _matchedGameSystems = [];
 
   @override
@@ -76,7 +76,6 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
 
       setState(() {
         _affectedQuests = allQuests.values.toList();
-        _totalCount = _affectedQuests.length;
         _matchedGameSystems = matchedSystems.toList();
         _isLoading = false;
       });
@@ -89,7 +88,12 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
   }
 
   Future<void> _applyStandardization() async {
+    developer.log('Starting...',
+        name: '_GameSystemBatchViewState._applyStandardization'); // Changed log
     if (_affectedQuests.isEmpty) {
+      developer.log('No quests to update. Aborting.',
+          name:
+              '_GameSystemBatchViewState._applyStandardization'); // Changed log
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No quests to update')),
       );
@@ -102,25 +106,49 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
     });
 
     try {
+      developer.log(
+          'Calling migrationService.applyStandardToQuests for ${widget.gameSystem.standardName} with ${_affectedQuests.length} quests.',
+          name:
+              '_GameSystemBatchViewState._applyStandardization'); // Changed log
       final count = await _migrationService.applyStandardToQuests(
         widget.gameSystem,
         _affectedQuests,
       );
+      developer.log('Migration service returned count: $count',
+          name:
+              '_GameSystemBatchViewState._applyStandardization'); // Changed log
 
       setState(() {
         _processedCount = count;
         _isMigrating = false;
       });
 
+      developer.log('Update successful. Showing SnackBar.',
+          name:
+              '_GameSystemBatchViewState._applyStandardization'); // Changed log
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Successfully updated $count quests')),
       );
-    } catch (e) {
+    } catch (e, s) {
+      // Added stack trace parameter 's'
+      developer.log('Error caught during standardization.',
+          name: '_GameSystemBatchViewState._applyStandardization',
+          error: e,
+          stackTrace: s); // Changed log
       setState(() {
-        _errorMessage = 'Error applying standardization: $e';
+        // Display the specific Firestore error if available
+        String displayError = 'Error applying standardization: $e';
+        if (e is FirebaseException) {
+          displayError =
+              'Error applying standardization: [${e.code}] ${e.message}';
+        }
+        _errorMessage = displayError;
         _isMigrating = false;
       });
 
+      developer.log('Error state set. Showing SnackBar.',
+          name:
+              '_GameSystemBatchViewState._applyStandardization'); // Changed log
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $_errorMessage')),
       );

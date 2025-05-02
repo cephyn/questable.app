@@ -5,7 +5,7 @@ from firebase_admin import credentials, firestore
 
 # --- Configuration ---
 # Point the SDK to the Firestore emulator
-os.environ["FIRESTORE_EMULATOR_HOST"] = "localhost:8181"
+os.environ["FIRESTORE_EMULATOR_HOST"] = "localhost:8282"
 
 # --- Initialization ---
 try:

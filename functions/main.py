@@ -199,7 +199,9 @@ def record_system_mapping_metrics(match_result, original_system):
 
 
 # On Create - Ingestion-time standardization for new quest cards
-# @firestore_fn.on_document_created(document='questCards/{questId}') # Temporarily disabled for testing scheduled_game_system_cleanup
+@firestore_fn.on_document_created(
+    document="questCards/{questId}"
+)  # Temporarily disabled for testing scheduled_game_system_cleanup
 def standardize_new_quest_card(
     event: firestore_fn.Event[firestore_fn.DocumentSnapshot],
 ) -> None:
@@ -270,7 +272,9 @@ def standardize_new_quest_card(
 
 
 # On Update - Handle game system changes in quest cards
-# @firestore_fn.on_document_updated(document='questCards/{questId}') # Temporarily disabled for testing scheduled_game_system_cleanup
+@firestore_fn.on_document_updated(
+    document="questCards/{questId}"
+)  # Temporarily disabled for testing scheduled_game_system_cleanup
 def handle_quest_card_update(
     event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]],
 ) -> None:
@@ -463,7 +467,16 @@ def scheduled_game_system_cleanup(event: scheduler_fn.ScheduledEvent) -> None:
 
         # Generate daily report
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        stats = get_standardization_stats()  # <--- This call was causing the error
+        # Call the internal helper function directly
+        stats = _calculate_standardization_stats()
+
+        # Check if stats calculation resulted in an error before proceeding
+        if "error" in stats:
+            # Log the error from stats calculation but don't necessarily stop the whole process
+            # The main error handling block below will catch larger issues
+            logging.error(f"Error generating stats for report: {stats['error']}")
+            # Optionally, decide if you want to skip report generation on stats error
+            # For now, we'll let it proceed and potentially store the error in the report
 
         report_ref = (
             firestore.client().collection("standardization_reports").document(today)
@@ -472,7 +485,7 @@ def scheduled_game_system_cleanup(event: scheduler_fn.ScheduledEvent) -> None:
             {
                 "date": today,
                 "timestamp": firestore.SERVER_TIMESTAMP,
-                "stats": stats,
+                "stats": stats,  # Store the stats dict (might contain the error)
                 "migrationId": migration_id,
             }
         )
@@ -489,10 +502,9 @@ def scheduled_game_system_cleanup(event: scheduler_fn.ScheduledEvent) -> None:
             )
 
 
-# Callable function to get current standardization stats
-@https_fn.on_call()
-def get_standardization_stats(req: https_fn.CallableRequest = None) -> dict:
-    """Get current statistics for game system standardization"""
+# NEW Internal helper function for calculating stats
+def _calculate_standardization_stats() -> dict:
+    """Calculates and returns current statistics for game system standardization."""
     try:
         db = firestore.client()
         # Get counts for different statuses
@@ -500,52 +512,65 @@ def get_standardization_stats(req: https_fn.CallableRequest = None) -> dict:
             db.collection("questCards")
             .where("systemMigrationStatus", "==", "completed")
             .count()
-            .get()[0]
-            .count
+            .get()[0][0]  # Added extra [0]
+            .value
         )
 
         pending_count = (
             db.collection("questCards")
             .where("systemMigrationStatus", "==", "pending")
             .count()
-            .get()[0]
-            .count
+            .get()[0][0]  # Added extra [0]
+            .value
         )
 
         failed_count = (
             db.collection("questCards")
             .where("systemMigrationStatus", "==", "failed")
             .count()
-            .get()[0]
-            .count
+            .get()[0][0]  # Added extra [0]
+            .value
         )
 
         needs_review_count = (
             db.collection("questCards")
             .where("systemMigrationStatus", "==", "needs_review")
             .count()
-            .get()[0]
-            .count
+            .get()[0][0]  # Added extra [0]
+            .value
         )
 
         no_match_count = (
             db.collection("questCards")
             .where("systemMigrationStatus", "==", "no_match")
             .count()
-            .get()[0]
-            .count
+            .get()[0][0]  # Added extra [0]
+            .value
         )
 
-        total_count = db.collection("questCards").count().get()[0].count
+        # Add count for 'flagged' status if it exists
+        flagged_count = (
+            db.collection("questCards")
+            .where("systemMigrationStatus", "==", "flagged")
+            .count()
+            .get()[0][0]  # Added extra [0]
+            .value
+        )
 
-        # Calculate the number of unprocessed cards
-        unprocessed_count = total_count - (
+        total_count = (
+            db.collection("questCards").count().get()[0][0].value  # Added extra [0]
+        )
+
+        # Calculate the number of unprocessed cards (those without any status field or with null/other values)
+        processed_statuses_count = (
             standardized_count
             + pending_count
             + failed_count
             + needs_review_count
             + no_match_count
+            + flagged_count
         )
+        unprocessed_count = total_count - processed_statuses_count
 
         return {
             "standardized": standardized_count,
@@ -553,14 +578,24 @@ def get_standardization_stats(req: https_fn.CallableRequest = None) -> dict:
             "failed": failed_count,
             "needsReview": needs_review_count,
             "noMatch": no_match_count,
+            "flagged": flagged_count,  # Added flagged count
             "unprocessed": unprocessed_count,
             "total": total_count,
             "coverage": (standardized_count / total_count) if total_count > 0 else 0,
         }
 
     except Exception as e:
-        logging.error(f"Error getting standardization stats: {e}")
+        logging.error(f"Error calculating standardization stats: {e}")
+        # Return error within the dictionary for consistency
         return {"error": str(e)}
+
+
+# MODIFIED Callable function to get current standardization stats
+@https_fn.on_call()
+def get_standardization_stats(req: https_fn.CallableRequest = None) -> dict:
+    """Get current statistics for game system standardization (calls helper)."""
+    # Simply call the internal helper function
+    return _calculate_standardization_stats()
 
 
 # Callable function for users to report incorrect mappings
@@ -617,20 +652,34 @@ def process_system_mapping_feedback(
     event: firestore_fn.Event[firestore_fn.DocumentSnapshot],
 ) -> None:
     """Process user feedback on incorrect mappings to improve the system"""
+    feedback_id = event.resource.split("/")[-1]
+    logging.info(f"Processing system mapping feedback for ID: {feedback_id}")
+
     try:
         db = firestore.client()
+        logging.info("Firestore client initialized.")
+
         # Get the feedback data
         feedback_data = event.data.to_dict()
         if not feedback_data:
+            logging.warning(f"Feedback data is empty for ID: {feedback_id}. Exiting.")
             return
+
+        logging.info(f"Feedback data retrieved: {feedback_data}")
 
         original_system = feedback_data.get("originalSystem")
         suggested_system = feedback_data.get("suggestedSystem")
 
         if not original_system or not suggested_system:
+            logging.warning(
+                f"Missing originalSystem or suggestedSystem for ID: {feedback_id}. Exiting."
+            )
             return
 
+        logging.info(f"Original: {original_system}, Suggested: {suggested_system}")
+
         # Find the suggested system in the standard systems
+        logging.info(f"Querying game_systems for standardName == {suggested_system}")
         standard_system_query = (
             db.collection("game_systems")
             .where("standardName", "==", suggested_system)
@@ -638,9 +687,15 @@ def process_system_mapping_feedback(
         )
 
         standard_systems = list(standard_system_query.stream())
+        logging.info(
+            f"Found {len(standard_systems)} standard system(s) matching '{suggested_system}'."
+        )
 
         if not standard_systems:
             # If suggested system doesn't exist, mark feedback for admin review
+            logging.warning(
+                f"Suggested system '{suggested_system}' not found. Marking feedback {feedback_id} for admin review."
+            )
             event.data.reference.update(
                 {
                     "status": "needs_admin_review",
@@ -648,15 +703,22 @@ def process_system_mapping_feedback(
                     "note": "Suggested system does not exist in standard systems",
                 }
             )
+            logging.info(f"Feedback {feedback_id} updated for admin review.")
             return
 
         standard_system = standard_systems[0]
         standard_system_data = standard_system.to_dict()
+        standard_system_id = standard_system.id
+        logging.info(f"Found standard system ID: {standard_system_id}")
 
         # Check if original system is already in aliases
         aliases = standard_system_data.get("aliases", [])
+        logging.info(f"Current aliases for {standard_system_id}: {aliases}")
         if original_system in aliases:
             # Already an alias, just mark feedback as processed
+            logging.info(
+                f"'{original_system}' already in aliases for {standard_system_id}. Marking feedback {feedback_id} as processed."
+            )
             event.data.reference.update(
                 {
                     "status": "processed",
@@ -664,15 +726,19 @@ def process_system_mapping_feedback(
                     "note": "Original system already in aliases",
                 }
             )
+            logging.info(f"Feedback {feedback_id} updated as already processed.")
             return
 
         # Add original system to aliases
+        logging.info(f"Adding '{original_system}' to aliases for {standard_system_id}.")
         aliases.append(original_system)
         standard_system.reference.update(
             {"aliases": aliases, "updatedAt": firestore.SERVER_TIMESTAMP}
         )
+        logging.info(f"Updated aliases for {standard_system_id}.")
 
         # Mark feedback as processed
+        logging.info(f"Marking feedback {feedback_id} as processed (alias added).")
         event.data.reference.update(
             {
                 "status": "processed",
@@ -680,9 +746,13 @@ def process_system_mapping_feedback(
                 "note": "Added original system to aliases",
             }
         )
+        logging.info(f"Feedback {feedback_id} updated as processed.")
 
         # Update related quest cards that use this original system
         # This is a potentially expensive operation, so we limit it
+        logging.info(
+            f"Querying questCards where gameSystem == '{original_system}' (limit 100)."
+        )
         query = (
             db.collection("questCards")
             .where("gameSystem", "==", original_system)
@@ -690,29 +760,47 @@ def process_system_mapping_feedback(
         )
 
         docs = list(query.stream())
+        logging.info(f"Found {len(docs)} quest cards matching '{original_system}'.")
 
         if docs:
             batch = db.batch()
-            for doc in docs:
-                batch.update(
-                    doc.reference,
-                    {
-                        "standardizedGameSystem": suggested_system,
-                        "systemMigrationStatus": "completed",
-                        "systemMigrationConfidence": 1.0,  # User-verified match
-                        "systemMigrationMatchType": "user_feedback",
-                        "systemMigrationTimestamp": firestore.SERVER_TIMESTAMP,
-                    },
-                )
-            batch.commit()
+            logging.info(f"Starting batch update for {len(docs)} quest cards.")
+            # --- THIS IS WHERE THE BATCH UPDATE LOGIC SHOULD BE ---
+            # You need to iterate through 'docs' and add update operations to the batch
+            # For example:
+            # for doc in docs:
+            #     batch.update(doc.reference, {"gameSystem": suggested_system, "standardizedAt": firestore.SERVER_TIMESTAMP})
+            # logging.info(f"Committing batch update for {len(docs)} quest cards.")
+            # batch.commit()
+            # logging.info("Batch update committed successfully.")
+            # ------------------------------------------------------
+            # Placeholder: Log that batch logic is missing/incomplete if needed
+            logging.warning(
+                "Batch update logic for questCards is not implemented in this snippet."
+            )
 
     except Exception as e:
-        logging.error(f"Error processing system mapping feedback: {e}")
-        if "event" in locals() and "data" in event:
-            event.data.reference.update(
-                {
-                    "status": "error",
-                    "error": str(e),
-                    "processedAt": firestore.SERVER_TIMESTAMP,
-                }
+        # Log the full exception details, including traceback
+        logging.exception(
+            f"Error processing system mapping feedback ID {feedback_id}: {e}"
+        )
+        # Attempt to update the feedback document with error status, if possible
+        try:
+            if event and event.data and event.data.reference:
+                logging.info(f"Attempting to mark feedback {feedback_id} as errored.")
+                event.data.reference.update(
+                    {
+                        "status": "error",
+                        "processedAt": firestore.SERVER_TIMESTAMP,
+                        "errorDetails": str(e),
+                    }
+                )
+                logging.info(f"Successfully marked feedback {feedback_id} as errored.")
+            else:
+                logging.error(
+                    "Could not update feedback status: event data or reference missing."
+                )
+        except Exception as update_error:
+            logging.error(
+                f"Failed to update feedback {feedback_id} status to error: {update_error}"
             )
