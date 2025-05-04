@@ -91,7 +91,7 @@ class _GameSystemFeedbackWidgetState extends State<GameSystemFeedbackWidget> {
 
     return Card(
       elevation: 1,
-      color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
+      color: Theme.of(context).colorScheme.secondaryContainer.withAlpha(128),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
