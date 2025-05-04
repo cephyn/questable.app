@@ -113,6 +113,7 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
         );
       } else {
         //final id = await _gameSystemService.createGameSystem(gameSystem);
+        await _gameSystemService.createGameSystem(gameSystem); // Fix: Uncommented and removed unused 'id'
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Game system created successfully')),
         );

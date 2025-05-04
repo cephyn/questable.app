@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/standard_game_system.dart';
+import 'package:quest_cards/src/quest_card/quest_card.dart'; // Correct import path for QuestCard model
 
 /// Service for managing standardized game systems in Firestore
 class GameSystemService {
@@ -291,6 +292,63 @@ class GameSystemService {
       });
     } catch (e, stackTrace) {
       _logError('Error updating quest card game system', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Get quest cards that need review or haven't been fully standardized.
+  /// Fetches cards where systemMigrationStatus is NOT 'completed'.
+  /// This includes null, pending, failed, needs_review, etc.
+  Future<List<QuestCard>> getQuestCardsNeedingReview({int limit = 50}) async {
+    try {
+      debugPrint(
+          '[getQuestCardsNeedingReview] Fetching quest cards where systemMigrationStatus is NOT \'completed\' (limit: $limit)...');
+
+      // Query for documents where systemMigrationStatus is not equal to 'completed'
+      // Firestore's `isNotEqualTo` implicitly excludes documents where the field doesn't exist.
+      // We need a separate query for documents where the field is null (or doesn't exist).
+
+      // Query 1: Find documents where the status is explicitly not 'completed'
+      final notCompletedSnapshot = await questCards
+          .where('systemMigrationStatus', isNotEqualTo: 'completed')
+          .limit(limit)
+          .get();
+
+      debugPrint(
+          '[getQuestCardsNeedingReview] Query 1 (isNotEqualTo: completed) found ${notCompletedSnapshot.docs.length} documents.');
+
+      // Query 2: Find documents where the status field is null (meaning not processed yet)
+      // Adjust limit based on results from the first query to respect the overall limit.
+      final remainingLimit = limit - notCompletedSnapshot.docs.length;
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> nullStatusDocs = [];
+      if (remainingLimit > 0) {
+        final nullStatusSnapshot = await questCards
+            .where('systemMigrationStatus', isNull: true)
+            .limit(remainingLimit)
+            .get();
+        nullStatusDocs = nullStatusSnapshot.docs;
+        debugPrint(
+            '[getQuestCardsNeedingReview] Query 2 (isNull: true) found ${nullStatusDocs.length} documents.');
+      } else {
+        debugPrint(
+            '[getQuestCardsNeedingReview] Query 1 already met limit, skipping Query 2 (isNull: true).');
+      }
+
+
+      // Combine results (no need for deduplication as queries are mutually exclusive)
+      final finalDocs = [...notCompletedSnapshot.docs, ...nullStatusDocs];
+
+      debugPrint('[getQuestCardsNeedingReview] Total documents found: ${finalDocs.length}');
+
+      return finalDocs
+          .map((doc) {
+              final questCard = QuestCard.fromJson(doc.data())..id = doc.id;
+              debugPrint('[getQuestCardsNeedingReview] Mapping doc ${doc.id} to QuestCard: ${questCard.title ?? 'No Title'} (Status: ${questCard.systemMigrationStatus ?? 'null'})');
+              return questCard;
+            })
+          .toList();
+    } catch (e, stackTrace) {
+      _logError('[getQuestCardsNeedingReview] Error getting quest cards needing review', e, stackTrace);
       rethrow;
     }
   }

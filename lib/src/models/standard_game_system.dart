@@ -152,4 +152,17 @@ class GameSystemEdition {
       if (year != null) 'year': year,
     };
   }
+
+  /// Create a copy of this GameSystemEdition with updated fields
+  GameSystemEdition copyWith({
+    String? name,
+    String? description,
+    int? year,
+  }) {
+    return GameSystemEdition(
+      name: name ?? this.name,
+      description: description ?? this.description,
+      year: year ?? this.year,
+    );
+  }
 }

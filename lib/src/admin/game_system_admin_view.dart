@@ -6,6 +6,7 @@ import 'package:quest_cards/src/services/game_system_service.dart';
 import 'package:quest_cards/src/admin/game_system_detail_view.dart';
 import 'package:quest_cards/src/admin/game_system_batch_view.dart';
 import 'package:quest_cards/src/admin/game_system_analytics_view.dart';
+import 'package:quest_cards/src/admin/unstandardized_quests_view.dart'; // Import the new view
 
 /// Game System Admin View
 ///
@@ -70,6 +71,15 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
         builder: (context) => GameSystemDetailView(gameSystem: system),
       ),
     ).then((_) => _loadGameSystems());
+  }
+
+  void _navigateToUnstandardizedQuests() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const UnstandardizedQuestsView(),
+      ),
+    );
   }
 
   Future<void> _deleteSystem(StandardGameSystem system) async {
@@ -162,6 +172,11 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
       appBar: AppBar(
         title: const Text('Game System Management'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.rule_folder_outlined), // Icon for unstandardized quests
+            onPressed: _navigateToUnstandardizedQuests,
+            tooltip: 'View Unstandardized Quests', // Tooltip for the new button
+          ),
           IconButton(
             icon: const Icon(Icons.analytics),
             onPressed: () => Navigator.push(
