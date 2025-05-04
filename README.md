@@ -7,9 +7,13 @@ Questable is an application designed to manage and explore RPG Adventures ("Ques
 - [Build Steps](#build-steps)
 - [Getting Started](#getting-started)
 - [Features](#features)
+- [Technology Stack](#technology-stack)
 - [Assets](#assets)
+- [Project Structure](#project-structure)
 - [Localization](#localization)
+- [Testing](#testing)
 - [Contributing](#contributing)
+- [Contact / Issues](#contact--issues)
 - [License](#license)
 
 ## Build Steps
@@ -48,9 +52,9 @@ flutter run -d chrome
    # Install dependencies
    flutter pub get
    
-   # Configure Firebase
+   # Configure Firebase (ensure you have firebase_options.dart configured)
    firebase login
-   firebase use your-project-id
+   firebase use your-project-id # Replace with your actual Firebase project ID
    ```
 
 ## Features
@@ -60,12 +64,33 @@ flutter run -d chrome
 - **AI-powered Analysis**: Automatic categorization and extraction of quest data
 - **Multi-platform Support**: Web, iOS, and Android compatibility
 
+## Technology Stack
+
+Questable is built using the following technologies:
+
+- **Frontend**: Flutter (Dart)
+- **Backend**: Firebase (Authentication, Firestore, Cloud Storage, Cloud Functions)
+- **Cloud Functions Language**: Python
+- **Analysis Scripts**: JavaScript (Node.js)
+
 ## Assets
 
 The `assets` folder contains:
 - Icons for different RPG systems
 - App logos and images
 - Theme configuration files
+
+## Project Structure
+
+The project is organized into the following main directories:
+
+- `lib/`: Contains the main Flutter application code (Dart).
+- `functions/`: Contains Firebase Cloud Functions code (Python).
+- `analysis_scripts/`: Holds scripts for data analysis (JavaScript).
+- `assets/`: Stores static assets like icons and images.
+- `test/`: Contains application tests.
+- `ios/`, `android/`, `web/`, `linux/`, `macos/`, `windows/`: Platform-specific code.
+- `public/`: Web-specific static files like `index.html`.
 
 ## Localization
 
@@ -76,6 +101,14 @@ The application supports localization. To add or modify translations:
    ```sh
    flutter gen-l10n
    ```
+
+## Testing
+
+To run the automated tests:
+
+```sh
+flutter test
+```
 
 ## Contributing
 
@@ -108,6 +141,10 @@ firebase init emulators
 # Start the emulators
 firebase emulators:start
 ```
+
+## Contact / Issues
+
+Please report any issues or suggest features via the [GitHub Issues](https://github.com/cephyn/quest_cards/issues) page. (Remember to replace the URL if your repository location is different).
 
 ## License
 
