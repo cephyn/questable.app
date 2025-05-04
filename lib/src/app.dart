@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
-import 'package:flutter_donation_buttons/flutter_donation_buttons.dart';
 // import 'package:flutter_localizations/flutter_localizations.dart'; // Commented out localization
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -156,11 +155,6 @@ class _HomePageState extends State<HomePage> {
   // Helper to build AppBar actions
   List<Widget> _buildAppBarActions(User? currentUser) {
     return [
-      KofiButton(
-          text: 'Support us on Ko-fi',
-          kofiName: "busywyvern",
-          kofiColor: KofiColor.Blue,
-          onDonation: () {}),
       if (currentUser != null) ...[
         IconButton(
           icon: const Icon(Icons.person),

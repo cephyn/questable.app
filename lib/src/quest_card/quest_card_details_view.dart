@@ -10,6 +10,10 @@ import 'package:quest_cards/src/widgets/game_system_mapping_feedback.dart'
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:quest_cards/src/services/firebase_auth_service.dart'; // Import auth service
 import 'package:quest_cards/src/auth/auth_dialog_helper.dart'; // Import auth dialog helper
+import 'package:share_plus/share_plus.dart'; // Keep for fallback if needed
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:quest_cards/src/config/app_constants.dart';
+import 'package:quest_cards/src/widgets/share_options_modal.dart'; // Import the modal
 
 class QuestCardDetailsView extends StatefulWidget {
   final String docId;
@@ -24,6 +28,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   final FirestoreService _firestoreService = FirestoreService();
   final FirebaseAuthService _authService =
       FirebaseAuthService(); // Instantiate auth service
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance; // Analytics instance
   Map<String, dynamic>? _questCardData;
   bool _isLoading = true;
   bool _hasError = false;
@@ -99,6 +104,13 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
+          // Share button
+          if (!_isLoading && !_hasError && _questCardData != null)
+            IconButton(
+              icon: const Icon(Icons.share),
+              tooltip: 'Share Quest',
+              onPressed: _shareQuest, // Call the share method
+            ),
           // Show edit button if we have quest data
           if (!_isLoading && !_hasError)
             IconButton(
@@ -572,6 +584,57 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
         ),
       ],
     );
+  }
+
+  // Method to handle sharing - now opens the modal
+  Future<void> _shareQuest() async {
+    if (_questCardData == null) return;
+
+    final String questId = widget.docId;
+    final String shareableUrl = '${AppConstants.baseUrl}/quests/$questId';
+    final String questTitle =
+        Utils.capitalizeTitle(_questCardData!['title'] ?? 'Untitled Quest');
+    // Text primarily for system share fallback or if needed by modal logic
+    final String shareText =
+        'Check out this quest on Questable: "$questTitle" - $shareableUrl';
+
+    try {
+      // Log analytics event for initiating share - happens before modal shown
+      await _analytics.logEvent(
+        name: 'share_quest_initiated',
+        parameters: {'quest_id': questId},
+      );
+
+      // Show the custom modal bottom sheet
+      if (mounted) {
+        showShareOptionsModal(
+          context,
+          shareText: shareText, // Pass text for potential fallback
+          shareUrl: shareableUrl,
+          questId: questId,
+          questTitle: questTitle,
+          analytics: _analytics,
+        );
+      }
+
+      // Note: The Share.share() call is removed from here.
+      // Platform-specific analytics logging is now handled within the modal.
+
+    } catch (e) {
+      // Catch errors related to *initiating* the share (e.g., logging analytics)
+      // Errors during actual sharing (copy, launch URL) are handled in the modal
+      debugPrint('Error initiating share action: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not start sharing process.')),
+        );
+      }
+      // Optionally log initiation error
+      await _analytics.logEvent(
+        name: 'share_quest_initiation_error',
+        parameters: {'quest_id': questId, 'error': e.toString()},
+      );
+    }
   }
 
   Future<void> _launchURL(String url) async {
