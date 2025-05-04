@@ -56,15 +56,21 @@ class GameSystemMigrationService {
     return [...results1.docs, ...results2.docs];
   }
 
-  /// Get quest cards that use a specific game system name
+  /// Get quest cards that use a specific game system name (case-insensitive)
   ///
   /// This is useful for finding all quest cards that would be affected
-  /// by standardizing a specific game system
+  /// by standardizing a specific game system.
+  /// NOTE: This requires a `gameSystem_lowercase` field to exist on documents,
+  /// containing the lowercase version of the `gameSystem` field.
   Future<List<DocumentSnapshot>> getQuestCardsByGameSystem(
       String gameSystemName,
       {int limit = 100}) async {
+    // Normalize the input name to lowercase for the query
+    final lowercaseName = gameSystemName.toLowerCase();
+
     final snapshot = await questCards
-        .where('gameSystem', isEqualTo: gameSystemName)
+        // Query the dedicated lowercase field
+        .where('gameSystem_lowercase', isEqualTo: lowercaseName)
         .limit(limit)
         .get();
 

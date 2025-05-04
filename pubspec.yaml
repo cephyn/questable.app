@@ -49,6 +49,7 @@ dependencies:
   gpt_markdown: ^1.0.17
   mockito: ^5.4.6
   flutter_typeahead: ^5.2.0
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:

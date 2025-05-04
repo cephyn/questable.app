@@ -300,9 +300,10 @@ class GameSystemMapper {
     return acronym.toLowerCase() == potential.toLowerCase();
   }
 
-  /// Check if one string is a substring of another
+  /// Check if one string is a substring of another (case-insensitive)
   bool _isSubstringOf(String potential, String full) {
-    return full.contains(potential);
+    // Convert both strings to lowercase for case-insensitive comparison
+    return full.toLowerCase().contains(potential.toLowerCase());
   }
 
   /// Learn from manual mapping to improve future suggestions

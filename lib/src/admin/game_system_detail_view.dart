@@ -112,7 +112,7 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
           const SnackBar(content: Text('Game system updated successfully')),
         );
       } else {
-        final id = await _gameSystemService.createGameSystem(gameSystem);
+        //final id = await _gameSystemService.createGameSystem(gameSystem);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Game system created successfully')),
         );

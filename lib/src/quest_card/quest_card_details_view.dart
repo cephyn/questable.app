@@ -5,8 +5,11 @@ import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 import 'package:quest_cards/src/util/utils.dart';
-import 'package:quest_cards/src/widgets/game_system_feedback_widget.dart';
+import 'package:quest_cards/src/widgets/game_system_mapping_feedback.dart'
+    as feedback_widget; // Add alias
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:quest_cards/src/services/firebase_auth_service.dart'; // Import auth service
+import 'package:quest_cards/src/auth/auth_dialog_helper.dart'; // Import auth dialog helper
 
 class QuestCardDetailsView extends StatefulWidget {
   final String docId;
@@ -19,6 +22,8 @@ class QuestCardDetailsView extends StatefulWidget {
 
 class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   final FirestoreService _firestoreService = FirestoreService();
+  final FirebaseAuthService _authService =
+      FirebaseAuthService(); // Instantiate auth service
   Map<String, dynamic>? _questCardData;
   bool _isLoading = true;
   bool _hasError = false;
@@ -100,19 +105,27 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
               icon: const Icon(Icons.edit),
               tooltip: 'Edit Quest',
               onPressed: () {
-                // Get root navigator for authentication handling
-                final navigator = RootNavigator.of(context);
-                if (navigator != null) {
-                  navigator.showLoginPrompt(context, 'edit',
-                      docId: widget.docId);
-                } else {
-                  // Fallback to direct navigation for authenticated users
+                // Check if the user is logged in by checking currentUser
+                if (_authService.auth.currentUser != null) {
+                  // If logged in, navigate directly to edit screen
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => EditQuestCard(docId: widget.docId),
                     ),
                   );
+                } else {
+                  // If not logged in, show login prompt
+                  final navigator = RootNavigator.of(context);
+                  if (navigator != null) {
+                    // Use RootNavigator if available (handles context better)
+                    navigator.showLoginPrompt(context, 'edit',
+                        docId: widget.docId);
+                  } else {
+                    // Fallback to AuthDialogHelper
+                    AuthDialogHelper.showLoginPrompt(
+                        context, 'edit this quest');
+                  }
                 }
               },
             ),
@@ -188,6 +201,18 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   }
 
   Widget _buildQuestHeader() {
+    // Ensure data is not null before accessing
+    if (_questCardData == null) return const SizedBox.shrink();
+
+    final String? standardizedSystem =
+        _questCardData!['standardizedGameSystem'];
+    final String? originalSystem = _questCardData!['gameSystem'];
+    final String displaySystemName =
+        standardizedSystem ?? originalSystem ?? 'Any System';
+    final bool showOriginal = standardizedSystem != null &&
+        originalSystem != null &&
+        standardizedSystem != originalSystem;
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -207,31 +232,36 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
             // Game system with icon
             Row(
               children: [
-                const Icon(Icons.casino, size: 16),
+                // Use standardized icon if available, fallback to original
+                CircleAvatar(
+                  backgroundImage: Utils.getSystemIcon(displaySystemName),
+                  radius: 10, // Smaller icon
+                  backgroundColor: Colors.transparent,
+                ),
                 const SizedBox(width: 8),
+                // Display Standardized Name prominently
                 Text(
-                  'System: ${_questCardData!['gameSystem'] ?? 'Any System'}',
+                  displaySystemName,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.secondary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                // Show original name in parentheses if different and standardized exists
+                if (showOriginal)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4.0),
+                    child: Text(
+                      '($originalSystem)', // Removed unnecessary !
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
               ],
             ),
-            // Display standardized game system if available
-            if (_questCardData!['standardizedGameSystem'] != null &&
-                _questCardData!['standardizedGameSystem'].toString().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, left: 24.0),
-                child: Text(
-                  'Standardized as: ${_questCardData!['standardizedGameSystem']}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.tertiary,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
             const SizedBox(height: 4),
             // Level range
             Row(
@@ -468,7 +498,9 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
       return const SizedBox.shrink();
     }
 
-    return GameSystemFeedbackWidget(
+    return feedback_widget.GameSystemFeedbackWidget(
+      // Corrected widget name
+      // Use alias
       questId: widget.docId,
       originalSystem: _questCardData!['gameSystem'],
       standardizedSystem: _questCardData!['standardizedGameSystem'],

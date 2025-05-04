@@ -1,6 +1,8 @@
 // Configuration values for the application
 // This file stores constants and configuration settings used across the app
 
+import 'dart:developer';
+
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 class Config {
@@ -88,7 +90,7 @@ class Config {
       await remoteConfig.fetchAndActivate();
     } catch (e) {
       // Handle fetch error, but continue with defaults or cached values
-      print('Error fetching remote config: $e');
+      log('Error fetching remote config: $e');
     }
   }
 

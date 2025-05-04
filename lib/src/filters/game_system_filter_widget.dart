@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
+import 'package:quest_cards/src/util/utils.dart'; // Import Utils for icons
+import 'package:collection/collection.dart'; // Import for listEquals
+
+// Enum to represent checkbox state (for tristate)
+enum CheckboxState { selected, partial, unselected }
 
 /// A specialized filter widget for game systems that supports the standardization process
 ///
 /// This widget provides a hierarchical view of game systems and their editions,
-/// with special handling for standardized game systems.
+/// using standardized game system data.
 class GameSystemFilterWidget extends StatefulWidget {
   const GameSystemFilterWidget({super.key});
 
@@ -15,9 +20,11 @@ class GameSystemFilterWidget extends StatefulWidget {
 }
 
 class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
-  bool _isExpanded = false;
-  String? _selectedGameSystem;
-  List<String>? _selectedEditions;
+  // Store selected system name and edition names
+  List<String> _selectedSystemNames = [];
+  // Track expanded state for each system
+  final Map<String, bool> _systemExpansionState = {};
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -29,6 +36,42 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
         _searchQuery = _searchController.text.toLowerCase();
       });
     });
+
+    // Initialize selection state from FilterProvider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadInitialSelection();
+    });
+  }
+
+  void _loadInitialSelection() {
+    if (!mounted) return;
+    final filterProvider = Provider.of<FilterProvider>(context, listen: false);
+    // Use the correct field name used in applyFilters
+    final systemFilter =
+        filterProvider.filterState.getFilterForField('standardizedGameSystem');
+
+    if (systemFilter != null && systemFilter.value is List) {
+      setState(() {
+        _selectedSystemNames = List<String>.from(systemFilter.value);
+        // Initialize expansion state for selected systems that have editions
+        _systemExpansionState.clear(); // Clear previous state
+        for (var name in _selectedSystemNames) {
+          final system = filterProvider.getSystemByName(name);
+          // Check if it's a main system name (not an edition name)
+          if (system != null && system.editions.isNotEmpty) {
+            // Expand if the main system is selected
+            if (_selectedSystemNames.contains(system.standardName)) {
+              _systemExpansionState[system.standardName] = true;
+            }
+          }
+        }
+      });
+    } else {
+      setState(() {
+        _selectedSystemNames = [];
+        _systemExpansionState.clear();
+      });
+    }
   }
 
   @override
@@ -42,385 +85,360 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
     final filterProvider = Provider.of<FilterProvider>(context);
     final standardSystems = filterProvider.standardGameSystems;
 
-    // Check for any existing game system filter
-    final existingSystemFilter =
-        filterProvider.filterState.getFilterForField('gameSystem');
-    if (existingSystemFilter != null && _selectedGameSystem == null) {
-      _selectedGameSystem = existingSystemFilter.value is List
-          ? null // Multiple systems selected, don't show a single selected system
-          : existingSystemFilter.value.toString();
+    // Re-check selection state if filters change externally
+    final currentFilter =
+        filterProvider.filterState.getFilterForField('standardizedGameSystem');
+    List<String> currentSelectedNames = [];
+    if (currentFilter != null && currentFilter.value is List) {
+      currentSelectedNames = List<String>.from(currentFilter.value);
     }
+    // Basic check to see if external state differs from internal
+    // Use the imported listEquals from package:collection
+    if (!const ListEquality()
+        .equals(_selectedSystemNames, currentSelectedNames)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadInitialSelection();
+      });
+    }
+
+    // Filter systems based on search query
+    final filteredSystems = standardSystems.where((system) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery;
+      // Check standard name, aliases, and editions
+      return system.standardName.toLowerCase().contains(query) ||
+          system.aliases.any((alias) => alias.toLowerCase().contains(query)) ||
+          system.editions
+              .any((edition) => edition.name.toLowerCase().contains(query));
+    }).toList();
+
+    // Sort systems alphabetically for display
+    filteredSystems.sort((a, b) => a.standardName.compareTo(b.standardName));
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
+      elevation: 1, // Reduced elevation
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with expand/collapse functionality
-            InkWell(
-              onTap: () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Game System',
-                    style: Theme.of(context).textTheme.titleMedium,
+            // Header
+            Text(
+              'Game System',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600, // Slightly bolder title
                   ),
-                  Icon(
-                    _isExpanded ? Icons.expand_less : Icons.expand_more,
-                  ),
-                ],
-              ),
             ),
+            const SizedBox(height: 8),
 
-            // Current selection summary (when collapsed)
-            if (!_isExpanded && existingSystemFilter != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Wrap(
-                  spacing: 8,
-                  children: [
-                    Chip(
-                      label: Text(
-                        existingSystemFilter.value is List
-                            ? '${(existingSystemFilter.value as List).length} systems selected'
-                            : existingSystemFilter.value.toString(),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      onDeleted: () {
-                        filterProvider.removeFilter('gameSystem');
-                        setState(() {
-                          _selectedGameSystem = null;
-                          _selectedEditions = null;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-            // Expanded filter options
-            if (_isExpanded) ...[
-              const SizedBox(height: 8),
-              // Search bar for filtering systems
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search game systems...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Game Systems List with Icons
-              ...buildGameSystemsList(standardSystems, filterProvider),
-
-              const SizedBox(height: 16),
-
-              // Action buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  OutlinedButton(
-                    onPressed: () {
-                      // Clear game system filters
-                      filterProvider.removeFilter('gameSystem');
-                      setState(() {
-                        _selectedGameSystem = null;
-                        _selectedEditions = null;
-                      });
-                    },
-                    child: const Text('Clear'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _isExpanded = false;
-                      });
-                    },
-                    child: const Text('Apply'),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build the list of game systems with their editions
-  List<Widget> buildGameSystemsList(
-      List<StandardGameSystem> systems, FilterProvider filterProvider) {
-    // Filter systems based on search query
-    final filteredSystems = systems.where((system) {
-      if (_searchQuery.isEmpty) return true;
-
-      // Check if system name contains the search query
-      if (system.standardName.toLowerCase().contains(_searchQuery)) {
-        return true;
-      }
-
-      // Check if any alias contains the search query
-      for (final alias in system.aliases) {
-        if (alias.toLowerCase().contains(_searchQuery)) {
-          return true;
-        }
-      }
-
-      // Check if any edition contains the search query
-      for (final edition in system.editions) {
-        if (edition.name.toLowerCase().contains(_searchQuery)) {
-          return true;
-        }
-      }
-
-      return false;
-    }).toList();
-
-    if (filteredSystems.isEmpty) {
-      return [
-        const Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('No game systems found'),
-          ),
-        ),
-      ];
-    }
-
-    return filteredSystems.map((system) {
-      final isSelected = _selectedGameSystem == system.standardName;
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Game System Row
-          InkWell(
-            onTap: () {
-              setState(() {
-                if (_selectedGameSystem == system.standardName) {
-                  // Deselect if already selected
-                  _selectedGameSystem = null;
-                  _selectedEditions = null;
-                  filterProvider.removeFilter('gameSystem');
-                } else {
-                  // Select this system
-                  _selectedGameSystem = system.standardName;
-                  _selectedEditions = null;
-
-                  // Apply filter for this game system
-                  filterProvider.addFilter(
-                    'gameSystem',
-                    system.standardName,
-                    FilterOperator.equals,
-                  );
-                }
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  // Game system icon if available
-                  if (system.icon != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Image.asset(
-                        'assets/icons/${system.icon}',
-                        width: 24,
-                        height: 24,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const SizedBox(width: 24, height: 24);
+            // Search bar
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search systems or editions...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
                         },
-                      ),
-                    ),
-
-                  Expanded(
-                    child: Text(
-                      system.standardName,
-                      style: TextStyle(
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-
-                  // Selection indicator
-                  if (isSelected)
-                    const Icon(Icons.check, color: Colors.green)
-                  else if (system.editions.isNotEmpty)
-                    const Icon(Icons.arrow_forward_ios, size: 16)
-                ],
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  // Lighter border when enabled
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  // Theme color border when focused
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                isDense: true, // Make it more compact
               ),
             ),
-          ),
+            const SizedBox(height: 12),
 
-          // Show editions if this system is selected and has editions
-          if (isSelected && system.editions.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 24),
-              child: buildEditionsList(system, filterProvider),
-            ),
-
-          const Divider(),
-        ],
-      );
-    }).toList();
-  }
-
-  /// Build the list of editions for a selected game system
-  Widget buildEditionsList(
-      StandardGameSystem system, FilterProvider filterProvider) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 4),
-          child: Text(
-            'Editions:',
-            style: TextStyle(
-              fontSize: 12,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-        ...system.editions.map((edition) {
-          final isSelected = _selectedEditions?.contains(edition.name) ?? false;
-
-          return InkWell(
-            onTap: () {
-              setState(() {
-                _selectedEditions ??= [];
-
-                if (isSelected) {
-                  // Remove this edition
-                  _selectedEditions!.remove(edition.name);
-                  if (_selectedEditions!.isEmpty) {
-                    _selectedEditions = null;
-                  }
-                } else {
-                  // Add this edition
-                  _selectedEditions!.add(edition.name);
-                }
-
-                // Apply filter for editions if we have selections
-                if (_selectedEditions != null &&
-                    _selectedEditions!.isNotEmpty) {
-                  filterProvider.addFilter(
-                    'edition',
-                    _selectedEditions,
-                    FilterOperator.whereIn,
-                  );
-                } else {
-                  filterProvider.removeFilter('edition');
-                }
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      edition.name +
-                          (edition.year != null ? ' (${edition.year})' : ''),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-
-                  // Selection checkbox
-                  Icon(
-                    isSelected
-                        ? Icons.check_box
-                        : Icons.check_box_outline_blank,
-                    size: 18,
-                    color: isSelected ? Colors.green : Colors.grey,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-}
-
-/// Widget to display a game system with its icon
-class GameSystemWithIcon extends StatelessWidget {
-  final StandardGameSystem system;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const GameSystemWithIcon({
-    super.key,
-    required this.system,
-    this.selected = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        child: Row(
-          children: [
-            // Game system icon
-            if (system.icon != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Image.asset(
-                  'assets/icons/${system.icon}',
-                  width: 24,
-                  height: 24,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const SizedBox(width: 24, height: 24);
+            // Game Systems List
+            if (filterProvider.isLoadingFilterOptions)
+              const Center(child: CircularProgressIndicator())
+            else if (filteredSystems.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text('No game systems found'),
+                ),
+              )
+            else
+              // Use a constrained box for the list if it gets too long
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight:
+                      MediaQuery.of(context).size.height * 0.4, // Limit height
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: filteredSystems.length,
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final system = filteredSystems[index];
+                    return buildGameSystemTile(system, filterProvider);
                   },
                 ),
               ),
 
-            // Game system name
-            Expanded(
-              child: Text(
-                system.standardName,
-                style: TextStyle(
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ),
+            const SizedBox(height: 16),
 
-            // Selection indicator
-            if (selected) const Icon(Icons.check, color: Colors.green)
+            // Action buttons
+            Row(
+              mainAxisAlignment:
+                  MainAxisAlignment.end, // Align buttons to the right
+              children: [
+                TextButton(
+                  // Use TextButton for less emphasis on Clear
+                  onPressed: (_selectedSystemNames.isEmpty)
+                      ? null
+                      : () {
+                          // Disable if nothing selected
+                          // Clear game system filters
+                          filterProvider.removeFilter('standardizedGameSystem');
+                          // No need to manually update state here, FilterProvider change will trigger rebuild
+                          // setState(() {
+                          //   _selectedSystemNames = [];
+                          //   _systemExpansionState.clear();
+                          // });
+                        },
+                  child: const Text('Clear Selection'),
+                ),
+                // Apply button removed - selection applies instantly via checkboxes
+              ],
+            ),
           ],
         ),
       ),
     );
   }
+
+  /// Build a tile for a single game system, potentially expandable for editions.
+  Widget buildGameSystemTile(
+      StandardGameSystem system, FilterProvider filterProvider) {
+    final bool isSelected = _selectedSystemNames.contains(system.standardName);
+    final bool hasEditions = system.editions.isNotEmpty;
+    final bool isExpanded = _systemExpansionState[system.standardName] ?? false;
+
+    // Determine checkbox state: selected, partially selected (editions), or unselected
+    CheckboxState checkboxState = CheckboxState.unselected;
+    int selectedEditionCount = 0;
+    if (hasEditions) {
+      selectedEditionCount = system.editions
+          .where((ed) => _selectedSystemNames.contains(ed.name))
+          .length;
+    }
+
+    if (isSelected) {
+      // Main system is selected
+      if (!hasEditions || selectedEditionCount == system.editions.length) {
+        checkboxState = CheckboxState
+            .selected; // Selected, and no editions or all editions selected
+      } else {
+        checkboxState = CheckboxState
+            .partial; // Selected, but not all editions selected (or none explicitly)
+      }
+    } else {
+      // Main system not selected
+      if (hasEditions && selectedEditionCount > 0) {
+        checkboxState =
+            CheckboxState.partial; // Not selected, but some editions are
+      } else {
+        checkboxState =
+            CheckboxState.unselected; // Not selected, no editions selected
+      }
+    }
+
+    Widget titleWidget = Row(
+      children: [
+        // Icon
+        CircleAvatar(
+          backgroundImage: Utils.getSystemIcon(system.standardName),
+          radius: 12,
+          backgroundColor:
+              Colors.transparent, // Avoid default color if icon fails
+        ),
+        const SizedBox(width: 12),
+        // Name
+        Expanded(
+          child: Text(
+            system.standardName,
+            style: TextStyle(
+              // Adjust font weight based on any selection (system or edition)
+              fontWeight: (checkboxState != CheckboxState.unselected)
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    // Define the action for tapping the main checkbox/row
+    VoidCallback toggleSystemSelection = () {
+      setState(() {
+        bool currentlySelectedOrPartial =
+            checkboxState != CheckboxState.unselected;
+        if (currentlySelectedOrPartial) {
+          // Deselect system and all its editions
+          _selectedSystemNames.remove(system.standardName);
+          for (var edition in system.editions) {
+            _selectedSystemNames.remove(edition.name);
+          }
+          _systemExpansionState
+              .remove(system.standardName); // Collapse on deselect
+        } else {
+          // Select system
+          _selectedSystemNames.add(system.standardName);
+          // Select all editions when selecting the parent?
+          // Let's keep it simple: only select the parent system itself.
+          // User can expand and select editions individually.
+          // for (var edition in system.editions) {
+          //    if (!_selectedSystemNames.contains(edition.name)) {
+          //       _selectedSystemNames.add(edition.name);
+          //    }
+          // }
+          if (hasEditions) {
+            _systemExpansionState[system.standardName] =
+                true; // Expand on select
+          }
+        }
+        _applyFilters(filterProvider);
+      });
+    };
+
+    if (!hasEditions) {
+      // Simple CheckboxListTile if no editions
+      return CheckboxListTile(
+        value: isSelected,
+        onChanged: (bool? value) {
+          toggleSystemSelection(); // Use the defined toggle action
+        },
+        title: titleWidget,
+        controlAffinity: ListTileControlAffinity.leading, // Checkbox on left
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+      );
+    } else {
+      // Use ExpansionTile if editions exist
+      return ExpansionTile(
+        key: PageStorageKey(system.standardName), // Preserve state on scroll
+        title: titleWidget,
+        initiallyExpanded: isExpanded,
+        onExpansionChanged: (expanding) {
+          // Only toggle expansion state, don't change selection here
+          setState(() {
+            _systemExpansionState[system.standardName] = expanding;
+          });
+        },
+        leading: Checkbox(
+          value: checkboxState == CheckboxState.selected,
+          tristate: true, // Allow partial state
+          onChanged: (bool? value) {
+            // Toggling the main checkbox selects/deselects the system and its editions
+            toggleSystemSelection();
+          },
+        ),
+        // Use expansion arrow for visual cue, handle expansion via onExpansionChanged
+        // trailing: const SizedBox.shrink(), // Keep default trailing icon
+        tilePadding: const EdgeInsets.only(
+            left: 0, right: 16, top: 0, bottom: 0), // Adjust padding
+        childrenPadding: const EdgeInsets.only(
+            left: 40, bottom: 8, right: 16), // Indent editions
+        children: system.editions.map((GameSystemEdition edition) {
+          return buildEditionTile(system, edition, filterProvider);
+        }).toList(),
+      );
+    }
+  }
+
+  /// Build a tile for a single edition under a game system.
+  // Ensure GameSystemEdition type is correctly referenced from the imported model
+  Widget buildEditionTile(StandardGameSystem system, GameSystemEdition edition,
+      FilterProvider filterProvider) {
+    final bool isSelected = _selectedSystemNames.contains(edition.name);
+
+    return CheckboxListTile(
+      value: isSelected,
+      onChanged: (bool? value) {
+        setState(() {
+          if (value == true) {
+            // Select edition
+            _selectedSystemNames.add(edition.name);
+            // Ensure parent system is added if not already selected
+            if (!_selectedSystemNames.contains(system.standardName)) {
+              _selectedSystemNames.add(system.standardName);
+            }
+          } else {
+            // Deselect edition
+            _selectedSystemNames.remove(edition.name);
+            // Check if this was the last selected item for this parent (edition or parent itself)
+            bool anyOtherEditionSelected = system.editions
+                .any((ed) => _selectedSystemNames.contains(ed.name));
+            if (!anyOtherEditionSelected &&
+                !_selectedSystemNames.contains(system.standardName)) {
+              // If deselecting the last edition AND the parent isn't selected, ensure parent is removed
+              // This case shouldn't happen with current logic, but good for robustness
+              _selectedSystemNames.remove(system.standardName);
+            }
+            // If the parent IS selected, deselecting the last edition makes the parent state partial (handled by checkboxState logic)
+          }
+          _applyFilters(filterProvider);
+        });
+      },
+      title: Text(
+        edition.name + (edition.year != null ? ' (${edition.year})' : ''),
+        style: const TextStyle(fontSize: 14),
+      ),
+      controlAffinity: ListTileControlAffinity.leading,
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+    );
+  }
+
+  /// Apply the current selections to the FilterProvider.
+  void _applyFilters(FilterProvider filterProvider) {
+    // Ensure no duplicates before applying
+    final uniqueSelections = _selectedSystemNames.toSet().toList();
+
+    if (uniqueSelections.isEmpty) {
+      filterProvider.removeFilter('standardizedGameSystem');
+    } else {
+      // Use the provider's addFilter method with correct arguments
+      filterProvider.addFilter(
+        'standardizedGameSystem', // field (String)
+        uniqueSelections, // value (List<String>)
+        FilterOperator.whereIn, // operator (FilterOperator)
+      );
+    }
+    // FilterProvider.addFilter notifies listeners, triggering rebuilds where needed
+  }
 }
+
+// Helper function for comparing lists (moved outside the class)
+// Use ListEquality from package:collection instead
+// bool listEquals<T>(List<T>? a, List<T>? b) {
+//   if (a == null) return b == null;
+//   if (b == null || a.length != b.length) return false;
+//   if (identical(a, b)) return true;
+//   for (int index = 0; index < a.length; index += 1) {
+//     if (a[index] != b[index]) return false;
+//   }
+//   return true;
+// }

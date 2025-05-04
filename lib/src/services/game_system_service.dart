@@ -205,7 +205,7 @@ class GameSystemService {
       // This is just a starting point - a more sophisticated NLP algorithm would be better
       final processedSystems = <String>{};
 
-      gameSystemCounts.forEach((system, count) {
+      gameSystemCounts.forEach((system, systemCount) {
         // Skip if already processed
         if (processedSystems.contains(system)) return;
 
@@ -219,7 +219,7 @@ class GameSystemService {
         // Add this system to its group
         group.add({
           'name': system,
-          'count': count,
+          'count': systemCount,
           'matchType': 'primary',
         });
 

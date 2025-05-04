@@ -382,7 +382,7 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.2),
+                            color: statusColor.withAlpha((255 * 0.2).round()),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: statusColor),
                           ),

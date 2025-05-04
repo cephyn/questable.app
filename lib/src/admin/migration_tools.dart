@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Added missing import
@@ -25,6 +27,13 @@ class _MigrationToolsState extends State<MigrationTools> {
   String _checkStatusMessage = '';
   int _missingFieldCount = -1;
 
+  // New state variables for populating gameSystem_lowercase
+  bool _isPopulatingLowercase = false;
+  String _populateLowercaseStatus = '';
+  bool _populateLowercaseSuccess = false;
+  int _populatedLowercaseCount = 0;
+  int _processedLowercaseCount = 0;
+
   @override
   Widget build(BuildContext context) {
     final userContext = Provider.of<UserContext>(context);
@@ -47,8 +56,8 @@ class _MigrationToolsState extends State<MigrationTools> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
+          // Changed Column to ListView
           children: [
             const Text(
               'Database Migration Utilities',
@@ -56,7 +65,7 @@ class _MigrationToolsState extends State<MigrationTools> {
             ),
             const SizedBox(height: 20),
 
-            // First card: Check for missing fields
+            // First card: Check for missing isPublic fields
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -111,7 +120,7 @@ class _MigrationToolsState extends State<MigrationTools> {
 
             const SizedBox(height: 20),
 
-            // Second card: Run migration
+            // Second card: Run isPublic migration
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -164,7 +173,7 @@ class _MigrationToolsState extends State<MigrationTools> {
 
             const SizedBox(height: 20),
 
-            // Third card: Test Query
+            // Third card: Test Filter Query
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -191,6 +200,65 @@ class _MigrationToolsState extends State<MigrationTools> {
                 ),
               ),
             ),
+
+            const SizedBox(height: 20), // Add space before the new card
+
+            // Fourth card: Populate gameSystem_lowercase
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Populate gameSystem_lowercase Field',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'This tool scans all quest cards and adds/updates the `gameSystem_lowercase` field, '
+                      'which is required for case-insensitive game system searching and filtering. '
+                      'It only updates documents where the field is missing or incorrect. Safe to re-run.',
+                    ),
+                    const SizedBox(height: 16),
+                    if (_populateLowercaseStatus.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        color: _populateLowercaseSuccess
+                            ? Colors.green.shade100
+                            : _isPopulatingLowercase
+                                ? Colors.blue.shade100
+                                : Colors.red.shade100,
+                        width: double.infinity,
+                        child: Text(_populateLowercaseStatus),
+                      ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _isPopulatingLowercase
+                          ? null
+                          : _runPopulateLowercaseGameSystem,
+                      child: _isPopulatingLowercase
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                SizedBox(width: 8),
+                                Text('Populating...'),
+                              ],
+                            )
+                          : const Text('Populate Lowercase Field'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20), // Add some padding at the bottom
           ],
         ),
       ),
@@ -317,7 +385,7 @@ class _MigrationToolsState extends State<MigrationTools> {
 
       // Print the full error with the link to the console for easy access
       if (hasIndexLink) {
-        print('Index creation link: $indexLink');
+        log('Index creation link: $indexLink');
       }
     }
   }
@@ -347,6 +415,140 @@ class _MigrationToolsState extends State<MigrationTools> {
           _success = false;
         });
       }
+    }
+  }
+
+  /// Runs the process to populate the gameSystem_lowercase field
+  Future<void> _runPopulateLowercaseGameSystem() async {
+    setState(() {
+      _isPopulatingLowercase = true;
+      _populateLowercaseStatus = 'Starting population... Fetching first batch.';
+      _populateLowercaseSuccess = false;
+      _populatedLowercaseCount = 0;
+      _processedLowercaseCount = 0;
+    });
+
+    final firestore = FirebaseFirestore.instance;
+    final questCardsRef = firestore.collection('questCards');
+    const batchSize = 400; // Firestore batch limit is 500 operations
+    int batchCounter = 0;
+    WriteBatch batch = firestore.batch();
+    DocumentSnapshot? lastDoc;
+
+    try {
+      while (true) {
+        // Query for the next batch
+        Query query =
+            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        if (lastDoc != null) {
+          // No need for '!' as lastDoc is checked for null
+          query = query.startAfterDocument(lastDoc);
+        }
+
+        if (!mounted) return; // Check if widget is still mounted
+        setState(() {
+          _populateLowercaseStatus =
+              'Fetching next batch (processed: $_processedLowercaseCount)...';
+        });
+
+        final snapshot = await query.get();
+
+        if (snapshot.docs.isEmpty) {
+          log('No more documents found.');
+          break; // Exit loop
+        }
+
+        lastDoc = snapshot.docs.last;
+        final currentBatchSize = snapshot.docs.length;
+        log('Processing ${currentBatchSize} documents (up to ${lastDoc.id})...');
+
+        for (final doc in snapshot.docs) {
+          _processedLowercaseCount++;
+          final data = doc.data() as Map<String, dynamic>?;
+          String? gameSystem;
+          String? existingLowercase;
+
+          if (data != null) {
+            if (data.containsKey('gameSystem') &&
+                data['gameSystem'] is String) {
+              gameSystem = data['gameSystem'] as String;
+            }
+            if (data.containsKey('gameSystem_lowercase')) {
+              existingLowercase = data['gameSystem_lowercase'] as String?;
+            }
+          }
+
+          if (gameSystem != null && gameSystem.isNotEmpty) {
+            final lowercaseGameSystem = gameSystem.toLowerCase();
+
+            if (existingLowercase == null ||
+                existingLowercase != lowercaseGameSystem) {
+              batch.update(
+                  doc.reference, {'gameSystem_lowercase': lowercaseGameSystem});
+              batchCounter++;
+              _populatedLowercaseCount++;
+
+              if (batchCounter >= batchSize) {
+                if (!mounted) return;
+                setState(() {
+                  _populateLowercaseStatus =
+                      'Committing batch (Processed: $_processedLowercaseCount, Updated: $_populatedLowercaseCount)...';
+                });
+                log('Committing batch...');
+                await batch.commit();
+                log('Batch committed.');
+                batch = firestore.batch(); // Start new batch
+                batchCounter = 0;
+                await Future.delayed(
+                    const Duration(milliseconds: 50)); // Small delay
+              }
+            }
+          }
+          // Update status periodically within a batch
+          if (_processedLowercaseCount % 100 == 0 && mounted) {
+            setState(() {
+              _populateLowercaseStatus =
+                  'Processing... (Processed: $_processedLowercaseCount, Updated: $_populatedLowercaseCount)';
+            });
+          }
+        }
+        if (!mounted) return;
+        setState(() {
+          _populateLowercaseStatus =
+              'Finished processing batch. (Total Processed: $_processedLowercaseCount, Total Updated: $_populatedLowercaseCount)';
+        });
+      }
+
+      // Commit final batch
+      if (batchCounter > 0) {
+        if (!mounted) return;
+        setState(() {
+          _populateLowercaseStatus = 'Committing final batch...';
+        });
+        log('Committing final batch ($batchCounter operations)...');
+        await batch.commit();
+        log('Final batch committed.');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isPopulatingLowercase = false;
+          _populateLowercaseStatus =
+              'Population complete! Processed: $_processedLowercaseCount, Updated/Verified: $_populatedLowercaseCount';
+          _populateLowercaseSuccess = true;
+        });
+      }
+    } catch (e, s) {
+      log('Error during gameSystem_lowercase population: $e', stackTrace: s);
+      if (mounted) {
+        setState(() {
+          _isPopulatingLowercase = false;
+          _populateLowercaseStatus =
+              'Error during population: $e. Processed: $_processedLowercaseCount, Updated: $_populatedLowercaseCount';
+          _populateLowercaseSuccess = false;
+        });
+      }
+      // Optionally try to commit the current batch on error
     }
   }
 }

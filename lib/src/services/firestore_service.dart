@@ -22,9 +22,12 @@ class FirestoreService {
     String docId = "";
     await questCards.add({
       'id': questCard.generateUniqueHash(),
-      'title': questCard.title!.toLowerCase(),
+      'title':
+          questCard.title?.toLowerCase(), // Ensure title is stored lowercase
       'productTitle': questCard.productTitle,
       'gameSystem': questCard.gameSystem,
+      'gameSystem_lowercase':
+          questCard.gameSystem?.toLowerCase(), // Add lowercase field
       'edition': questCard.edition,
       'level': questCard.level,
       'pageLength': questCard.pageLength,
@@ -33,7 +36,7 @@ class FirestoreService {
       'publicationYear': questCard.publicationYear,
       'setting': questCard.setting,
       'environments': questCard.environments,
-      'link': questCard.link.toString(),
+      'link': questCard.link?.toString(),
       'bossVillains': questCard.bossVillains,
       'commonMonsters': questCard.commonMonsters,
       'notableItems': questCard.notableItems,
@@ -179,9 +182,12 @@ class FirestoreService {
     log(questCard.toJson().toString());
     return questCards.doc(docId).update({
       'id': questCard.id,
-      'title': questCard.title!.toLowerCase(),
+      'title':
+          questCard.title?.toLowerCase(), // Ensure title is stored lowercase
       'productTitle': questCard.productTitle,
       'gameSystem': questCard.gameSystem,
+      'gameSystem_lowercase':
+          questCard.gameSystem?.toLowerCase(), // Add/Update lowercase field
       'edition': questCard.edition,
       'level': questCard.level,
       'pageLength': questCard.pageLength,
@@ -190,7 +196,7 @@ class FirestoreService {
       'publicationYear': questCard.publicationYear,
       'setting': questCard.setting,
       'environments': questCard.environments,
-      'link': questCard.link.toString(),
+      'link': questCard.link?.toString(),
       'bossVillains': questCard.bossVillains,
       'commonMonsters': questCard.commonMonsters,
       'notableItems': questCard.notableItems,
@@ -200,6 +206,10 @@ class FirestoreService {
       'classification': questCard.classification,
       'uploadedBy': questCard.uploadedBy,
       'isPublic': questCard.isPublic, // Add isPublic field
+      // Keep standardizedGameSystem fields if they exist, don't overwrite on general update
+      // 'standardizedGameSystem': questCard.standardizedGameSystem, // Handled separately
+      // 'systemMigrationStatus': questCard.systemMigrationStatus, // Handled separately
+      // 'systemMigrationTimestamp': questCard.systemMigrationTimestamp, // Handled separately
     });
   }
 
@@ -359,6 +369,8 @@ class FirestoreService {
               ?.toLowerCase(), // Ensure title is stored lowercase
           'productTitle': questCard.productTitle,
           'gameSystem': questCard.gameSystem,
+          'gameSystem_lowercase':
+              questCard.gameSystem?.toLowerCase(), // Add lowercase field
           'edition': questCard.edition,
           'level': questCard.level,
           'pageLength': questCard.pageLength,

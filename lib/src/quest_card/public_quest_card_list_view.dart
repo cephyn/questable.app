@@ -504,15 +504,18 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
             elevation: 2,
             child: ListTile(
               leading: CircleAvatar(
+                // Prioritize standardized system for icon
                 backgroundImage: Utils.getSystemIcon(
-                    data['standardizedGameSystem'] ?? data['gameSystem']),
+                    data['standardizedGameSystem'] ?? data['gameSystem'] ?? ''),
+                backgroundColor: Colors.transparent,
               ),
               title: AutoSizeText(
                 Utils.capitalizeTitle(title),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Text(
-                "${data['gameSystem'] ?? 'Unknown'} • Level ${data['level'] ?? '?'} • ${data['pageLength'] ?? '?'} pages",
+                // Prioritize standardized system name, fallback to original
+                "${data['standardizedGameSystem'] ?? data['gameSystem'] ?? 'Unknown'} • Level ${data['level'] ?? '?'} • ${data['pageLength'] ?? '?'} pages",
                 style: const TextStyle(fontSize: 12),
               ),
               onTap: () {
