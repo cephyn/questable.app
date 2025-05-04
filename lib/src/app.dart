@@ -178,18 +178,7 @@ class _HomePageState extends State<HomePage> {
           },
         ),
         AuthWidgets.signOutButton(context, auth),
-      ] else ...[
-        ElevatedButton.icon(
-          icon: const Icon(Icons.login),
-          label: const Text('Sign In'),
-          onPressed: () {
-             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Sign-in flow not implemented yet.'))
-            );
-            // TODO: Navigate to sign-in
-          },
-        )
-      ]
+      ] 
     ];
   }
 

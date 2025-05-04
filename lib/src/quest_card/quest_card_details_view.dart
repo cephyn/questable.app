@@ -591,7 +591,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
     if (_questCardData == null) return;
 
     final String questId = widget.docId;
-    final String shareableUrl = '${AppConstants.baseUrl}/quests/$questId';
+    final String shareableUrl = '${AppConstants.baseUrl}/#/quests/$questId';
     final String questTitle =
         Utils.capitalizeTitle(_questCardData!['title'] ?? 'Untitled Quest');
     // Text primarily for system share fallback or if needed by modal logic

@@ -75,20 +75,55 @@
 
 ---
 
-## Phase 3: Testing & Refinement
+## Phase 3: Server-Side Rendering for Link Previews (New)
 
-1.  **Comprehensive Testing:** (Next Step)
-    *   Test sharing via the system share sheet on web builds.
-    *   Verify the "Copy Link" functionality works correctly (if available in the system sheet).
+**Goal:** Improve link unfurling/previews on social media by dynamically injecting meta tags.
+
+1.  **Update Cloud Function (`functions/main.py`):**
+    *   Add necessary imports (e.g., `firebase_admin`, `google.cloud.firestore`, `flask`).
+    *   Ensure Firebase Admin SDK is initialized.
+    *   Create or modify an HTTP function to handle requests.
+    *   Intercept requests for paths matching `/quests/<questId>`.
+    *   Extract the `questId` from the request path.
+    *   Connect to Firestore and fetch the quest document using the `questId`.
+    *   If the quest exists:
+        *   Read the base `index.html` file content (from `../build/web/index.html` relative to the function).
+        *   Extract relevant data (title, summary) from the quest document.
+        *   Construct meta tags (Open Graph: `og:title`, `og:description`, `og:url`, `og:type`, `og:image` [optional]; Twitter Card: `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image` [optional]).
+        *   Inject these meta tags into the `<head>` section of the `index.html` content.
+        *   Return the modified HTML content with a `Content-Type: text/html` header.
+    *   If the quest doesn't exist or an error occurs, fall back to serving the original `index.html` or an appropriate error response.
+
+2.  **Update Firebase Hosting (`firebase.json`):**
+    *   Modify the `hosting.rewrites` section.
+    *   Add a rewrite rule to direct requests matching the pattern `/quests/**` to the Cloud Function created/updated in step 1.
+    *   Ensure the existing rewrite `{"source": "**", "destination": "/index.html"}` remains but is ordered *after* the function rewrite, acting as a fallback for non-quest URLs.
+
+3.  **Deploy Function & Hosting:**
+    *   Run `firebase deploy --only functions,hosting` to deploy the updated Cloud Function and hosting configuration.
+
+4.  **Test Link Unfurling:**
+    *   Use social media debuggers (e.g., Twitter Card Validator, Facebook Sharing Debugger) with a quest URL (`https://questable.app/quests/<questId>`).
+    *   Verify that the preview shows the correct title, description, and image (if configured).
+    *   Paste a quest link into a test post on relevant platforms to see the live preview.
+
+---
+
+## Phase 4: Testing & Refinement (Previously Phase 3)
+
+1.  **Comprehensive Testing:** (Partially done, continue after SSR)
+    *   Test sharing via the custom modal and system share sheet fallback on web builds.
+    *   Verify the "Copy Link" functionality works correctly.
     *   Test on different browsers (Chrome, Firefox, Safari).
     *   Ensure the shared links correctly open the specific quest details page.
-    *   Check how links appear when pasted (link previews/unfurling).
-    *   Verify analytics events are logged in Firebase console.
+    *   Re-verify link previews after SSR implementation. ✅
+    *   Verify analytics events (initiation, platform choice, errors) are logged correctly in the Firebase console.
 
-2.  **Code Review & Cleanup:** (Partially addressed)
-    *   Review code for clarity, efficiency, and adherence to best practices.
+2.  **Code Review & Cleanup:** (Ongoing)
+    *   Review code (Flutter, Python function) for clarity, efficiency, and adherence to best practices.
     *   Add comments where necessary.
-    *   Extracted base URL to configuration. ✅
+    *   Ensure error handling is robust (Firestore fetch, HTML injection, URL launching).
+    *   Consider edge cases (missing quest data, invalid URLs).
 
 ---
 
