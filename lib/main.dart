@@ -6,13 +6,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:json_theme/json_theme.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:quest_cards/firebase_options.dart';
 import 'package:quest_cards/src/config/config.dart';
+import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
 
 import 'src/app.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
+
+// Define the GoRouter configuration
+final GoRouter _router = GoRouter(
+  routes: <RouteBase>[
+    GoRoute(
+      path: '/',
+      builder: (BuildContext context, GoRouterState state) {
+        return HomePage(settingsController: Provider.of<SettingsController>(context));
+      },
+      routes: <RouteBase>[
+        GoRoute(
+          path: 'quests/:questId', // Define the route for quest details
+          builder: (BuildContext context, GoRouterState state) {
+            final questId = state.pathParameters['questId']!;
+            return QuestCardDetailsView(docId: questId);
+          },
+        ),
+      ],
+    ),
+  ],
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,9 +79,10 @@ void main() async {
   // SettingsView.
   runApp(MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => settingsController),
+      ChangeNotifierProvider.value(value: settingsController),
+      // Add other providers if needed by HomePage or other routes accessed via Provider
     ],
-    child: MyApp(settingsController: settingsController, theme: theme),
+    // Pass the router configuration to MyApp
+    child: MyApp(settingsController: settingsController, router: _router),
   ));
-  //runApp(MyApp(theme: theme));
 }

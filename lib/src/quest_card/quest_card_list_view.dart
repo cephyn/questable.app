@@ -2,6 +2,8 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart'; // Add this import
+
 import 'package:quest_cards/src/filters/active_filter_chips.dart';
 import 'package:quest_cards/src/filters/filter_drawer.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
@@ -344,13 +346,15 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                     style: const TextStyle(fontSize: 12),
                   ),
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            QuestCardDetailsView(docId: docId),
-                      ),
-                    );
+                    // Navigate using GoRouter
+                    context.go('/quests/$docId');
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (context) =>
+                    //         QuestCardDetailsView(docId: docId),
+                    //   ),
+                    // );
                   },
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -358,6 +362,7 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                       IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: () {
+                          // TODO: Update EditQuestCard navigation if needed (might need its own route)
                           Navigator.push(
                             context,
                             MaterialPageRoute(
