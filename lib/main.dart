@@ -1,16 +1,15 @@
-import 'dart:convert';
 import 'dart:developer';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:json_theme/json_theme.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:quest_cards/firebase_options.dart';
 import 'package:quest_cards/src/config/config.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
+import 'package:quest_cards/src/screens/profile_screen.dart'; // Import ProfileScreen
+import 'package:quest_cards/src/providers/auth_provider.dart'; // Import AuthProvider
 
 import 'src/app.dart';
 import 'src/settings/settings_controller.dart';
@@ -22,7 +21,8 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/',
       builder: (BuildContext context, GoRouterState state) {
-        return HomePage(settingsController: Provider.of<SettingsController>(context));
+        return HomePage(
+            settingsController: Provider.of<SettingsController>(context));
       },
       routes: <RouteBase>[
         GoRoute(
@@ -30,6 +30,14 @@ final GoRouter _router = GoRouter(
           builder: (BuildContext context, GoRouterState state) {
             final questId = state.pathParameters['questId']!;
             return QuestCardDetailsView(docId: questId);
+          },
+        ),
+        GoRoute(
+          // Add route for profile screen
+          path: 'profile',
+          builder: (BuildContext context, GoRouterState state) {
+            // TODO: Add authentication check here - redirect if not logged in
+            return const ProfileScreen();
           },
         ),
       ],
@@ -46,10 +54,6 @@ void main() async {
   // Load the user's preferred theme while the splash screen is displayed.
   // This prevents a sudden theme change when the app is first displayed.
   await settingsController.loadSettings();
-  final themeStr =
-      await rootBundle.loadString('assets/appainter_theme_green.json');
-  final themeJson = jsonDecode(themeStr);
-  final theme = ThemeDecoder.decodeThemeData(themeJson)!;
 
   try {
     // Initialize Firebase with platform-specific options
@@ -80,6 +84,7 @@ void main() async {
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: settingsController),
+      ChangeNotifierProvider(create: (_) => AuthProvider()), // Add AuthProvider
       // Add other providers if needed by HomePage or other routes accessed via Provider
     ],
     // Pass the router configuration to MyApp

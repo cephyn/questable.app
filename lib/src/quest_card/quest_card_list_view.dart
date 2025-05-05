@@ -7,11 +7,10 @@ import 'package:go_router/go_router.dart'; // Add this import
 import 'package:quest_cards/src/filters/active_filter_chips.dart';
 import 'package:quest_cards/src/filters/filter_drawer.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
-import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
-import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/role_based_widgets/role_based_delete_documents_buttons.dart';
 import 'package:quest_cards/src/services/firebase_auth_service.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
+import 'package:quest_cards/src/providers/auth_provider.dart';
 
 import '../util/utils.dart';
 
@@ -40,11 +39,12 @@ class _QuestCardListViewState extends State<QuestCardListView> {
     super.initState();
     _loadTotalCount();
 
-    // Preload filter options for the filter drawer
+    // Preload filter options and setup analytics via FilterProvider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final filterProvider =
           Provider.of<FilterProvider>(context, listen: false);
-      _loadFilterOptions(filterProvider);
+      // Filter options are now loaded by FilterProvider itself
+      // _loadFilterOptions(filterProvider);
 
       // Set the analytics user ID for authenticated users
       _setupAnalytics(filterProvider);
@@ -53,39 +53,10 @@ class _QuestCardListViewState extends State<QuestCardListView> {
 
   // Set up analytics with the current user ID
   void _setupAnalytics(FilterProvider provider) async {
-    final user = auth.getCurrentUser();
-    if (user.email != null) {
-      await provider.setAnalyticsUserId(user.email);
-    }
-  }
-
-  // Load distinct values for filter options
-  Future<void> _loadFilterOptions(FilterProvider provider) async {
-    try {
-      // Load game systems
-      final gameSystems =
-          await firestoreService.getDistinctFieldValues('gameSystem');
-      if (gameSystems.isNotEmpty) {
-        provider.filterOptions['gameSystem'] = gameSystems;
-      }
-
-      // Load editions
-      final editions = await firestoreService.getDistinctFieldValues('edition');
-      if (editions.isNotEmpty) {
-        provider.filterOptions['edition'] = editions;
-      }
-
-      // Load publishers
-      final publishers =
-          await firestoreService.getDistinctFieldValues('publisher');
-      if (publishers.isNotEmpty) {
-        provider.filterOptions['publisher'] = publishers;
-      }
-
-      // Notify listeners to update UI
-      //provider.notifyListeners();
-    } catch (e) {
-      debugPrint('Error loading filter options: $e');
+    // Use the auth instance directly to check for null user
+    final user = auth.auth.currentUser;
+    if (user?.email != null) {
+      await provider.setAnalyticsUserId(user!.email);
     }
   }
 
@@ -94,8 +65,12 @@ class _QuestCardListViewState extends State<QuestCardListView> {
     try {
       final filterProvider =
           Provider.of<FilterProvider>(context, listen: false);
+      // Get current user ID (null if not logged in)
+      final userId = auth.auth.currentUser?.uid;
+
       _totalQuestCount = await firestoreService.getQuestCardsCount(
         filterState: filterProvider.filterState,
+        userId: userId, // Pass userId here (can be null)
       );
 
       if (mounted) {
@@ -110,6 +85,9 @@ class _QuestCardListViewState extends State<QuestCardListView> {
   Widget build(BuildContext context) {
     Utils.setBrowserTabTitle("List Quests");
     final filterProvider = Provider.of<FilterProvider>(context);
+    // Use AuthProvider to check authentication status
+    final authProvider = Provider.of<AuthProvider>(context);
+    final bool isAuthenticated = authProvider.isAuthenticated;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -168,7 +146,8 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                 _isLoading || _totalQuestCount == null
                     ? const CircularProgressIndicator()
                     : Text(
-                        "$_totalQuestCount Quests${filterProvider.filterState.hasFilters ? ' (Filtered)' : ''}",
+                        // Display count, adjust text if filtered
+                        "${_totalQuestCount ?? '...'} Quests${filterProvider.filterState.hasFilters ? ' (Filtered)' : ''}",
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -180,10 +159,9 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                     label: const Text('Clear Filters'),
                     onPressed: () {
                       filterProvider.clearFilters();
-                      // Force refresh
-                      setState(() {
-                        _loadTotalCount();
-                      });
+                      // Force refresh count after clearing filters
+                      _loadTotalCount(); // Reload count immediately
+                      // setState is not strictly needed here as _loadTotalCount calls it
                     },
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -196,7 +174,8 @@ class _QuestCardListViewState extends State<QuestCardListView> {
           ),
         ),
       ),
-      endDrawer: FilterDrawer(isAuthenticated: true),
+      // Pass authentication status to the drawer
+      endDrawer: FilterDrawer(isAuthenticated: isAuthenticated),
       onEndDrawerChanged: (isOpen) {
         if (!isOpen) {
           // When drawer closes, refresh the quest count
@@ -207,7 +186,8 @@ class _QuestCardListViewState extends State<QuestCardListView> {
             filterProvider.trackFilterUsage();
           }
 
-          // Refresh happens automatically due to stream
+          // Reset the flag to allow tracking again if filters change
+          _hasTrackedInitialFilters = false;
         }
       },
       body: Column(
@@ -232,11 +212,18 @@ class _QuestCardListViewState extends State<QuestCardListView> {
 
   Widget _buildQuestList(BuildContext context) {
     final filterProvider = Provider.of<FilterProvider>(context);
+    // Use AuthProvider to get user ID
+    final authProvider = Provider.of<AuthProvider>(context,
+        listen: false); // Don't need to listen here
+    final userId =
+        authProvider.currentUser?.uid; // Use currentUser instead of user
 
     return StreamBuilder<List<QueryDocumentSnapshot>>(
       stream: firestoreService.getQuestCardsStream(
-        widget.questCardList,
+        widget
+            .questCardList, // Assuming this is still relevant (e.g., from search results)
         filterState: filterProvider.filterState,
+        userId: userId, // Pass the user ID here (can be null)
       ),
       builder: (context, snapshot) {
         // Track filter usage when data is loaded (only once per filter combination)
@@ -302,10 +289,8 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                       label: const Text('Clear All Filters'),
                       onPressed: () {
                         filterProvider.clearFilters();
-                        // Force refresh
-                        setState(() {
-                          _loadTotalCount();
-                        });
+                        // Force refresh count after clearing filters
+                        _loadTotalCount(); // Reload count immediately
                       },
                     ),
                   ),
@@ -321,8 +306,9 @@ class _QuestCardListViewState extends State<QuestCardListView> {
               DocumentSnapshot document = questCards[index];
               String docId = document.id;
               Map<String, dynamic> data =
-                  document.data() as Map<String, dynamic>;
-              String title = data['title'];
+                  document.data() as Map<String, dynamic>; // Cast data
+              String title =
+                  data['title'] ?? 'Untitled'; // Handle potential null title
 
               return Card(
                 margin:
@@ -348,36 +334,25 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                   onTap: () {
                     // Navigate using GoRouter
                     context.go('/quests/$docId');
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(
-                    //     builder: (context) =>
-                    //         QuestCardDetailsView(docId: docId),
-                    //   ),
-                    // );
                   },
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // TODO: Conditionally show edit/delete based on roles/ownership?
                       IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: () {
-                          // TODO: Update EditQuestCard navigation if needed (might need its own route)
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditQuestCard(
-                                docId: docId,
-                              ),
-                            ),
-                          );
+                          // Navigate to EditQuestCard route
+                          context.go('/quests/$docId/edit');
                         },
                         tooltip: 'Edit Quest',
                       ),
-                      rbDeleteDocumentsButtons.deleteQuestCardButton(
-                        auth.getCurrentUser().uid,
-                        docId,
-                      ),
+                      // Only show delete button if user is logged in
+                      if (userId != null)
+                        rbDeleteDocumentsButtons.deleteQuestCardButton(
+                          userId, // Now guaranteed non-null
+                          docId,
+                        ),
                     ],
                   ),
                 ),

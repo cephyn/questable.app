@@ -27,11 +27,12 @@ class _FilterDrawerState extends State<FilterDrawer> {
   @override
   void initState() {
     super.initState();
-    // Load filter options when the drawer is first opened
+    // Load filter options and systems when the drawer is first opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final filterProvider =
           Provider.of<FilterProvider>(context, listen: false);
-      filterProvider.loadFilterOptions();
+      // Use the updated method name
+      filterProvider.loadFilterOptionsAndSystems();
     });
   }
 
@@ -93,6 +94,18 @@ class _FilterDrawerState extends State<FilterDrawer> {
                     icon: Icons.book,
                     children: _buildPublicationFilters(filterProvider),
                   ),
+
+                  // Ownership Status Section (authenticated only)
+                  if (widget.isAuthenticated) ...[
+                    const Divider(),
+                    _buildFilterSection(
+                      context: context,
+                      title: 'Ownership Status',
+                      icon: Icons
+                          .inventory_2, // Or Icons.bookmark, Icons.check_box
+                      children: _buildOwnershipFilters(filterProvider),
+                    ),
+                  ],
 
                   // Creator Section (authenticated only)
                   if (widget.isAuthenticated) ...[
@@ -448,6 +461,55 @@ class _FilterDrawerState extends State<FilterDrawer> {
         field: 'uploadedBy',
         label: 'Creator Email',
         hint: 'Filter by creator email',
+      ),
+    ];
+  }
+
+  List<Widget> _buildOwnershipFilters(FilterProvider provider) {
+    final currentStatus = provider.filterState.ownershipStatus;
+
+    return [
+      // Ownership Status Filter (Radio Buttons)
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RadioListTile<OwnershipFilterStatus>(
+            title: const Text('All'),
+            value: OwnershipFilterStatus.all,
+            groupValue: currentStatus,
+            onChanged: (OwnershipFilterStatus? value) {
+              if (value != null) {
+                provider.setOwnershipStatus(value);
+              }
+            },
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+          RadioListTile<OwnershipFilterStatus>(
+            title: const Text('Owned'),
+            value: OwnershipFilterStatus.owned,
+            groupValue: currentStatus,
+            onChanged: (OwnershipFilterStatus? value) {
+              if (value != null) {
+                provider.setOwnershipStatus(value);
+              }
+            },
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+          RadioListTile<OwnershipFilterStatus>(
+            title: const Text('Unowned'),
+            value: OwnershipFilterStatus.unowned,
+            groupValue: currentStatus,
+            onChanged: (OwnershipFilterStatus? value) {
+              if (value != null) {
+                provider.setOwnershipStatus(value);
+              }
+            },
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ],
       ),
     ];
   }

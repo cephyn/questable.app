@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
 import 'package:quest_cards/src/util/utils.dart'; // Import Utils for icons
-import 'package:collection/collection.dart'; // Import for listEquals
+import 'package:collection/collection.dart'; // Import for listEquals, firstWhereOrNull
 
 // Enum to represent checkbox state (for tristate)
 enum CheckboxState { selected, partial, unselected }
@@ -46,9 +46,9 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
   void _loadInitialSelection() {
     if (!mounted) return;
     final filterProvider = Provider.of<FilterProvider>(context, listen: false);
-    // Use the correct field name used in applyFilters
-    final systemFilter =
-        filterProvider.filterState.getFilterForField('standardizedGameSystem');
+    // Find the filter for 'standardizedGameSystem' using the correct getter
+    final systemFilter = filterProvider.filterState.filters // Use .filters
+        .firstWhereOrNull((f) => f.field == 'standardizedGameSystem');
 
     if (systemFilter != null && systemFilter.value is List) {
       setState(() {
@@ -56,6 +56,7 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
         // Initialize expansion state for selected systems that have editions
         _systemExpansionState.clear(); // Clear previous state
         for (var name in _selectedSystemNames) {
+          // Use the correct method from FilterProvider
           final system = filterProvider.getSystemByName(name);
           // Check if it's a main system name (not an edition name)
           if (system != null && system.editions.isNotEmpty) {
@@ -83,11 +84,13 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
   @override
   Widget build(BuildContext context) {
     final filterProvider = Provider.of<FilterProvider>(context);
+    // Access the cached list directly using the getter
     final standardSystems = filterProvider.standardGameSystems;
 
     // Re-check selection state if filters change externally
-    final currentFilter =
-        filterProvider.filterState.getFilterForField('standardizedGameSystem');
+    // Use the correct getter
+    final currentFilter = filterProvider.filterState.filters
+        .firstWhereOrNull((f) => f.field == 'standardizedGameSystem');
     List<String> currentSelectedNames = [];
     if (currentFilter != null && currentFilter.value is List) {
       currentSelectedNames = List<String>.from(currentFilter.value);
@@ -169,7 +172,9 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
             const SizedBox(height: 12),
 
             // Game Systems List
-            if (filterProvider.isLoadingFilterOptions)
+            // Removed isLoadingFilterOptions check
+            if (standardSystems
+                .isEmpty) // Check if systems list is empty as a proxy
               const Center(child: CircularProgressIndicator())
             else if (filteredSystems.isEmpty)
               const Center(
@@ -210,13 +215,9 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
                       ? null
                       : () {
                           // Disable if nothing selected
-                          // Clear game system filters
+                          // Clear game system filters using the correct method
                           filterProvider.removeFilter('standardizedGameSystem');
                           // No need to manually update state here, FilterProvider change will trigger rebuild
-                          // setState(() {
-                          //   _selectedSystemNames = [];
-                          //   _systemExpansionState.clear();
-                          // });
                         },
                   child: const Text('Clear Selection'),
                 ),
@@ -416,18 +417,19 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
   void _applyFilters(FilterProvider filterProvider) {
     // Ensure no duplicates before applying
     final uniqueSelections = _selectedSystemNames.toSet().toList();
+    const String field = 'standardizedGameSystem';
 
     if (uniqueSelections.isEmpty) {
-      filterProvider.removeFilter('standardizedGameSystem');
+      filterProvider.removeFilter(field);
     } else {
-      // Use the provider's addFilter method with correct arguments
+      // Call addFilter with field, value, and operator
       filterProvider.addFilter(
-        'standardizedGameSystem', // field (String)
-        uniqueSelections, // value (List<String>)
-        FilterOperator.whereIn, // operator (FilterOperator)
+        field,
+        uniqueSelections,
+        FilterOperator.whereIn, // Use whereIn for list selections
       );
     }
-    // FilterProvider.addFilter notifies listeners, triggering rebuilds where needed
+    // FilterProvider methods now notify listeners via FilterState listener
   }
 }
 

@@ -12,7 +12,7 @@ class RoleBasedDeleteDocumentsButtons {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return CircularProgressIndicator();
         } else if (snapshot.hasError) {
-          return Text('Error: ${snapshot.error}');
+          return SelectableText('Error: ${snapshot.error}');
         } else if (snapshot.hasData) {
           List<String>? roles = snapshot.data;
           if (roles != null && roles.contains('admin')) {
