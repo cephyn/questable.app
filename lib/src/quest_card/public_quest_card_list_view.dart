@@ -7,11 +7,11 @@ import 'package:quest_cards/src/filters/active_filter_chips.dart';
 import 'package:quest_cards/src/filters/filter_drawer.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/navigation/root_navigator.dart';
-import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 import '../util/utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:go_router/go_router.dart';
 
 /// A version of QuestCardListView that works without authentication.
 /// Shows quest cards to non-authenticated users and replaces edit/delete
@@ -519,12 +519,8 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
                 style: const TextStyle(fontSize: 12),
               ),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => QuestCardDetailsView(docId: docId),
-                  ),
-                );
+                // Use GoRouter to navigate to the quest detail page
+                context.go('/quests/$docId');
               },
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
