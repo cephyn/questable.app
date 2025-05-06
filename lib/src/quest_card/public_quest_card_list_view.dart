@@ -108,7 +108,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
 
       // Track filter usage with analytics when loading more cards with filters
       if (filterProvider.filterState.hasFilters) {
-        await filterProvider.trackFilterUsage();
+        filterProvider.trackFilterUsage();
       }
 
       final snapshots = await _firestoreService.getPublicQuestCardsBatch(
@@ -228,7 +228,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
 
       // Track filter usage when refreshing the quest list with filters
       if (filterProvider.filterState.hasFilters) {
-        await filterProvider.trackFilterUsage();
+        filterProvider.trackFilterUsage();
       }
 
       final cards = await _firestoreService.getPublicQuestCardsBatch(

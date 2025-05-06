@@ -5,11 +5,17 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:quest_cards/src/services/firestore_service.dart';
 import 'package:quest_cards/src/filters/saved_filters_manager.dart';
 import 'package:quest_cards/src/filters/filter_analytics.dart';
 import 'package:quest_cards/src/services/game_system_service.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
+import 'package:collection/collection.dart'; // Add collection import
+
+// Define a constant for the special ownership filter field
+const String ownershipFilterField = '__ownership__';
+
+/// Enum to represent the ownership filter status
+enum OwnershipFilterStatus { all, owned, unowned }
 
 /// Represents a filter criteria that can be applied to quest cards.
 class FilterCriteria {
@@ -42,6 +48,14 @@ class FilterCriteria {
 
   /// Convert this filter criteria to a human-readable display string
   String toDisplayString() {
+    // Handle special ownership filter display
+    if (field == ownershipFilterField) {
+      if (value == 'owned') return 'Status: Owned';
+      if (value == 'unowned') return 'Status: Unowned';
+      // Should not happen if managed correctly, but good fallback
+      return 'Status: All';
+    }
+
     String displayValue = value is List ? value.join(', ') : value.toString();
     switch (operator) {
       case FilterOperator.equals:
@@ -110,20 +124,67 @@ enum FilterOperator {
 /// Manages the state of all active filters for quest cards.
 class FilterState extends ChangeNotifier {
   final Set<FilterCriteria> _filters = HashSet<FilterCriteria>();
+  OwnershipFilterStatus _ownershipStatus =
+      OwnershipFilterStatus.all; // Add ownership status
   static const String _prefsKey = 'quest_card_filters';
+  static const String _ownershipPrefsKey =
+      'quest_card_ownership_filter'; // Key for saving ownership status
 
-  /// All currently active filters
+  // Private constructor for cloning
+  FilterState._internal(Set<FilterCriteria> clonedFilters,
+      OwnershipFilterStatus ownershipStatus) {
+    _filters.clear();
+    _filters.addAll(clonedFilters);
+    _ownershipStatus = ownershipStatus;
+  }
+
+  // Default constructor
+  FilterState();
+
+  /// Clone the current filter state
+  FilterState clone() {
+    final Set<FilterCriteria> clonedFiltersSet = HashSet<FilterCriteria>();
+    for (var filter in _filters) {
+      // Assuming FilterCriteria.fromMap(toMap()) correctly creates a new instance
+      clonedFiltersSet.add(FilterCriteria.fromMap(filter.toMap()));
+    }
+    return FilterState._internal(clonedFiltersSet, _ownershipStatus);
+  }
+
+  /// All currently active filters (excluding the internal ownership one)
   UnmodifiableListView<FilterCriteria> get filters =>
-      UnmodifiableListView<FilterCriteria>(_filters.toList());
+      UnmodifiableListView<FilterCriteria>(_filters
+          .where((f) => f.field != ownershipFilterField)
+          .toList()); // Exclude ownership filter from public list
 
-  /// Number of active filters
-  int get filterCount => _filters.length;
+  /// Current ownership filter status
+  OwnershipFilterStatus get ownershipStatus => _ownershipStatus;
 
-  /// Whether there are any active filters
-  bool get hasFilters => _filters.isNotEmpty;
+  /// Number of active filters (including ownership if not 'all')
+  int get filterCount {
+    // Count non-ownership filters
+    int count = _filters.where((f) => f.field != ownershipFilterField).length;
+    // Add 1 if ownership status is not 'all'
+    if (_ownershipStatus != OwnershipFilterStatus.all) {
+      count++;
+    }
+    return count;
+  }
+
+  /// Whether there are any active filters (including ownership if not 'all')
+  bool get hasFilters =>
+      _filters.isNotEmpty || _ownershipStatus != OwnershipFilterStatus.all;
 
   /// Add a new filter criteria
   void addFilter(FilterCriteria criteria) {
+    // Special handling for ownership filter - use setOwnershipStatus instead
+    if (criteria.field == ownershipFilterField) {
+      developer.log(
+          'Warning: Use setOwnershipStatus to manage ownership filters.',
+          name: 'FilterState');
+      return;
+    }
+
     // Remove any existing filter for the same field to avoid conflicts
     _filters.removeWhere((filter) => filter.field == criteria.field);
     _filters.add(criteria);
@@ -131,46 +192,101 @@ class FilterState extends ChangeNotifier {
     saveFilters(); // Save filters when updated
   }
 
-  /// Remove a specific filter criteria
-  void removeFilter(FilterCriteria criteria) {
-    _filters.remove(criteria);
+  /// Set the ownership filter status
+  void setOwnershipStatus(OwnershipFilterStatus status) {
+    if (_ownershipStatus == status) return; // No change
+
+    _ownershipStatus = status;
+
+    // Remove any existing internal ownership criteria first
+    _filters.removeWhere((f) => f.field == ownershipFilterField);
+
+    // Add new internal criteria if needed
+    if (status == OwnershipFilterStatus.owned) {
+      _filters.add(FilterCriteria(
+          field: ownershipFilterField,
+          value: 'owned',
+          operator: FilterOperator.equals));
+    } else if (status == OwnershipFilterStatus.unowned) {
+      _filters.add(FilterCriteria(
+          field: ownershipFilterField,
+          value: 'unowned',
+          operator: FilterOperator.equals));
+    }
+
     notifyListeners();
     saveFilters(); // Save filters when updated
   }
 
+  /// Remove a specific filter criteria
+  void removeFilter(FilterCriteria criteria) {
+    if (criteria.field == ownershipFilterField) {
+      // If removing the ownership filter, reset the status
+      setOwnershipStatus(OwnershipFilterStatus.all);
+    } else {
+      _filters.remove(criteria);
+      notifyListeners();
+      saveFilters(); // Save filters when updated
+    }
+  }
+
   /// Remove all filters for a specific field
   void removeFilterByField(String field) {
-    _filters.removeWhere((filter) => filter.field == field);
-    notifyListeners();
-    saveFilters(); // Save filters when updated
+    if (field == ownershipFilterField) {
+      // If removing the ownership filter, reset the status
+      setOwnershipStatus(OwnershipFilterStatus.all);
+    } else {
+      _filters.removeWhere((filter) => filter.field == field);
+      notifyListeners();
+      saveFilters(); // Save filters when updated
+    }
   }
 
   /// Clear all active filters
   void clearFilters() {
     _filters.clear();
+    _ownershipStatus = OwnershipFilterStatus.all; // Reset ownership status
     notifyListeners();
     saveFilters(); // Save filters when updated
   }
 
   /// Check if a field is currently being filtered
   bool hasFilterForField(String field) {
+    if (field == ownershipFilterField) {
+      return _ownershipStatus != OwnershipFilterStatus.all;
+    }
     return _filters.any((filter) => filter.field == field);
   }
 
   /// Get the current filter for a specific field, if it exists
   FilterCriteria? getFilterForField(String field) {
     try {
-      return _filters.firstWhere((filter) => filter.field == field);
+      // Return the internal ownership filter if requested
+      if (field == ownershipFilterField &&
+          _ownershipStatus != OwnershipFilterStatus.all) {
+        // Find the specific ownership filter (owned or unowned)
+        return _filters.firstWhere((f) => f.field == ownershipFilterField);
+      }
+      // Otherwise, find the regular filter, ensuring it's not the ownership one
+      return _filters.firstWhere((filter) =>
+          filter.field == field && filter.field != ownershipFilterField);
     } catch (e) {
+      // If no filter is found (including ownership when status is 'all'), return null
       return null;
     }
   }
 
   /// Convert active filters to Firestore query constraints
+  /// Note: This does NOT handle the special ownership filter.
+  /// Ownership filtering needs to be handled separately, likely involving
+  /// fetching owned IDs and using whereIn/whereNotIn.
   List<Query Function(Query)> toFirestoreQueryConstraints() {
     List<Query Function(Query)> constraints = [];
 
     for (var filter in _filters) {
+      // Skip the special ownership filter here
+      if (filter.field == ownershipFilterField) continue;
+
       switch (filter.operator) {
         case FilterOperator.equals:
           constraints.add(
@@ -205,12 +321,16 @@ class FilterState extends ChangeNotifier {
               query.where(filter.field, whereIn: filter.value as List));
           break;
         case FilterOperator.contains:
-          // Firestore doesn't have a direct "contains" operator for strings
-          // This would need a different implementation or custom indexing
+          // Firestore doesn't directly support 'contains' for strings.
+          // This requires specific handling, potentially using >= and <=
+          // with a special character, or relying on external search services.
+          // For now, we'll log a warning and skip this filter.
+          developer.log(
+              'Warning: Firestore does not directly support string \'contains\' filter for field: ${filter.field}. Skipping.',
+              name: 'FilterState');
           break;
       }
     }
-
     return constraints;
   }
 
@@ -362,303 +482,397 @@ class FilterState extends ChangeNotifier {
     // as they have access to proper BuildContext
   }
 
-  /// Save the current filters to shared preferences
+  /// Save current filters to SharedPreferences
   Future<void> saveFilters() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final filtersList = _filters.map((filter) => filter.toMap()).toList();
-      await prefs.setString(_prefsKey, jsonEncode(filtersList));
+      // Save regular filters
+      final List<Map<String, dynamic>> filterMaps = _filters
+          .where((f) => f.field != ownershipFilterField) // Exclude ownership
+          .map((f) => f.toMap())
+          .toList();
+      await prefs.setString(_prefsKey, jsonEncode(filterMaps));
+      // Save ownership status separately
+      await prefs.setInt(_ownershipPrefsKey, _ownershipStatus.index);
+      developer.log('Filters saved successfully. Ownership: $_ownershipStatus',
+          name: 'FilterState');
     } catch (e) {
-      debugPrint('Error saving filters: $e');
+      developer.log('Error saving filters: $e', name: 'FilterState', error: e);
     }
   }
 
-  /// Load filters from shared preferences
+  /// Load filters from SharedPreferences
   Future<void> loadFilters() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? filtersJson = prefs.getString(_prefsKey);
-
-      if (filtersJson != null && filtersJson.isNotEmpty) {
-        final List<dynamic> filtersList = jsonDecode(filtersJson);
-        _filters.clear();
-
-        for (var filterMap in filtersList) {
-          if (filterMap is Map<String, dynamic>) {
-            _filters.add(FilterCriteria.fromMap(filterMap));
-          }
-        }
-
-        notifyListeners();
+      // Load regular filters
+      final String? savedFiltersJson = prefs.getString(_prefsKey);
+      _filters.clear(); // Clear existing before loading
+      if (savedFiltersJson != null) {
+        final List<dynamic> filterList = jsonDecode(savedFiltersJson);
+        _filters.addAll(filterList
+            .map((map) => FilterCriteria.fromMap(map as Map<String, dynamic>))
+            .where((f) =>
+                f.field !=
+                ownershipFilterField)); // Ensure no ownership filter loaded here
       }
+      // Load ownership status
+      final int? savedOwnershipIndex = prefs.getInt(_ownershipPrefsKey);
+      if (savedOwnershipIndex != null &&
+          savedOwnershipIndex >= 0 &&
+          savedOwnershipIndex < OwnershipFilterStatus.values.length) {
+        _ownershipStatus = OwnershipFilterStatus.values[savedOwnershipIndex];
+        // Re-add the internal ownership criteria if needed
+        // Make sure not to add duplicates if loadFilters is called multiple times
+        _filters.removeWhere(
+            (f) => f.field == ownershipFilterField); // Remove existing first
+        if (_ownershipStatus == OwnershipFilterStatus.owned) {
+          _filters.add(FilterCriteria(
+              field: ownershipFilterField,
+              value: 'owned',
+              operator: FilterOperator.equals));
+        } else if (_ownershipStatus == OwnershipFilterStatus.unowned) {
+          _filters.add(FilterCriteria(
+              field: ownershipFilterField,
+              value: 'unowned',
+              operator: FilterOperator.equals));
+        }
+      } else {
+        _ownershipStatus =
+            OwnershipFilterStatus.all; // Default if not found or invalid
+        _filters.removeWhere((f) =>
+            f.field ==
+            ownershipFilterField); // Ensure no ownership filter if status is all
+      }
+
+      notifyListeners();
+      developer.log('Filters loaded successfully. Ownership: $_ownershipStatus',
+          name: 'FilterState');
     } catch (e) {
-      debugPrint('Error loading filters: $e');
+      developer.log('Error loading filters: $e', name: 'FilterState', error: e);
+      // Optionally clear filters on load error
+      // _filters.clear();
+      // _ownershipStatus = OwnershipFilterStatus.all;
+      // notifyListeners();
     }
+  }
+
+  /// Apply a saved filter set
+  void applySavedFilters(List<FilterCriteria> savedFilters) {
+    _filters.clear();
+    _ownershipStatus = OwnershipFilterStatus.all; // Reset ownership first
+
+    for (var criteria in savedFilters) {
+      if (criteria.field == ownershipFilterField) {
+        // Handle ownership from saved filter
+        if (criteria.value == 'owned') {
+          setOwnershipStatus(OwnershipFilterStatus.owned);
+        } else if (criteria.value == 'unowned') {
+          setOwnershipStatus(OwnershipFilterStatus.unowned);
+        }
+      } else {
+        // Add regular filters, ensuring no duplicates for the same field
+        _filters.removeWhere((f) => f.field == criteria.field);
+        _filters.add(criteria);
+      }
+    }
+    notifyListeners();
+    saveFilters(); // Save the newly applied filters
+  }
+
+  /// Convert the current filter state to a map (for saving filter sets)
+  Map<String, dynamic> toMap() {
+    // Include the actual internal ownership filter criteria if status is not 'all'
+    final List<Map<String, dynamic>> filterMaps =
+        _filters.map((f) => f.toMap()).toList();
+    return {'filters': filterMaps};
+  }
+
+  /// Create a FilterState from a map (for loading filter sets)
+  static FilterState fromMap(Map<String, dynamic> map) {
+    final state = FilterState();
+    if (map['filters'] != null) {
+      final List<dynamic> filterList = map['filters'];
+      final loadedFilters = filterList
+          .map((m) => FilterCriteria.fromMap(m as Map<String, dynamic>))
+          .toList();
+      state.applySavedFilters(
+          loadedFilters); // Use applySavedFilters to correctly set state
+    }
+    return state;
   }
 }
 
-/// A provider for filter-related data and operations.
+/// Provides filter state and manages filter options and saved filters.
 class FilterProvider extends ChangeNotifier {
-  final FilterState filterState = FilterState();
-  final SavedFiltersManager savedFiltersManager = SavedFiltersManager();
-  final FilterAnalytics _analytics = FilterAnalytics.instance;
-  bool _initialized = false;
-  final FirestoreService _firestoreService = FirestoreService();
-  final GameSystemService _gameSystemService = GameSystemService();
-  bool _isLoadingFilterOptions = false;
+  final FilterState _filterState = FilterState();
+  final Map<String, List<dynamic>> _filterOptions = {};
+  final SavedFiltersManager _savedFiltersManager = SavedFiltersManager();
+  // Use the singleton instance for FilterAnalytics
+  final FilterAnalytics _filterAnalytics = FilterAnalytics.instance;
+  final GameSystemService _gameSystemService =
+      GameSystemService(); // Add GameSystemService
+
+  // Cache for standard game systems
   List<StandardGameSystem> _standardGameSystems = [];
 
-  FilterProvider() {
-    _initializeFilters();
-  }
+  FilterState get filterState => _filterState;
+  Map<String, List<dynamic>> get filterOptions => _filterOptions;
+  // Access saved filters directly from the manager's getter
+  Map<String, List<FilterCriteria>> get savedFilterSets =>
+      _savedFiltersManager.savedFilterSets;
 
-  Future<void> _initializeFilters() async {
-    if (!_initialized) {
-      await filterState.loadFilters();
-      await savedFiltersManager.initialize();
-      _initialized = true;
-      notifyListeners();
-    }
-  }
-
-  /// Common filter fields for quest cards - used for UI organization
-  static const List<String> gameSystemFields = [
-    'standardizedGameSystem',
-    'edition'
-  ];
-  static const List<String> difficultyFields = ['level'];
-  static const List<String> contentFields = [
-    'classification',
-    'genre',
-    'setting',
-    'environments' // Changed from 'environments' to 'environment'
-  ];
-  static const List<String> publicationFields = [
-    'publisher',
-    'publicationYear',
-    'authors'
-  ];
-
-  /// For authenticated users only
-  static const List<String> creatorFields = ['uploadedBy'];
-
-  /// Map of field names to human-readable display names
-  static Map<String, String> fieldDisplayNames = {
-    'gameSystem': 'Game System',
-    'edition': 'Edition',
-    'level': 'Level Range',
-    'classification': 'Type',
-    'genre': 'Genre',
-    'setting': 'Setting',
-    'environments':
-        'Environments', // Changed from 'environments' to 'environment'
-    'publisher': 'Publisher',
-    'publicationYear': 'Year Published',
-    'authors': 'Authors',
-    'uploadedBy': 'Created By',
-  };
-
-  /// Initialize common filter options that may be provided from Firestore
-  Map<String, List<dynamic>> filterOptions = {
-    'gameSystem': [],
-    'standardizedGameSystem': [],
-    'edition': [],
-    'classification': ['Adventure', 'Rulebook', 'Supplement', 'Other'],
-    'publisher': [],
-    'genre': [],
-  };
-
-  /// Get standard game systems for filtering
+  // Getter for cached standard game systems
   List<StandardGameSystem> get standardGameSystems => _standardGameSystems;
 
-  /// Whether filter options are currently being loaded
-  bool get isLoadingFilterOptions => _isLoadingFilterOptions;
+  FilterProvider() {
+    _filterState.addListener(_notifyAndUpdateAnalytics);
+    loadFilters(); // Load filters on initialization
+    // Load options AND standard systems on initialization
+    loadFilterOptionsAndSystems();
+    // Initialize the SavedFiltersManager instead of calling loadSavedFilters
+    _savedFiltersManager.initialize().then((_) {
+      // Optionally notify listeners after initialization if needed,
+      // though SavedFiltersManager might notify itself.
+      // notifyListeners();
+    });
+    // Saved filters are loaded within initialize, listen for changes if needed or access via getter
+    // loadSavedFilters(); // Remove this direct call
+  }
 
-  /// Load filter options from Firestore
-  Future<void> loadFilterOptions() async {
-    if (_isLoadingFilterOptions) return; // Prevent multiple concurrent loads
+  @override
+  void dispose() {
+    _filterState.removeListener(_notifyAndUpdateAnalytics);
+    _filterState.dispose();
+    super.dispose();
+  }
 
-    _isLoadingFilterOptions = true;
+  void _notifyAndUpdateAnalytics() {
     notifyListeners();
+    // Optionally trigger analytics update here if needed immediately on change
+    // _filterAnalytics.updateActiveFilters(_filterState.filters);
+  }
 
+  /// Load available options for filterable fields AND standard game systems
+  Future<void> loadFilterOptionsAndSystems() async {
+    bool optionsChanged = false;
+    bool systemsChanged = false;
+
+    // --- Fetch Standard Game Systems First ---
     try {
-      // Keep the static classification options and load the rest from Firestore
-      final staticClassifications = filterOptions['classification']!;
+      final fetchedSystems = await _gameSystemService.getAllGameSystems();
+      // Use ListEquality for comparison
+      if (!const ListEquality().equals(_standardGameSystems, fetchedSystems)) {
+        _standardGameSystems = fetchedSystems;
+        systemsChanged = true;
+        developer.log('Standard game systems updated.', name: 'FilterProvider');
 
-      // Load standard game systems
-      _standardGameSystems = await _gameSystemService.getAllGameSystems();
-
-      // Extract standard system names for filtering
-      final standardSystemNames =
-          _standardGameSystems.map((system) => system.standardName).toList();
-
-      // Load distinct field values from Firestore for relevant fields
-      final gameSystems =
-          await _firestoreService.getDistinctFieldValues('gameSystem');
-      // Get standardized game systems but don't use directly - we already have better data
-      await _firestoreService.getDistinctFieldValues('standardizedGameSystem');
-      final editions =
-          await _firestoreService.getDistinctFieldValues('edition');
-      final publishers =
-          await _firestoreService.getDistinctFieldValues('publisher');
-      final genres = await _firestoreService.getDistinctFieldValues('genre');
-      // Changed 'environment' to 'environments' to match the field name in Firestore
-      final environments =
-          await _firestoreService.getDistinctFieldValues('environments');
-      final settings =
-          await _firestoreService.getDistinctFieldValues('setting');
-
-      // Update filter options with loaded values
-      filterOptions = {
-        'gameSystem': gameSystems
-            .where((item) => item != null && item.toString().isNotEmpty)
-            .toList(),
-        'standardizedGameSystem': standardSystemNames,
-        'edition': editions
-            .where((item) => item != null && item.toString().isNotEmpty)
-            .toList(),
-        'classification': staticClassifications,
-        'publisher': publishers
-            .where((item) => item != null && item.toString().isNotEmpty)
-            .toList(),
-        'genre': genres
-            .where((item) => item != null && item.toString().isNotEmpty)
-            .toList(),
-        // Store the environment values in the 'environment' key for the UI to access
-        'environments': environments
-            .where((item) => item != null && item.toString().isNotEmpty)
-            .toList(),
-        'setting': settings
-            .where((item) => item != null && item.toString().isNotEmpty)
-            .toList(),
-      };
+        // Update filter options for standardGameSystem based on the fetched list
+        final standardSystemNames =
+            _standardGameSystems.map((s) => s.standardName).toList()..sort();
+        if (_filterOptions['standardizedGameSystem'] == null ||
+            !_listEquals(_filterOptions['standardizedGameSystem']!,
+                standardSystemNames)) {
+          _filterOptions['standardizedGameSystem'] = standardSystemNames;
+          optionsChanged = true; // Mark options as changed too
+        }
+      }
     } catch (e) {
-      debugPrint('Error loading filter options: $e');
-    } finally {
-      _isLoadingFilterOptions = false;
-      notifyListeners();
+      developer.log('Error fetching standard game systems: $e',
+          name: 'FilterProvider', error: e);
+      // Optionally clear cache on error?
+      // _standardGameSystems = [];
+      // systemsChanged = true;
+    }
+
+    // --- Fetch Options for Other Fields ---
+    const List<String> fields = [
+      'gameSystem', // Keep fetching original gameSystem for now
+      'environments',
+      'genre',
+      'setting',
+      'publisher',
+      // Add other fields as needed
+    ];
+
+    for (String field in fields) {
+      final newOptions = await _fetchOptionsForField(field);
+      if (_filterOptions[field] == null ||
+          !_listEquals(_filterOptions[field]!, newOptions)) {
+        _filterOptions[field] = newOptions;
+        optionsChanged = true;
+      }
+    }
+
+    // --- Notify if anything changed ---
+    if (optionsChanged || systemsChanged) {
+      notifyListeners(); // Notify if any options or systems were updated
+      developer.log('Filter options/systems loaded/updated.',
+          name: 'FilterProvider');
     }
   }
 
-  /// Get a StandardGameSystem by name
-  StandardGameSystem? getSystemByName(String name) {
+  /// Helper to fetch distinct values for a field
+  Future<List<dynamic>> _fetchOptionsForField(String field) async {
+    developer.log('Fetching options for field: $field', name: 'FilterProvider');
     try {
-      return _standardGameSystems.firstWhere(
-        (system) =>
-            system.standardName == name || system.aliases.contains(name),
-      );
-    } catch (e) {
-      return null;
+      // Correct the collection name to questCards
+      final snapshot = await FirebaseFirestore.instance
+          .collection('questCards') // Corrected collection name
+          .where('isPublic',
+              isEqualTo: true) // Only consider public quests for options
+          .get(const GetOptions(
+              source: Source.serverAndCache)); // Keep serverAndCache for now
+
+      developer.log(
+          'Fetched ${snapshot.docs.length} documents for field: $field',
+          name: 'FilterProvider');
+
+      Set<dynamic> uniqueOptions = {};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        // Check and extract the field directly from data
+        if (data.containsKey(field)) {
+          final value = data[field];
+          if (value is List) {
+            // If the field is an array, add all its elements
+            uniqueOptions.addAll(
+                value.map((item) => item?.toString()).whereType<String>());
+          } else if (value != null) {
+            // Otherwise, add the single value
+            uniqueOptions.add(value.toString());
+          }
+        }
+      }
+      // Sort options alphabetically
+      List<dynamic> sortedOptions = uniqueOptions.toList()..sort();
+      developer.log(
+          'Found ${sortedOptions.length} unique options for field: $field',
+          name: 'FilterProvider');
+      return sortedOptions;
+    } catch (e, stackTrace) {
+      // Add stackTrace
+      developer.log('Error fetching options for field $field: $e',
+          name: 'FilterProvider',
+          error: e,
+          stackTrace: stackTrace); // Log stackTrace
+      return []; // Return empty list on error
     }
   }
 
-  /// Get editions for a specific game system
-  List<String> getEditionsForSystem(String systemName) {
-    final system = getSystemByName(systemName);
-    if (system != null && system.editions.isNotEmpty) {
-      // Extract just the name strings from the GameSystemEdition objects
-      return system.editions.map((edition) => edition.name).toList();
+  /// Helper to compare lists
+  bool _listEquals(List<dynamic> list1, List<dynamic> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i] != list2[i]) return false;
     }
-    // Fall back to generic editions from Firestore if no system-specific editions
-    return List<String>.from(filterOptions['edition'] ?? []);
+    return true;
   }
 
-  /// Save current filters as a named set
+  /// Load saved filter sets from storage
+  // This might not be needed if initialize handles loading and notifies
+  // Future<void> loadSavedFilters() async {
+  //   await _savedFiltersManager.initialize(); // Ensure initialized
+  //   notifyListeners(); // Notify after loading/initialization
+  // }
+
+  /// Save the current filter state as a named set
   Future<bool> saveCurrentFilters(String name) async {
-    if (name.trim().isEmpty) return false;
-
-    final success = await savedFiltersManager.saveFilterSet(
-        name, filterState.filters.toList());
+    if (name.isEmpty || !_filterState.hasFilters) return false;
+    final success = await _savedFiltersManager.saveFilterSet(
+        name, _filterState.filters.toList());
     if (success) {
-      // Track the saved filter set in analytics
-      await _analytics.trackFilterSetSaved(name, filterState.filterCount);
-      notifyListeners();
+      notifyListeners(); // Update UI with the new saved filter
     }
     return success;
-  }
-
-  /// Apply a saved filter set by name
-  bool applySavedFilters(String name) {
-    final savedFilters = savedFiltersManager.getFilterSetByName(name);
-    if (savedFilters == null) return false;
-
-    // Clear existing filters and apply the saved ones
-    filterState.clearFilters();
-    for (var filter in savedFilters) {
-      filterState.addFilter(filter);
-    }
-
-    // Track application of saved filter set
-    _analytics.trackSavedFilterApplied(name, savedFilters.length);
-
-    notifyListeners();
-    return true;
   }
 
   /// Delete a saved filter set by name
   Future<bool> deleteSavedFilterSet(String name) async {
-    final success = await savedFiltersManager.deleteFilterSet(name);
+    final success = await _savedFiltersManager.deleteFilterSet(name);
     if (success) {
-      notifyListeners();
+      notifyListeners(); // Update UI
     }
     return success;
   }
 
-  /// Get all saved filter sets
-  Map<String, List<FilterCriteria>> get savedFilterSets =>
-      savedFiltersManager.savedFilterSets;
-
-  /// Apply a filter and notify listeners
-  void addFilter(String field, dynamic value, FilterOperator operator) {
-    final filter =
-        FilterCriteria(field: field, value: value, operator: operator);
-    filterState.addFilter(filter);
-
-    // Track the filter application in analytics
-    _analytics.trackFilterApplied(filter);
-
-    notifyListeners();
-  }
-
-  /// Remove a filter and notify listeners
-  void removeFilter(String field) {
-    filterState.removeFilterByField(field);
-
-    // Track filter removal in analytics
-    _analytics.trackFilterRemoved(field);
-
-    notifyListeners();
-  }
-
-  /// Clear all filters and notify listeners
-  void clearFilters() {
-    filterState.clearFilters();
-
-    // Track clearing of filters
-    _analytics.trackFilterCleared();
-
-    notifyListeners();
-  }
-
-  /// Set user ID for analytics tracking
-  Future<void> setAnalyticsUserId(String? userId) async {
-    await _analytics.setUserId(userId);
-  }
-
-  /// Track the current filter combination (typically called when executing a search)
-  Future<void> trackFilterUsage() async {
-    if (filterState.hasFilters) {
-      await _analytics.trackFilterCombination(filterState.filters.toList());
+  /// Apply a previously saved filter set by name
+  void applySavedFilters(String name) {
+    // Get the filter set directly from the manager's map
+    final filtersToApply =
+        _savedFiltersManager.savedFilterSets[name]; // Corrected access
+    if (filtersToApply != null) {
+      _filterState.applySavedFilters(filtersToApply);
+      // No need to call notifyListeners, _filterState listener handles it
     }
   }
 
-  /// Get popular filter combinations for suggestions
-  List<Map<String, dynamic>> getPopularFilterCombinations({int limit = 5}) {
-    return _analytics.getPopularFilterCombinations(limit: limit);
+  /// Add a filter criteria to the current state
+  void addFilter(String field, dynamic value, FilterOperator operator) {
+    // Use the FilterState's method directly
+    _filterState.addFilter(
+        FilterCriteria(field: field, value: value, operator: operator));
+    // No need to call notifyListeners here, _filterState listener handles it
   }
 
-  /// Save filter preferences explicitly
-  Future<void> saveFilterPreferences() async {
-    await filterState.saveFilters();
+  /// Remove a filter criteria by field name
+  void removeFilter(String field) {
+    // Use the FilterState's method directly
+    _filterState.removeFilterByField(field);
+    // No need to call notifyListeners here, _filterState listener handles it
+  }
+
+  /// Clear all active filters
+  void clearFilters() {
+    _filterState.clearFilters();
+    // No need to call notifyListeners here, _filterState listener handles it
+  }
+
+  /// Set the ownership filter status
+  void setOwnershipStatus(OwnershipFilterStatus status) {
+    _filterState.setOwnershipStatus(status);
+    // No need to call notifyListeners here, _filterState listener handles it
+  }
+
+  /// Load filters from storage
+  Future<void> loadFilters() async {
+    await _filterState.loadFilters();
+    // No need to call notifyListeners here, _filterState listener handles it
+  }
+
+  /// Set the user ID for analytics tracking
+  Future<void> setAnalyticsUserId(String? userId) async {
+    await _filterAnalytics.setUserId(userId);
+  }
+
+  /// Track the usage of the current filters
+  void trackFilterUsage() {
+    // Use trackFilterCombination instead of trackFilterEvent/trackFilterSetUsage
+    // Pass the full list including the internal ownership filter
+    _filterAnalytics.trackFilterCombination(
+        _filterState.filters.toList()); // Corrected method name
+  }
+
+  /// Get standardized game systems for filtering (returns cached list)
+  // This method is now just a getter: standardGameSystems
+  // Future<List<StandardGameSystem>> getStandardGameSystems() async {
+  //   // Use getAllGameSystems instead of getStandardGameSystems
+  //   return await _gameSystemService
+  //       .getAllGameSystems(); // Corrected method name
+  // }
+
+  /// Get a specific standard game system by its standard name from the cache.
+  StandardGameSystem? getSystemByName(String name) {
+    try {
+      // Use firstWhereOrNull from collection package
+      return _standardGameSystems
+          .firstWhereOrNull((system) => system.standardName == name);
+    } catch (e) {
+      // Should not happen with firstWhereOrNull, but good practice
+      // Corrected logging statement syntax
+      developer.log('Error finding system by name \'$name\': $e',
+          name: 'FilterProvider');
+      return null;
+    }
   }
 }

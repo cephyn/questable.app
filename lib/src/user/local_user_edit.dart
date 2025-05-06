@@ -38,7 +38,7 @@ class _LocalUserEditState extends State<LocalUserEdit> {
           return Scaffold(body: Center(child: CircularProgressIndicator()));
         } else if (snapshot.hasError) {
           return Scaffold(
-              body: Center(child: Text('Error: ${snapshot.error}')));
+              body: Center(child: SelectableText('Error: ${snapshot.error}')));
         } else if (snapshot.hasData) {
           Map<String, dynamic> data =
               snapshot.data!.data() as Map<String, dynamic>;

@@ -50,11 +50,9 @@ class ActiveFilterChips extends StatelessWidget {
             spacing: 8.0,
             runSpacing: 4.0,
             children: filterState.filters.map((criteria) {
-              // Get human-readable display name for the field
-              String fieldDisplay =
-                  FilterProvider.fieldDisplayNames[criteria.field] ??
-                      criteria.field.replaceFirst(
-                          criteria.field[0], criteria.field[0].toUpperCase());
+              // Generate human-readable display name by capitalizing the field
+              String fieldDisplay = criteria.field.replaceFirst(
+                  criteria.field[0], criteria.field[0].toUpperCase());
 
               // Format the value for display - Special handling for gameSystem
               String valueDisplay;
@@ -112,11 +110,13 @@ class ActiveFilterChips extends StatelessWidget {
 
               return Tooltip(
                 // Wrap FilterChip in a Tooltip
-                message: tooltipMessage, // Use the generated tooltip message
+                message:
+                    tooltipMessage, // Tooltip message is always non-null here
                 child: FilterChip(
                   label: Text('$fieldDisplay: $valueDisplay'),
                   onSelected: (_) =>
                       filterProvider.removeFilter(criteria.field),
+                  // Use onDeleted for the visual delete icon action
                   onDeleted: () => filterProvider.removeFilter(criteria.field),
                   deleteIcon: const Icon(Icons.close, size: 16),
                   backgroundColor:

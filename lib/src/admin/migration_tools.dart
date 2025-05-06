@@ -17,7 +17,6 @@ class MigrationTools extends StatefulWidget {
 }
 
 class _MigrationToolsState extends State<MigrationTools> {
-  final FirestoreService _firestoreService = FirestoreService();
   bool _isRunning = false;
   String _statusMessage = '';
   bool _success = false;
@@ -268,33 +267,78 @@ class _MigrationToolsState extends State<MigrationTools> {
   Future<void> _checkMissingFields() async {
     setState(() {
       _isChecking = true;
-      _checkStatusMessage = 'Checking for missing fields...';
-      _missingFieldCount = -1;
+      _checkStatusMessage =
+          'Checking for missing fields... Fetching documents.';
+      _missingFieldCount = 0; // Initialize count to 0
     });
 
-    try {
-      final missingCount = await _firestoreService.checkMissingIsPublicField();
+    final firestore = FirebaseFirestore.instance;
+    final questCardsRef = firestore.collection('questCards');
+    const batchSize = 500; // Process in batches
+    int processedCount = 0;
+    int missingCount = 0;
+    DocumentSnapshot? lastDoc;
 
+    try {
+      while (true) {
+        Query query =
+            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        if (lastDoc != null) {
+          query = query.startAfterDocument(lastDoc);
+        }
+
+        if (!mounted) return; // Check if widget is still mounted
+        setState(() {
+          _checkStatusMessage =
+              'Fetching batch (processed: $processedCount)...';
+        });
+
+        final snapshot = await query.get();
+
+        if (snapshot.docs.isEmpty) {
+          log('No more documents found for checking.');
+          break; // Exit loop
+        }
+
+        lastDoc = snapshot.docs.last;
+        processedCount += snapshot.docs.length;
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>?;
+          // Check if the field exists and is not null
+          if (data == null || data['isPublic'] == null) {
+            missingCount++;
+          }
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _checkStatusMessage =
+              'Processing... (Checked: $processedCount, Missing: $missingCount)';
+        });
+      }
+
+      // Final update after loop finishes
       if (mounted) {
         setState(() {
           _isChecking = false;
           if (missingCount == 0) {
-            _checkStatusMessage = 'All documents have the isPublic field! ✓';
-          } else if (missingCount > 0) {
             _checkStatusMessage =
-                'Found $missingCount documents missing the isPublic field. Run the migration to fix.';
+                'Check complete! All $processedCount documents have the isPublic field! ✓';
           } else {
-            _checkStatusMessage = 'Error checking documents. Please try again.';
+            _checkStatusMessage =
+                'Check complete! Found $missingCount documents missing the isPublic field out of $processedCount checked. Run the migration to fix.';
           }
           _missingFieldCount = missingCount;
         });
       }
-    } catch (e) {
+    } catch (e, s) {
+      log('Error checking missing isPublic fields: $e', stackTrace: s);
       if (mounted) {
         setState(() {
           _isChecking = false;
           _checkStatusMessage = 'Error checking fields: $e';
-          _missingFieldCount = -1;
+          _missingFieldCount = -1; // Indicate error
         });
       }
     }
@@ -393,28 +437,107 @@ class _MigrationToolsState extends State<MigrationTools> {
   Future<void> _runIsPublicMigration() async {
     setState(() {
       _isRunning = true;
-      _statusMessage = 'Running migration...';
+      _statusMessage = 'Starting migration... Fetching first batch.';
       _success = false;
     });
 
+    final firestore = FirebaseFirestore.instance;
+    final questCardsRef = firestore.collection('questCards');
+    const batchSize = 400; // Firestore batch limit is 500 operations
+    int batchCounter = 0;
+    int updatedCount = 0;
+    int processedCount = 0;
+    WriteBatch batch = firestore.batch();
+    DocumentSnapshot? lastDoc;
+
     try {
-      await _firestoreService.migrateQuestCardsAddIsPublic();
+      while (true) {
+        // Query for the next batch
+        Query query =
+            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        if (lastDoc != null) {
+          query = query.startAfterDocument(lastDoc);
+        }
+
+        if (!mounted) return; // Check if widget is still mounted
+        setState(() {
+          _statusMessage =
+              'Fetching next batch (processed: $processedCount, updated: $updatedCount)...';
+        });
+
+        final snapshot = await query.get();
+
+        if (snapshot.docs.isEmpty) {
+          log('No more documents found for migration.');
+          break; // Exit loop
+        }
+
+        lastDoc = snapshot.docs.last;
+        processedCount += snapshot.docs.length;
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>?;
+
+          // Check if 'isPublic' field is missing (or null)
+          if (data == null || data['isPublic'] == null) {
+            batch.update(doc.reference, {'isPublic': true});
+            batchCounter++;
+            updatedCount++;
+
+            if (batchCounter >= batchSize) {
+              if (!mounted) return;
+              setState(() {
+                _statusMessage =
+                    'Committing batch (Processed: $processedCount, Updated: $updatedCount)...';
+              });
+              log('Committing isPublic migration batch...');
+              await batch.commit();
+              log('Batch committed.');
+              batch = firestore.batch(); // Start new batch
+              batchCounter = 0;
+              await Future.delayed(
+                  const Duration(milliseconds: 50)); // Small delay
+            }
+          }
+        }
+        // Update status after processing a batch
+        if (!mounted) return;
+        setState(() {
+          _statusMessage =
+              'Processing... (Checked: $processedCount, Updated: $updatedCount)';
+        });
+      }
+
+      // Commit final batch
+      if (batchCounter > 0) {
+        if (!mounted) return;
+        setState(() {
+          _statusMessage = 'Committing final batch...';
+        });
+        log('Committing final isPublic migration batch ($batchCounter operations)...');
+        await batch.commit();
+        log('Final batch committed.');
+      }
 
       if (mounted) {
         setState(() {
           _isRunning = false;
-          _statusMessage = 'Migration completed successfully!';
+          _statusMessage =
+              'Migration complete! Processed: $processedCount, Updated: $updatedCount';
           _success = true;
         });
       }
-    } catch (e) {
+    } catch (e, s) {
+      log('Error during isPublic migration: $e', stackTrace: s);
       if (mounted) {
         setState(() {
           _isRunning = false;
-          _statusMessage = 'Error during migration: $e';
+          _statusMessage =
+              'Error during migration: $e. Processed: $processedCount, Updated: $updatedCount';
           _success = false;
         });
       }
+      // Optionally try to commit the current batch on error
     }
   }
 

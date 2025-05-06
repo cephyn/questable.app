@@ -2,8 +2,14 @@
 # To get started, simply uncomment the below code or create your own.
 # Deploy with `firebase deploy`
 
-from firebase_functions import https_fn, options, firestore_fn, scheduler_fn
-from firebase_admin import initialize_app, firestore
+from firebase_functions import (
+    https_fn,
+    options,
+    firestore_fn,
+    scheduler_fn,
+    auth_fn,
+)  # Added auth_fn
+from firebase_admin import initialize_app, firestore, auth  # Added auth
 from pypdf import PdfReader
 from markitdown import MarkItDown
 from io import BytesIO
@@ -804,3 +810,89 @@ def process_system_mapping_feedback(
             logging.error(
                 f"Failed to update feedback {feedback_id} status to error: {update_error}"
             )
+
+
+# --- New Function: User Deletion Cleanup ---
+
+
+# Helper function to delete subcollections recursively (adjust batch size as needed)
+def delete_collection(coll_ref, batch_size):
+    docs = coll_ref.limit(batch_size).stream()
+    deleted = 0
+
+    while True:
+        batch = firestore.client().batch()
+        doc_count = 0
+        for doc in docs:
+            batch.delete(doc.reference)
+            doc_count += 1
+            deleted += 1
+
+        if doc_count == 0:
+            break  # No more documents found
+
+        batch.commit()
+        # Get the next batch
+        docs = coll_ref.limit(batch_size).stream()
+
+    return deleted
+
+
+@auth_fn.on_user_deleted()
+def on_user_delete(event: auth_fn.AuthUserRecord) -> None:
+    """Cleans up user data from Firestore upon account deletion."""
+    uid = event.data.uid
+    logging.info(f"Starting cleanup for deleted user: {uid}")
+
+    try:
+        db = firestore.client()
+
+        # 1. Delete the user document from 'users' collection
+        user_doc_ref = db.collection("users").document(uid)
+        user_doc_ref.delete()
+        logging.info(f"Deleted user document: users/{uid}")
+
+        # 2. Delete the 'ownedQuests' subcollection
+        owned_quests_ref = user_doc_ref.collection("ownedQuests")
+        deleted_owned_count = delete_collection(owned_quests_ref, 50)  # Batch size 50
+        logging.info(
+            f"Deleted {deleted_owned_count} documents from ownedQuests subcollection for user {uid}"
+        )
+
+        # 3. Anonymize submitted quest cards
+        quests_query = db.collection("questCards").where("uploadedBy", "==", uid)
+        submitted_quests = quests_query.stream()
+
+        anonymized_count = 0
+        batch = db.batch()
+        batch_count = 0
+        max_batch_size = 400  # Firestore batch limit is 500 operations
+
+        for quest in submitted_quests:
+            batch.update(quest.reference, {"uploadedBy": None})
+            anonymized_count += 1
+            batch_count += 1
+            if batch_count >= max_batch_size:
+                batch.commit()
+                logging.info(
+                    f"Committed batch of {batch_count} quest anonymizations for user {uid}"
+                )
+                batch = db.batch()  # Start a new batch
+                batch_count = 0
+
+        # Commit any remaining updates in the last batch
+        if batch_count > 0:
+            batch.commit()
+            logging.info(
+                f"Committed final batch of {batch_count} quest anonymizations for user {uid}"
+            )
+
+        logging.info(
+            f"Anonymized {anonymized_count} quest cards submitted by user {uid}"
+        )
+        logging.info(f"Successfully completed cleanup for deleted user: {uid}")
+
+    except Exception as e:
+        logging.error(f"Error during cleanup for user {uid}: {e}")
+        # Depending on the error, you might want to add retry logic or specific handling
+        # For now, just log the error.

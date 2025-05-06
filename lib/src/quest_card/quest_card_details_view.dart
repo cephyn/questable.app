@@ -6,15 +6,21 @@ import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 import 'package:quest_cards/src/util/utils.dart';
 import 'package:quest_cards/src/widgets/game_system_mapping_feedback.dart'
-    as feedback_widget; // Add alias
+    as feedback_widget;
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
-import 'package:quest_cards/src/services/firebase_auth_service.dart'; // Import auth service
-import 'package:quest_cards/src/auth/auth_dialog_helper.dart'; // Import auth dialog helper
-import 'package:share_plus/share_plus.dart'; // Keep for fallback if needed
+import 'package:quest_cards/src/auth/auth_dialog_helper.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:quest_cards/src/config/app_constants.dart';
-import 'package:quest_cards/src/widgets/share_options_modal.dart'; // Import the modal
+import 'package:quest_cards/src/widgets/share_options_modal.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'
+    hide EmailAuthProvider; // Added for auth, hide to prevent conflict
+import 'package:provider/provider.dart';
+import 'package:quest_cards/src/services/user_service.dart'; // Added UserService import
+import 'package:quest_cards/src/providers/auth_provider.dart'
+    as app_auth; // Added AuthProvider import with prefix
 
+/// Displays detailed information about a QuestCard.
 class QuestCardDetailsView extends StatefulWidget {
   final String docId;
 
@@ -26,9 +32,8 @@ class QuestCardDetailsView extends StatefulWidget {
 
 class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   final FirestoreService _firestoreService = FirestoreService();
-  final FirebaseAuthService _authService =
-      FirebaseAuthService(); // Instantiate auth service
-  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance; // Analytics instance
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+  late UserService _userService; // Added UserService
   Map<String, dynamic>? _questCardData;
   bool _isLoading = true;
   bool _hasError = false;
@@ -41,6 +46,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   @override
   void initState() {
     super.initState();
+    _userService = UserService(); // Initialize UserService
     _loadQuestCardData();
   }
 
@@ -61,14 +67,18 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
         _hasError = false;
       });
 
-      final data = await _firestoreService.getQuestCardById(widget.docId);
+      // Use the stream and get the first snapshot
+      final DocumentSnapshot snapshot =
+          await _firestoreService.getQuestCardStream(widget.docId).first;
 
       if (mounted) {
         setState(() {
-          if (data != null) {
-            _questCardData = data;
+          if (snapshot.exists) {
+            // Extract data from the snapshot
+            _questCardData = snapshot.data() as Map<String, dynamic>?;
             // Log data to help with debugging
-            debugPrint('Loaded quest card data: ${data['title']}');
+            debugPrint(
+                'Loaded quest card data: ${_questCardData?['title'] ?? "N/A"}');
           } else {
             _hasError = true;
             _errorMessage = 'Quest card not found';
@@ -87,9 +97,70 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
     }
   }
 
+  // Function to handle ownership change
+  Future<void> _toggleOwnership(bool newValue) async {
+    final User? currentUser = _userService.currentUser;
+
+    if (currentUser == null) return;
+
+    try {
+      if (newValue) {
+        await _userService.addQuestToOwned(widget.docId);
+      } else {
+        await _userService.removeQuestFromOwned(widget.docId);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating ownership: \$e')),
+        );
+      }
+    }
+  }
+
+  // Widget to build the ownership switch using StreamBuilder
+  Widget _buildOwnershipSwitch() {
+    final User? currentUser = _userService.currentUser;
+
+    if (currentUser == null) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _userService.getOwnershipStream(widget.docId),
+      builder: (context, snapshot) {
+        bool isCurrentlyOwned = false;
+        if (snapshot.connectionState == ConnectionState.active) {
+          isCurrentlyOwned = snapshot.hasData && snapshot.data!.exists;
+        } else if (snapshot.connectionState == ConnectionState.waiting) {
+          // Show a loading indicator while checking ownership
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        // Handle errors if necessary
+        if (snapshot.hasError) {
+          return const ListTile(
+            title: Text('Error checking ownership'),
+            leading: Icon(Icons.error, color: Colors.red),
+          );
+        }
+
+        // Use SwitchListTile for better layout
+        return SwitchListTile(
+          title: const Text('I Own This Quest'),
+          value: isCurrentlyOwned,
+          onChanged: _toggleOwnership,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Utils.setBrowserTabTitle(_questCardData?['title'] ?? 'Quest Details');
+    final authProvider = Provider.of<app_auth.AuthProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -117,9 +188,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
               icon: const Icon(Icons.edit),
               tooltip: 'Edit Quest',
               onPressed: () {
-                // Check if the user is logged in by checking currentUser
-                if (_authService.auth.currentUser != null) {
-                  // If logged in, navigate directly to edit screen
+                if (authProvider.isAuthenticated) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -148,6 +217,8 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   }
 
   Widget _buildBody() {
+    final authProvider =
+        Provider.of<app_auth.AuthProvider>(context, listen: false);
     if (_isLoading) {
       return const Center(
         child: Column(
@@ -204,6 +275,8 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
             _buildQuestDescription(),
             const Divider(height: 32),
             _buildQuestProperties(),
+            const Divider(height: 32),
+            if (authProvider.isAuthenticated) _buildOwnershipSwitch(),
             const Divider(height: 32),
             _buildGameSystemFeedback(),
           ],
@@ -619,7 +692,6 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
 
       // Note: The Share.share() call is removed from here.
       // Platform-specific analytics logging is now handled within the modal.
-
     } catch (e) {
       // Catch errors related to *initiating* the share (e.g., logging analytics)
       // Errors during actual sharing (copy, launch URL) are handled in the modal

@@ -131,7 +131,8 @@ class AuthGate extends StatelessWidget {
                     } else if (rolesSnapshot.hasError) {
                       return Scaffold(
                           body: Center(
-                              child: Text('Error: ${rolesSnapshot.error}')));
+                              child: SelectableText(
+                                  'Error: ${rolesSnapshot.error}')));
                     } else if (rolesSnapshot.hasData) {
                       List<String>? roles = rolesSnapshot.data;
                       if (roles != null &&

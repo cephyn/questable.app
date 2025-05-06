@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_adaptive_scaffold/flutter_adaptive_scaffold.dart';
@@ -35,7 +37,6 @@ import 'settings/settings_view.dart';
 
 // App Localization (Commented out)
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-
 
 /// The Widget that configures your application.
 class MyApp extends StatelessWidget {
@@ -88,7 +89,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-
 class HomePage extends StatefulWidget {
   final SettingsController settingsController;
   const HomePage({super.key, required this.settingsController});
@@ -113,15 +113,19 @@ class _HomePageState extends State<HomePage> {
           if (authSnapshot.connectionState == ConnectionState.waiting) {
             return Scaffold(
               appBar: AppBar(title: const Text('Questable')),
-              body: const Center(child: CircularProgressIndicator(key: ValueKey('auth_loading'))),
+              body: const Center(
+                  child:
+                      CircularProgressIndicator(key: ValueKey('auth_loading'))),
             );
           }
 
           // Error State
           if (authSnapshot.hasError) {
-             return Scaffold(
+            return Scaffold(
               appBar: AppBar(title: const Text('Questable')),
-              body: Center(child: Text('Authentication Error: ${authSnapshot.error}')),
+              body: Center(
+                  child: SelectableText(
+                      'Authentication Error: ${authSnapshot.error}')),
             );
           }
 
@@ -142,7 +146,8 @@ class _HomePageState extends State<HomePage> {
             return Scaffold(
               key: const ValueKey('logged_out_scaffold'),
               appBar: appBar,
-              body: const PublicQuestCardListView(), // Directly show public view
+              body:
+                  const PublicQuestCardListView(), // Directly show public view
             );
           }
           // If user IS logged in, build the Scaffold with AdaptiveScaffold
@@ -158,32 +163,33 @@ class _HomePageState extends State<HomePage> {
       if (currentUser != null) ...[
         IconButton(
           icon: const Icon(Icons.person),
-          tooltip: 'Profile (Not Implemented)',
+          tooltip: 'Profile', // Updated tooltip
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Profile view not implemented yet.'))
-            );
+            // Navigate to the profile screen using GoRouter
+            context.go('/profile');
           },
         ),
-        IconButton( // Settings Icon
+        IconButton(
+          // Settings Icon
           icon: const Icon(Icons.settings),
           tooltip: 'Settings',
           onPressed: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SettingsView(controller: widget.settingsController),
+                builder: (context) =>
+                    SettingsView(controller: widget.settingsController),
               ),
             );
           },
         ),
         AuthWidgets.signOutButton(context, auth),
-      ] 
+      ]
     ];
   }
 
- // Helper function to build destinations for LOGGED-IN users
- List<NavigationDestination> _buildLoggedInDestinations(bool isAdmin) {
+  // Helper function to build destinations for LOGGED-IN users
+  List<NavigationDestination> _buildLoggedInDestinations(bool isAdmin) {
     // Assumes currentUser is not null
     return [
       const NavigationDestination(
@@ -224,40 +230,44 @@ class _HomePageState extends State<HomePage> {
           selectedIcon: Icon(Icons.link),
           label: 'Backfill', // Index 6
         ),
-         const NavigationDestination(
+        const NavigationDestination(
           icon: Icon(Icons.gamepad_outlined),
           selectedIcon: Icon(Icons.gamepad),
           label: 'Systems', // Index 7
         ),
       ]
     ];
- }
-
+  }
 
   // Builds the Scaffold containing AdaptiveScaffold for LOGGED-IN users
   Widget buildLoggedInScaffold(User currentUser, AppBar appBar) {
     // Fetch roles for the logged-in user
-    final Future<List<String>?> rolesFuture = firestoreService.getUserRoles(currentUser.uid);
+    final Future<List<String>?> rolesFuture =
+        firestoreService.getUserRoles(currentUser.uid);
 
     return FutureBuilder<List<String>?>(
         future: rolesFuture,
         builder: (context, roleSnapshot) {
           // Role Loading State
           if (roleSnapshot.connectionState == ConnectionState.waiting) {
-             return Scaffold(
-               key: const ValueKey('role_loading_scaffold'),
-               appBar: appBar, // Use the passed AppBar
-               body: const Center(child: CircularProgressIndicator(key: ValueKey('role_loading_indicator'))),
-             );
+            return Scaffold(
+              key: const ValueKey('role_loading_scaffold'),
+              appBar: appBar, // Use the passed AppBar
+              body: const Center(
+                  child: CircularProgressIndicator(
+                      key: ValueKey('role_loading_indicator'))),
+            );
           }
           // Role Error State
           if (roleSnapshot.hasError) {
-            print('Error loading user roles: ${roleSnapshot.error}');
-             return Scaffold(
-               key: const ValueKey('role_error_scaffold'),
-               appBar: appBar, // Use the passed AppBar
-               body: Center(child: Text('Error loading user data: ${roleSnapshot.error}')),
-             );
+            log('Error loading user roles: ${roleSnapshot.error}');
+            return Scaffold(
+              key: const ValueKey('role_error_scaffold'),
+              appBar: appBar, // Use the passed AppBar
+              body: Center(
+                  child:
+                      Text('Error loading user data: ${roleSnapshot.error}')),
+            );
           }
 
           // Roles are loaded
@@ -265,7 +275,8 @@ class _HomePageState extends State<HomePage> {
           bool isAdmin = roles?.contains('admin') ?? false;
 
           // Build destinations for the logged-in user
-          final List<NavigationDestination> destinations = _buildLoggedInDestinations(isAdmin);
+          final List<NavigationDestination> destinations =
+              _buildLoggedInDestinations(isAdmin);
 
           // Ensure selectedIndex is valid
           int effectiveSelectedIndex = _selectedIndex;
@@ -283,15 +294,37 @@ class _HomePageState extends State<HomePage> {
           // Determine the page widget for the logged-in user
           Widget page;
           switch (effectiveSelectedIndex) {
-            case 0: page = QuestCardListView(questCardList: []); break; // Browse
-            case 1: page = EditQuestCard(docId: ''); break; // Add Quest
-            case 2: page = QuestCardAnalyze(); break; // Analyze
-            case 3: page = QuestCardSearch(); break; // Search
-            case 4: page = LocalUserList(); break; // Users
+            case 0:
+              page = QuestCardListView(questCardList: []);
+              break; // Browse
+            case 1:
+              page = EditQuestCard(docId: '');
+              break; // Add Quest
+            case 2:
+              page = QuestCardAnalyze();
+              break; // Analyze
+            case 3:
+              page = QuestCardSearch();
+              break; // Search
+            case 4:
+              page = LocalUserList();
+              break; // Users
             // Admin pages (protected by destination list and this switch)
-            case 5: page = isAdmin ? MigrationTools() : QuestCardListView(questCardList: []); break;
-            case 6: page = isAdmin ? PurchaseLinkBackfill() : QuestCardListView(questCardList: []); break;
-            case 7: page = isAdmin ? GameSystemAdminView() : QuestCardListView(questCardList: []); break;
+            case 5:
+              page = isAdmin
+                  ? MigrationTools()
+                  : QuestCardListView(questCardList: []);
+              break;
+            case 6:
+              page = isAdmin
+                  ? PurchaseLinkBackfill()
+                  : QuestCardListView(questCardList: []);
+              break;
+            case 7:
+              page = isAdmin
+                  ? GameSystemAdminView()
+                  : QuestCardListView(questCardList: []);
+              break;
             default:
               page = QuestCardListView(questCardList: []); // Fallback
           }
@@ -303,20 +336,21 @@ class _HomePageState extends State<HomePage> {
             body: AdaptiveScaffold(
               selectedIndex: effectiveSelectedIndex,
               onSelectedIndexChange: (int index) {
-                 if (index < destinations.length) {
-                    setState(() {
-                      _selectedIndex = index;
-                    });
-                 }
+                if (index < destinations.length) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                }
               },
               destinations: destinations,
               body: (_) => page,
               smallBody: (_) => page,
               // Standard Breakpoints
-               smallBreakpoint: const Breakpoint(endWidth: 700),
-               mediumBreakpoint: const Breakpoint(beginWidth: 700, endWidth: 1000),
-               largeBreakpoint: const Breakpoint(beginWidth: 1000),
-               internalAnimations: true,
+              smallBreakpoint: const Breakpoint(endWidth: 700),
+              mediumBreakpoint:
+                  const Breakpoint(beginWidth: 700, endWidth: 1000),
+              largeBreakpoint: const Breakpoint(beginWidth: 1000),
+              internalAnimations: true,
             ),
           );
         });
