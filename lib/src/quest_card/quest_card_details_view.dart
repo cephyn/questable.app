@@ -6,15 +6,19 @@ import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 import 'package:quest_cards/src/util/utils.dart';
 import 'package:quest_cards/src/widgets/game_system_mapping_feedback.dart'
-    as feedback_widget; // Add alias
+    as feedback_widget;
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
-import 'package:quest_cards/src/services/firebase_auth_service.dart'; // Import auth service
-import 'package:quest_cards/src/auth/auth_dialog_helper.dart'; // Import auth dialog helper
+import 'package:quest_cards/src/auth/auth_dialog_helper.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:quest_cards/src/config/app_constants.dart';
-import 'package:quest_cards/src/widgets/share_options_modal.dart'; // Import the modal
+import 'package:quest_cards/src/widgets/share_options_modal.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Added for auth
+import 'package:firebase_auth/firebase_auth.dart'
+    hide EmailAuthProvider; // Added for auth, hide to prevent conflict
+import 'package:provider/provider.dart';
+import 'package:quest_cards/src/services/user_service.dart'; // Added UserService import
+import 'package:quest_cards/src/providers/auth_provider.dart'
+    as app_auth; // Added AuthProvider import with prefix
 
 /// Displays detailed information about a QuestCard.
 class QuestCardDetailsView extends StatefulWidget {
@@ -28,12 +32,8 @@ class QuestCardDetailsView extends StatefulWidget {
 
 class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   final FirestoreService _firestoreService = FirestoreService();
-  final FirebaseAuthService _authService =
-      FirebaseAuthService(); // Instantiate auth service
-  final FirebaseAnalytics _analytics =
-      FirebaseAnalytics.instance; // Analytics instance
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  User? _currentUser;
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+  late UserService _userService; // Added UserService
   Map<String, dynamic>? _questCardData;
   bool _isLoading = true;
   bool _hasError = false;
@@ -46,7 +46,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   @override
   void initState() {
     super.initState();
-    _currentUser = FirebaseAuth.instance.currentUser;
+    _userService = UserService(); // Initialize UserService
     _loadQuestCardData();
   }
 
@@ -99,23 +99,16 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
 
   // Function to handle ownership change
   Future<void> _toggleOwnership(bool newValue) async {
-    if (_currentUser == null) return;
+    final User? currentUser = _userService.currentUser;
 
-    final questRef = _firestore
-        .collection('users')
-        .doc(_currentUser!.uid)
-        .collection('ownedQuests')
-        .doc(widget.docId);
+    if (currentUser == null) return;
 
     try {
       if (newValue) {
-        // Add to owned quests
-        await questRef.set({'ownedAt': FieldValue.serverTimestamp()});
+        await _userService.addQuestToOwned(widget.docId);
       } else {
-        // Remove from owned quests
-        await questRef.delete();
+        await _userService.removeQuestFromOwned(widget.docId);
       }
-      // No need to setState here if using StreamBuilder for the switch state
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -127,20 +120,14 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
 
   // Widget to build the ownership switch using StreamBuilder
   Widget _buildOwnershipSwitch() {
-    if (_currentUser == null) {
-      // Don't show the switch if not logged in
+    final User? currentUser = _userService.currentUser;
+
+    if (currentUser == null) {
       return const SizedBox.shrink();
     }
 
-    final docStream = _firestore
-        .collection('users')
-        .doc(_currentUser!.uid)
-        .collection('ownedQuests')
-        .doc(widget.docId)
-        .snapshots();
-
     return StreamBuilder<DocumentSnapshot>(
-      stream: docStream,
+      stream: _userService.getOwnershipStream(widget.docId),
       builder: (context, snapshot) {
         bool isCurrentlyOwned = false;
         if (snapshot.connectionState == ConnectionState.active) {
@@ -173,6 +160,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   @override
   Widget build(BuildContext context) {
     Utils.setBrowserTabTitle(_questCardData?['title'] ?? 'Quest Details');
+    final authProvider = Provider.of<app_auth.AuthProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -200,9 +188,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
               icon: const Icon(Icons.edit),
               tooltip: 'Edit Quest',
               onPressed: () {
-                // Check if the user is logged in by checking currentUser
-                if (_authService.auth.currentUser != null) {
-                  // If logged in, navigate directly to edit screen
+                if (authProvider.isAuthenticated) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -231,6 +217,8 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   }
 
   Widget _buildBody() {
+    final authProvider =
+        Provider.of<app_auth.AuthProvider>(context, listen: false);
     if (_isLoading) {
       return const Center(
         child: Column(
@@ -288,8 +276,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
             const Divider(height: 32),
             _buildQuestProperties(),
             const Divider(height: 32),
-            // Add the ownership switch here
-            _buildOwnershipSwitch(),
+            if (authProvider.isAuthenticated) _buildOwnershipSwitch(),
             const Divider(height: 32),
             _buildGameSystemFeedback(),
           ],

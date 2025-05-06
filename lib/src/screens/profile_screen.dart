@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Added for Firestore access
-import 'package:go_router/go_router.dart'; // Added for navigation
-
-// TODO: Import specific service files if needed later
-// import '../services/firestore_service.dart';
+import 'package:firebase_auth/firebase_auth.dart'
+    hide EmailAuthProvider; // Hide to avoid conflict
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:quest_cards/src/providers/auth_provider.dart'
+    as app_auth; // Use prefix
+import 'package:quest_cards/src/services/user_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,18 +16,24 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final User? _currentUser = FirebaseAuth.instance.currentUser;
+  // User is now obtained from AuthProvider
   bool _isLoading = false;
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance; // Firestore instance
+  late UserService _userService; // Declare UserService instance
 
-  // Password reset logic (TODO removed)
-  Future<void> _resetPassword() async {
-    if (_currentUser?.email == null) return;
+  @override
+  void initState() {
+    super.initState();
+    // Initialize UserService here or in didChangeDependencies if context is needed earlier
+    _userService = UserService();
+  }
+
+  // Password reset logic
+  Future<void> _resetPassword(User? currentUser) async {
+    if (currentUser?.email == null) return;
     setState(() => _isLoading = true);
     try {
       await FirebaseAuth.instance
-          .sendPasswordResetEmail(email: _currentUser!.email!);
+          .sendPasswordResetEmail(email: currentUser!.email!);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Password reset email sent.')),
@@ -34,7 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending password reset email: \$e')),
+          SnackBar(content: Text('Error sending password reset email: $e')),
         );
       }
     } finally {
@@ -44,9 +52,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Account deletion logic with confirmation (TODO removed)
-  Future<void> _deleteAccount() async {
-    if (_currentUser == null) return;
+  // Account deletion logic with confirmation
+  Future<void> _deleteAccount(User? currentUser) async {
+    if (currentUser == null) return;
 
     // Show confirmation dialog
     final bool? confirmed = await showDialog<bool>(
@@ -74,23 +82,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (confirmed == true) {
       setState(() => _isLoading = true);
       try {
-        await _currentUser.delete(); // Removed unnecessary '!'
-        // User deleted successfully. Auth state listener should handle navigation.
+        await currentUser.delete();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Account deleted successfully.')),
           );
-          // Optionally navigate away explicitly if auth listener doesn't cover it fast enough
-          // Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (context) => LoginScreen()), (route) => false);
+          // AuthProvider will handle navigation on auth state change
         }
       } on FirebaseAuthException catch (e) {
         if (mounted) {
           // Handle specific errors like 'requires-recent-login'
-          String message = 'Error deleting account: \$e';
+          String message = 'Error deleting account: $e';
           if (e.code == 'requires-recent-login') {
             message =
                 'Please sign out and sign back in again before deleting your account.';
-            // Re-authentication prompt TODO removed - message is sufficient for now
           }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(message)),
@@ -99,7 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('An unexpected error occurred: \$e')),
+            SnackBar(content: Text('An unexpected error occurred: $e')),
           );
         }
       } finally {
@@ -112,14 +117,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<app_auth.AuthProvider>(
+        context); // Use prefixed AuthProvider
+    final User? currentUser = authProvider.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Profile'),
       ),
-      body: _currentUser == null
-          ? const Center(
-              child: Text(
-                  'Not logged in.')) // Should not happen if routed correctly
+      body: currentUser == null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Please log in to view your profile.'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.go('/'),
+                    child: const Text('Go to Home'),
+                  ),
+                ],
+              ),
+            )
           : ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
@@ -133,8 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text('User Information',
                             style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 8),
-                        Text(
-                            'Email: ${_currentUser.email ?? 'Not available'}'), // Removed unnecessary '!'
+                        Text('Email: ${currentUser.email ?? 'Not available'}'),
                         // Add other user details if available (e.g., display name)
                       ],
                     ),
@@ -161,19 +179,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     title: const Text('Reset Password'),
                                     subtitle: const Text(
                                         'Send a password reset link to your email'),
-                                    onTap: _resetPassword,
+                                    onTap: () => _resetPassword(
+                                        currentUser), // Pass currentUser
                                   ),
                                   const Divider(),
                                   ListTile(
-                                    leading: Icon(Icons.delete_forever,
-                                        color: Colors.red[700]),
-                                    title: Text('Delete Account',
-                                        style:
-                                            TextStyle(color: Colors.red[700])),
-                                    subtitle: const Text(
-                                        'Permanently delete your account and data'),
-                                    onTap: _deleteAccount,
+                                    leading: Icon(Icons.logout,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error),
+                                    title: Text('Sign Out',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error)),
+                                    subtitle:
+                                        const Text('Sign out of your account'),
+                                    onTap: () async {
+                                      await authProvider.signOut();
+                                      if (mounted &&
+                                          !authProvider.isAuthenticated) {
+                                        context.go('/');
+                                      }
+                                    },
                                   ),
+                                  const Divider(),
+                                  ListTile(
+                                      leading: Icon(Icons.delete_forever,
+                                          color: Colors.red[700]),
+                                      title: Text('Delete Account',
+                                          style: TextStyle(
+                                              color: Colors.red[700])),
+                                      subtitle: const Text(
+                                          'Permanently delete your account and data'),
+                                      onTap: () => _deleteAccount(
+                                          currentUser)), // Pass currentUser
                                 ],
                               ),
                       ],
@@ -192,7 +232,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text('My Submissions',
                             style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 8),
-                        _buildSubmittedQuestsList(), // Use StreamBuilder widget
+                        _buildSubmittedQuestsList(
+                            currentUser), // Pass currentUser
                       ],
                     ),
                   ),
@@ -209,7 +250,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text('My Owned Library',
                             style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 8),
-                        _buildOwnedQuestsList(), // Use FutureBuilder widget
+                        _buildOwnedQuestsList(currentUser), // Pass currentUser
                       ],
                     ),
                   ),
@@ -220,16 +261,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // Widget to build the list of submitted quests
-  Widget _buildSubmittedQuestsList() {
-    if (_currentUser == null) return const Text('Not logged in.');
+  Widget _buildSubmittedQuestsList(User? currentUser) {
+    if (currentUser == null) return const Text('Not logged in.');
 
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
-          .collection('questCards')
-          .where('uploadedBy',
-              isEqualTo: _currentUser.uid) // Removed unnecessary '!'
-          .orderBy('title') // Example ordering
-          .snapshots(),
+      stream: _userService.getSubmittedQuestsStream(), // Use UserService
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -260,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Add subtitle or trailing info if desired
               onTap: () {
                 // Navigate to quest details view
-                context.go('/quests/\${quest.id}');
+                context.go('/quests/${quest.id}');
               },
             );
           },
@@ -270,49 +306,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // Widget to build the list of owned quests
-  Widget _buildOwnedQuestsList() {
-    if (_currentUser == null) return const Text('Not logged in.');
+  Widget _buildOwnedQuestsList(User? currentUser) {
+    if (currentUser == null) return const Text('Not logged in.');
 
     // Future function to get owned quest IDs and then the quest data
-    Future<List<DocumentSnapshot>> getOwnedQuests() async {
-      // 1. Get owned quest IDs
-      final ownedRefs = await _firestore
-          .collection('users')
-          .doc(_currentUser.uid) // Removed unnecessary '!'
-          .collection('ownedQuests')
-          .get();
-
-      final ownedIds = ownedRefs.docs.map((doc) => doc.id).toList();
-
-      if (ownedIds.isEmpty) {
-        return [];
-      }
-
-      // 2. Get quest documents based on IDs
-      // Firestore 'whereIn' query limit is 30. Handle potential batching for > 30 owned quests.
-      List<DocumentSnapshot> ownedQuests = [];
-      for (var i = 0; i < ownedIds.length; i += 30) {
-        final sublist = ownedIds.sublist(
-            i, i + 30 > ownedIds.length ? ownedIds.length : i + 30);
-        final questSnapshots = await _firestore
-            .collection('questCards')
-            .where(FieldPath.documentId, whereIn: sublist)
-            .get();
-        ownedQuests.addAll(questSnapshots.docs);
-      }
-
-      // Optional: Sort owned quests if needed, e.g., by title
-      ownedQuests.sort((a, b) {
-        final titleA = (a.data() as Map<String, dynamic>?)?['title'] ?? '';
-        final titleB = (b.data() as Map<String, dynamic>?)?['title'] ?? '';
-        return titleA.compareTo(titleB);
-      });
-
-      return ownedQuests;
-    }
-
+    // This is now handled by UserService.getOwnedQuests()
     return FutureBuilder<List<DocumentSnapshot>>(
-      future: getOwnedQuests(),
+      future: _userService.getOwnedQuests(), // Use UserService
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -322,9 +322,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'Error loading owned quests: ${snapshot.error}');
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Text('You do not own any quests yet.');
+          return const Text('You have not marked any quests as owned yet.');
         }
-
         final quests = snapshot.data!;
 
         return ListView.builder(

@@ -130,6 +130,27 @@ class FilterState extends ChangeNotifier {
   static const String _ownershipPrefsKey =
       'quest_card_ownership_filter'; // Key for saving ownership status
 
+  // Private constructor for cloning
+  FilterState._internal(Set<FilterCriteria> clonedFilters,
+      OwnershipFilterStatus ownershipStatus) {
+    _filters.clear();
+    _filters.addAll(clonedFilters);
+    _ownershipStatus = ownershipStatus;
+  }
+
+  // Default constructor
+  FilterState();
+
+  /// Clone the current filter state
+  FilterState clone() {
+    final Set<FilterCriteria> clonedFiltersSet = HashSet<FilterCriteria>();
+    for (var filter in _filters) {
+      // Assuming FilterCriteria.fromMap(toMap()) correctly creates a new instance
+      clonedFiltersSet.add(FilterCriteria.fromMap(filter.toMap()));
+    }
+    return FilterState._internal(clonedFiltersSet, _ownershipStatus);
+  }
+
   /// All currently active filters (excluding the internal ownership one)
   UnmodifiableListView<FilterCriteria> get filters =>
       UnmodifiableListView<FilterCriteria>(_filters

@@ -10,7 +10,8 @@ import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/role_based_widgets/role_based_delete_documents_buttons.dart';
 import 'package:quest_cards/src/services/firebase_auth_service.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
-import 'package:quest_cards/src/providers/auth_provider.dart';
+import 'package:quest_cards/src/providers/auth_provider.dart'
+    as app_auth; // Ensure it has a prefix if AuthProvider is ambiguous, or ensure no conflict
 
 import '../util/utils.dart';
 
@@ -85,9 +86,9 @@ class _QuestCardListViewState extends State<QuestCardListView> {
   Widget build(BuildContext context) {
     Utils.setBrowserTabTitle("List Quests");
     final filterProvider = Provider.of<FilterProvider>(context);
-    // Use AuthProvider to check authentication status
-    final authProvider = Provider.of<AuthProvider>(context);
-    final bool isAuthenticated = authProvider.isAuthenticated;
+    final authProvider = Provider.of<app_auth.AuthProvider>(
+        context); // Use prefixed AuthProvider
+    // final bool isAuthenticated = authProvider.isAuthenticated; // This is fine for AppBar
 
     return Scaffold(
       key: _scaffoldKey,
@@ -175,7 +176,7 @@ class _QuestCardListViewState extends State<QuestCardListView> {
         ),
       ),
       // Pass authentication status to the drawer
-      endDrawer: FilterDrawer(isAuthenticated: isAuthenticated),
+      endDrawer: FilterDrawer(isAuthenticated: authProvider.isAuthenticated),
       onEndDrawerChanged: (isOpen) {
         if (!isOpen) {
           // When drawer closes, refresh the quest count
@@ -212,18 +213,15 @@ class _QuestCardListViewState extends State<QuestCardListView> {
 
   Widget _buildQuestList(BuildContext context) {
     final filterProvider = Provider.of<FilterProvider>(context);
-    // Use AuthProvider to get user ID
-    final authProvider = Provider.of<AuthProvider>(context,
-        listen: false); // Don't need to listen here
-    final userId =
-        authProvider.currentUser?.uid; // Use currentUser instead of user
+    final authProvider = Provider.of<app_auth.AuthProvider>(context,
+        listen: false); // Use prefixed AuthProvider
+    final userId = authProvider.currentUser?.uid;
 
     return StreamBuilder<List<QueryDocumentSnapshot>>(
       stream: firestoreService.getQuestCardsStream(
-        widget
-            .questCardList, // Assuming this is still relevant (e.g., from search results)
+        widget.questCardList,
         filterState: filterProvider.filterState,
-        userId: userId, // Pass the user ID here (can be null)
+        userId: userId,
       ),
       builder: (context, snapshot) {
         // Track filter usage when data is loaded (only once per filter combination)
@@ -338,19 +336,21 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // TODO: Conditionally show edit/delete based on roles/ownership?
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          // Navigate to EditQuestCard route
-                          context.go('/quests/$docId/edit');
-                        },
-                        tooltip: 'Edit Quest',
-                      ),
-                      // Only show delete button if user is logged in
-                      if (userId != null)
+                      // Conditionally show edit/delete based on roles/ownership and auth status
+                      if (authProvider
+                          .isAuthenticated) // Use authProvider from _buildQuestList scope
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () {
+                            context.go('/quests/$docId/edit');
+                          },
+                          tooltip: 'Edit Quest',
+                        ),
+                      if (authProvider.isAuthenticated &&
+                          userId !=
+                              null) // Use authProvider and userId from _buildQuestList scope
                         rbDeleteDocumentsButtons.deleteQuestCardButton(
-                          userId, // Now guaranteed non-null
+                          userId, // userId from _buildQuestList scope
                           docId,
                         ),
                     ],

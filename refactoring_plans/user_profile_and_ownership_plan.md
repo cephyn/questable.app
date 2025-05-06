@@ -75,21 +75,25 @@ This document outlines the plan for adding user profile management and a quest o
     *   ✅ Trigger: `functions.auth.user().onDelete()`
     *   ✅ Purpose: Clean up associated Firestore data (user profile, owned quests) and anonymize submitted quests by removing/nullifying `uploadedBy`.
 
-## 6. State Management - In Progress
+## 6. State Management - Complete
 
 *   ✅ Created `AuthProvider` (`lib/src/providers/auth_provider.dart`) to listen to `FirebaseAuth.instance.authStateChanges()` and provide `currentUser`, `isAuthenticated`, and `isLoading` status.
 *   ✅ Integrated `AuthProvider` into `main.dart` using `MultiProvider`.
-*   **To Do:**
-    *   Use `AuthProvider` in widgets to conditionally show/hide UI elements (e.g., profile button, edit/delete buttons, login prompts).
-    *   Implement route guards (e.g., for `/profile`) based on `AuthProvider.isAuthenticated`.
-    *   Manage fetching and caching of profile data (submitted/owned quests) potentially using another provider or integrating with `AuthProvider` where appropriate.
+*   ✅ Used `AuthProvider` in `QuestCardListView` to conditionally show profile button, edit, and delete buttons.
+*   ✅ Used `AuthProvider` in `QuestCardDetailsView` to conditionally show the edit button and the "I Own This" switch.
+*   ✅ Implemented route guard for `/profile` in `main.dart` using `GoRouter`'s redirect functionality and `AuthProvider.isAuthenticated`.
+*   ✅ Created `UserService` (`lib/src/services/user_service.dart`) to handle Firestore operations related to user profile data (submitted and owned quests).
+*   ✅ Refactored `ProfileScreen` to use `AuthProvider` for user state and `UserService` for data fetching.
+*   ✅ Refactored `QuestCardDetailsView` to use `UserService` for ownership state and actions.
+*   **To Do (Profile Data Management):**
+    *   Consider more advanced state management for profile data (submitted/owned quests) if needed, e.g., caching fetched data in a `ProfileProvider` or within `AuthProvider` to reduce Firestore reads if `ProfileScreen` is visited frequently. For now, `ProfileScreen` fetches directly using `UserService`.
 
 ## 7. File Structure Suggestions
 
 *   `lib/src/screens/profile_screen.dart` (✅ Created)
 *   `lib/src/providers/auth_provider.dart` (✅ Created)
-*   `lib/src/services/user_service.dart` (New or existing Firestore service - for profile, ownership, submissions)
-*   `lib/src/providers/` or `lib/src/blocs/` (Update/add state management for profile/ownership)
+*   `lib/src/services/user_service.dart` (✅ Created - New service for profile, ownership, submissions)
+*   `lib/src/providers/` or `lib/src/blocs/` (Consider for future: `ProfileProvider` for caching profile data - see "To Do" in State Management)
 *   `lib/src/widgets/quest_card_detail.dart` (✅ Modified)
 *   `lib/src/widgets/quest_list_view.dart` (✅ Modified)
 *   `lib/src/widgets/filter_controls.dart` (✅ Modified)
