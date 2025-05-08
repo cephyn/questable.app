@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-This document outlines the plan for implementing an automated feature that selects quest cards from the application and posts them to various social media platforms. The goal is to increase engagement, drive traffic to the application, and showcase the variety of quests available. The system will initially support Bluesky, with future phases incorporating X (formerly Twitter) and Instagram.
+This document outlines the plan for implementing an automated feature that selects quest cards from the application and posts them to various social media platforms. The goal is to increase engagement, drive traffic to the application, and showcase the variety of quests available. The system will initially support Bluesky, with future phases incorporating X (formerly Twitter), Instagram, and Threads.net.
 
 ## 2. Goals
 
@@ -10,7 +10,7 @@ This document outlines the plan for implementing an automated feature that selec
 *   Increase visibility and discovery of quest cards.
 *   Drive user engagement and traffic to the application.
 *   Provide a consistent social media presence.
-*   Start with Bluesky integration and expand to other platforms (X, Instagram) in subsequent phases.
+*   Start with Bluesky integration and expand to other platforms (X, Instagram, Threads.net) in subsequent phases.
 
 ## 3. Scope
 
@@ -37,6 +37,7 @@ This document outlines the plan for implementing an automated feature that selec
     *   Phase 1: Posting to Bluesky.
     *   Phase 2: Adding posting capabilities for X.
     *   Phase 3: Adding posting capabilities for Instagram.
+    *   Phase 4: Adding posting capabilities for Threads.net.
 *   **Scheduling**: Implementing a twice-daily automated posting schedule using Firebase Scheduled Functions.
 *   **Configuration**: API keys managed via Firebase Remote Config.
 *   **Logging & Error Handling**:
@@ -117,6 +118,27 @@ This document outlines the plan for implementing an automated feature that selec
 *   **Refinement**:
     *   Based on performance and feedback, refine quest selection logic (e.g., consider weighted randomness if pure random isn't ideal).
 
+### Phase 4: Threads.net Integration
+
+*   **Objective**: Extend social media integration to include posting to Threads.net.
+*   **Research & API Setup**:
+    *   Investigate the Threads.net API for automated posting capabilities. Refer to official documentation: https://developers.facebook.com/docs/threads/posts
+    *   Set up any necessary developer accounts and obtain API keys/tokens.
+    *   Securely store API credentials in Google Cloud Secret Manager.
+*   **Implementation**:
+    *   Develop a new Firebase Function or extend existing ones to handle posting to Threads.net.
+    *   Adapt content generation (text length, image/video requirements, link handling) for Threads.net specific formats and best practices.
+    *   Implement authentication and posting logic using the Threads.net API.
+*   **Image/Video Handling**:
+    *   Determine image and video requirements for Threads.net posts.
+    *   Integrate image/video uploading capabilities, leveraging existing image sourcing logic from Phase 2 & 3 where applicable.
+*   **Logging & Error Handling**:
+    *   Extend logging to include posts made to Threads.net (success, failures, API responses).
+    *   Update error handling and notification mechanisms to cover Threads.net integration.
+*   **Testing**:
+    *   Thoroughly test posting to Threads.net, including various content types (text, image, video if supported/planned).
+    *   Verify link functionality and overall post appearance.
+
 ## 5. Key Feature Components & Technical Considerations
 
 *   **Quest Card Selection Module (Firebase Function)**:
@@ -129,7 +151,7 @@ This document outlines the plan for implementing an automated feature that selec
     *   **Links**: Deep link generation (existing web, future mobile).
     *   **Call to Action**: Random selection from a predefined list.
 *   **Social Media Posting Module (Firebase Functions)**:
-    *   Separate clients/SDKs for Bluesky, X, Instagram, managed within Firebase Functions.
+    *   Separate clients/SDKs for Bluesky, X, Instagram, Threads.net, managed within Firebase Functions.
     *   Handling of authentication (API keys from Google Cloud Secret Manager), rate limits, error responses for each platform.
     *   Formatting content according to each platform's best practices.
 *   **Scheduling & Execution Environment**:
@@ -138,7 +160,7 @@ This document outlines the plan for implementing an automated feature that selec
 *   **Direct Linking Mechanism**:
     *   Utilize existing deep linking for web; plan for mobile deep linking.
 *   **Configuration Management**:
-    *   Secure storage for API keys (Bluesky, X, Instagram) and other settings using Google Cloud Secret Manager.
+    *   Secure storage for API keys (Bluesky, X, Instagram, Threads.net) and other settings using Google Cloud Secret Manager.
 *   **Logging, Monitoring, and Error Handling**:
     *   Structured logging to Firebase Logging (success/failure, API responses, errors).
     *   Email alerts to admin for critical failures or errors.
@@ -174,7 +196,7 @@ This document outlines the plan for implementing an automated feature that selec
 
 ## 7. Success Criteria
 
-*   The system reliably posts to Bluesky (and later X, Instagram) twice a day.
+*   The system reliably posts to Bluesky (and later X, Instagram, Threads.net) twice a day.
 *   Posts contain accurate quest information (name, system, link).
 *   Posts include compelling text (template + AI) and, where possible/implemented, an appropriate image.
 *   The system operates autonomously (or via admin approval) with minimal manual intervention.
