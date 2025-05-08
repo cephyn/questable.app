@@ -1,5 +1,10 @@
-firebase_functions~=0.1.0
-pypdf
+firebase_functions>=0.4.2  # Updated to a version that includes auth_fn
 google.api_core
 google.cloud
 markitdown[pdf,docx]
+firebase_admin>=6.8.0  # Ensure firebase_admin is included for Firestore operations
+# Add any other necessary libraries for Bluesky API, etc.
+# For example, if a specific Bluesky library is chosen:
+atproto>=0.0.61  # For Bluesky API interaction
+google-cloud-secret-manager>=2.0.0  # For Google Cloud Secret Manager
+google-generativeai>=0.5.0 # Added for Gemini

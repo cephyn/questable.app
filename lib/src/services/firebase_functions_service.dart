@@ -9,18 +9,18 @@ class FirebaseFunctionsService {
   final FirebaseStorageService firebaseStorageService =
       FirebaseStorageService();
 
-  Future<String> pdfToText(PlatformFile platformFile) async {
-    try {
-      String url = await firebaseStorageService.uploadFile(platformFile);
-      var x = await FirebaseFunctions.instance
-          .httpsCallable('pdf_to_text')
-          .call({'url': url});
-      return x.data.toString();
-    } catch (e) {
-      log("Error in pdfToText: $e");
-      rethrow; // Rethrow the exception after logging
-    }
-  }
+  // Future<String> pdfToText(PlatformFile platformFile) async {
+  //   try {
+  //     String url = await firebaseStorageService.uploadFile(platformFile);
+  //     var x = await FirebaseFunctions.instance
+  //         .httpsCallable('pdf_to_text')
+  //         .call({'url': url});
+  //     return x.data.toString();
+  //   } catch (e) {
+  //     log("Error in pdfToText: $e");
+  //     rethrow; // Rethrow the exception after logging
+  //   }
+  // }
 
   Future<String> pdfToMd(PlatformFile platformFile) async {
     String? url;

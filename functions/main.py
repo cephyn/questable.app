@@ -3,20 +3,35 @@
 # Deploy with `firebase deploy`
 
 from firebase_functions import (
-    https_fn,
-    options,
-    firestore_fn,
+    params,
     scheduler_fn,
-    auth_fn,
-)  # Added auth_fn
-from firebase_admin import initialize_app, firestore, auth  # Added auth
-from pypdf import PdfReader
-from markitdown import MarkItDown
+    https_fn,
+    firestore_fn,
+    options,  # Added options for memory allocation
+    # auth_fn, # Commented out or removed if no other 1st gen auth functions exist
+)
+from firebase_admin import (
+    initialize_app,
+    firestore,
+)
+import logging  # Added
+import datetime  # Added
+import random  # Added
+import re  # Added
+
+# from markitdown import MarkItDown # Commented out as it's likely an uninstalled library and not used by core features
+from google.cloud import secretmanager  # Added for Secret Manager
 from io import BytesIO
-import urllib.request
-import logging
-import datetime
-import re
+from atproto import Client, models, client_utils  # For Bluesky, added client_utils
+import google.generativeai as genai  # Added for Gemini
+
+# Set root logger level to INFO for better visibility in Cloud Run if default is higher
+logging.getLogger().setLevel(logging.INFO)
+
+# Configure the root logger to handle INFO and higher severity messages
+# logging.basicConfig(level=logging.INFO)
+# If you also need DEBUG messages, use:
+logging.basicConfig(level=logging.DEBUG)
 
 initialize_app()
 
@@ -26,32 +41,13 @@ def on_call_example(req: https_fn.CallableRequest) -> any:
     return {"text": req.data["text"]}
 
 
-@https_fn.on_call()
-def pdf_to_text(req: https_fn.CallableRequest) -> any:
-    response = urllib.request.urlopen(req.data["url"])
-    pdf_file = BytesIO(response.read())
-    reader = PdfReader(pdf_file)
-
-    text = ""
-    for page in reader.pages:
-        text = "".join(
-            [
-                text,
-                page.extract_text(
-                    extraction_mode="layout", layout_mode_space_vertically=False
-                ),
-            ]
-        )
-    return text
-
-
-@https_fn.on_call()
-def pdf_to_md(req: https_fn.CallableRequest) -> any:
-    url = req.data["url"]
-    md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
-    result = md.convert(url)
-
-    return result.text_content
+# @https_fn.on_call()
+# def pdf_to_md(req: https_fn.CallableRequest) -> any:
+#     url = req.data["url"]
+#     md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
+#     result = md.convert(url)
+#
+#     return result.text_content
 
 
 # Game System Standardization Functions
@@ -838,29 +834,34 @@ def delete_collection(coll_ref, batch_size):
     return deleted
 
 
-@auth_fn.on_user_deleted()
-def on_user_delete(event: auth_fn.AuthUserRecord) -> None:
-    """Cleans up user data from Firestore upon account deletion."""
-    uid = event.data.uid
-    logging.info(f"Starting cleanup for deleted user: {uid}")
+@firestore_fn.on_document_deleted(document="users/{userId}")  # Changed decorator
+def on_user_delete(event: firestore_fn.Event) -> None:  # Changed signature
+    """Cleans up user data from Firestore when a user document is deleted."""  # Updated docstring
+    userId = event.params["userId"]  # Changed to get userId from event.params
+    logging.info(
+        f"Starting cleanup for deleted user document: users/{userId}"
+    )  # Updated log
 
     try:
         db = firestore.client()
 
-        # 1. Delete the user document from 'users' collection
-        user_doc_ref = db.collection("users").document(uid)
-        user_doc_ref.delete()
-        logging.info(f"Deleted user document: users/{uid}")
+        # The user document users/{userId} is already deleted by the trigger.
+        # We need its reference to access subcollections.
+        user_doc_ref = db.collection("users").document(userId)
+        # user_doc_ref.delete() # This line is removed
+        # logging.info(f"Deleted user document: users/{userId}") # This log is removed
 
-        # 2. Delete the 'ownedQuests' subcollection
+        # 1. Delete the 'ownedQuests' subcollection (was 2)
         owned_quests_ref = user_doc_ref.collection("ownedQuests")
         deleted_owned_count = delete_collection(owned_quests_ref, 50)  # Batch size 50
         logging.info(
-            f"Deleted {deleted_owned_count} documents from ownedQuests subcollection for user {uid}"
+            f"Deleted {deleted_owned_count} documents from ownedQuests subcollection for user {userId}"  # Use userId
         )
 
-        # 3. Anonymize submitted quest cards
-        quests_query = db.collection("questCards").where("uploadedBy", "==", uid)
+        # 2. Anonymize submitted quest cards (was 3)
+        quests_query = db.collection("questCards").where(
+            "uploadedBy", "==", userId
+        )  # Use userId
         submitted_quests = quests_query.stream()
 
         anonymized_count = 0
@@ -875,7 +876,7 @@ def on_user_delete(event: auth_fn.AuthUserRecord) -> None:
             if batch_count >= max_batch_size:
                 batch.commit()
                 logging.info(
-                    f"Committed batch of {batch_count} quest anonymizations for user {uid}"
+                    f"Committed batch of {batch_count} quest anonymizations for user {userId}"  # Use userId
                 )
                 batch = db.batch()  # Start a new batch
                 batch_count = 0
@@ -884,15 +885,442 @@ def on_user_delete(event: auth_fn.AuthUserRecord) -> None:
         if batch_count > 0:
             batch.commit()
             logging.info(
-                f"Committed final batch of {batch_count} quest anonymizations for user {uid}"
+                f"Committed final batch of {batch_count} quest anonymizations for user {userId}"  # Use userId
             )
 
         logging.info(
-            f"Anonymized {anonymized_count} quest cards submitted by user {uid}"
+            f"Anonymized {anonymized_count} quest cards submitted by user {userId}"  # Use userId
         )
-        logging.info(f"Successfully completed cleanup for deleted user: {uid}")
+        logging.info(
+            f"Successfully completed cleanup for deleted user document: users/{userId}"
+        )  # Updated log
 
     except Exception as e:
-        logging.error(f"Error during cleanup for user {uid}: {e}")
+        logging.error(
+            f"Error during cleanup for user document users/{userId}: {e}"
+        )  # Updated log
         # Depending on the error, you might want to add retry logic or specific handling
         # For now, just log the error.
+
+
+@scheduler_fn.on_schedule(
+    schedule="0 14,23 * * *",  # Runs at 14:00 UTC (10 AM ET) and 23:00 UTC (7 PM ET)
+    memory=options.MemoryOption.MB_512,  # Corrected memory allocation
+)
+def select_quest_and_post_to_bluesky(event: scheduler_fn.ScheduledEvent) -> None:
+    """
+    Selects a random public quest card from Firestore and prepares it for posting.
+    This function will be triggered twice a day.
+    """
+    db = firestore.client()
+    quests_ref = db.collection("questCards")  # Corrected collection name
+
+    # Eligibility criteria
+    query = quests_ref.where("isPublic", "==", True)
+    logging.info("Querying for public quest cards...")
+
+    eligible_quests = []
+    processed_count = 0
+    for doc in query.stream():
+        processed_count += 1
+        quest_data = doc.to_dict()
+        quest_data["id"] = doc.id  # Ensure 'id' is in quest_data for the deep link
+        logging.info(f"Processing quest document ID: {doc.id}")
+
+        # Log the presence of each required field
+        has_system = bool(quest_data.get("gameSystem"))
+        has_standardized_game_system = bool(quest_data.get("standardizedGameSystem"))
+        has_title = bool(quest_data.get("title"))
+        has_product_title = bool(quest_data.get("productTitle"))
+        has_summary = bool(quest_data.get("summary"))
+        has_genre = bool(quest_data.get("genre"))
+
+        logging.info(
+            f"Quest ID: {doc.id} - Fields check: system({has_system}), standardizedGameSystem({has_standardized_game_system}), title({has_title}), productTitle({has_product_title}), summary({has_summary}), genre({has_genre})"
+        )
+        logging.debug(f"Quest ID: {doc.id} - Full data: {quest_data}")
+
+        # Check for essential fields required for posting
+        if (
+            quest_data.get("gameSystem")  # Check for existence and non-empty
+            and quest_data.get("standardizedGameSystem")
+            and quest_data.get("title")
+            and quest_data.get("productTitle")
+            and quest_data.get("summary")
+            and quest_data.get("genre")
+        ):
+            logging.info(f"Quest ID: {doc.id} is eligible.")
+            eligible_quests.append(quest_data)
+        else:
+            logging.warning(
+                f"Quest ID: {doc.id} is NOT eligible due to missing fields."
+            )
+
+    logging.info(f"Total public quests processed: {processed_count}")
+    if not eligible_quests:
+        logging.error(
+            "No eligible quests found for posting after checking all processed public quests."
+        )
+        return
+
+    selected_quest = random.choice(eligible_quests)
+    logging.info(
+        f"Selected quest for posting: {selected_quest.get('title')} (ID: {selected_quest.get('id')})"
+    )
+
+    generated_content = generate_post_content(selected_quest)
+
+    logging.info(
+        f"Quest selected: {selected_quest.get('title')}"
+    )  # console log for quick check
+    logging.info(f"Generated content: {generated_content}")  # console log
+
+    try:
+        post_to_bluesky(generated_content)
+    except Exception as e:
+        logging.error(
+            f"Error posting to Bluesky for quest ID {selected_quest.get('id')}: {e}"
+        )
+        # TODO: Implement email notification to admin on error
+
+
+def access_secret_version(
+    project_id: str, secret_id: str, version_id: str = "latest"
+) -> str | None:
+    """
+    Accesses a secret version from Google Cloud Secret Manager.
+
+    Args:
+        project_id: The Google Cloud project ID.
+        secret_id: The ID of the secret.
+        version_id: The version of the secret (defaults to "latest").
+
+    Returns:
+        The secret value as a string, or None if an error occurs.
+    """
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
+        response = client.access_secret_version(name=secret_name)
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        logging.error(
+            f"Error accessing secret {secret_id} (version {version_id}) in project {project_id}: {e}"
+        )
+        # Depending on requirements, you might want to raise the exception
+        # or handle it more gracefully (e.g., return a specific error indicator).
+        return None
+
+
+@https_fn.on_call()
+def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """
+    Fetches Google API Key and Search Engine ID from Google Cloud Secret Manager.
+    """
+    project_id = "766749273273"  # Your Google Cloud Project ID
+    google_api_key_secret_id = "GOOGLE_API_KEY"
+    google_search_engine_id_secret_id = "GOOGLE_SEARCH_ENGINE_ID"
+
+    try:
+        api_key = access_secret_version(project_id, google_api_key_secret_id)
+        search_engine_id = access_secret_version(
+            project_id, google_search_engine_id_secret_id
+        )
+
+        if not api_key:
+            logging.error(
+                f"Secret {google_api_key_secret_id} not found in project {project_id}."
+            )
+            # Return an error or handle as appropriate for your application
+            # For callable functions, you can raise an HttpsError
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.NOT_FOUND,
+                message=f"Google API Key secret ({google_api_key_secret_id}) not found.",
+            )
+
+        if not search_engine_id:
+            logging.error(
+                f"Secret {google_search_engine_id_secret_id} not found in project {project_id}."
+            )
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.NOT_FOUND,
+                message=f"Google Search Engine ID secret ({google_search_engine_id_secret_id}) not found.",
+            )
+
+        return {"apiKey": api_key, "searchEngineId": search_engine_id}
+
+    except https_fn.HttpsError as e:
+        # Re-raise HttpsError to be properly handled by the client
+        raise e
+    except Exception as e:
+        logging.error(f"Error fetching Google search config: {e}")
+        # For other types of errors, wrap them in an HttpsError
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="An internal error occurred while fetching Google search configuration.",
+            details=str(e),
+        )
+
+
+def get_gemini_api_key() -> str | None:
+    """Fetches the Gemini API key from Google Cloud Secret Manager."""
+    project_id = "766749273273"  # Your Google Cloud Project ID
+    gemini_api_key_secret_id = (
+        "gemini_api_key"  # Ensure this secret exists in Secret Manager
+    )
+
+    api_key = access_secret_version(project_id, gemini_api_key_secret_id)
+    if not api_key:
+        logging.error(
+            f"Gemini API Key secret ({gemini_api_key_secret_id}) not found in project {project_id}."
+        )
+    return api_key
+
+
+def get_bluesky_credentials() -> dict:
+    """Fetches Bluesky credentials using the utility function."""
+    project_id = "766749273273"  # Your Google Cloud Project ID
+    bluesky_handle_secret_id = "bluesky_handle"
+    bluesky_password_secret_id = "bluesky_password"
+
+    bluesky_handle = access_secret_version(project_id, bluesky_handle_secret_id)
+    bluesky_password = access_secret_version(project_id, bluesky_password_secret_id)
+
+    if not bluesky_handle or not bluesky_password:
+        logging.error("Bluesky handle or password not found in Secret Manager.")
+        raise ValueError(
+            "Bluesky credentials not configured correctly in Google Cloud Secret Manager."
+        )
+
+    return {"handle": bluesky_handle, "password": bluesky_password}
+
+
+def post_to_bluesky(content: dict):
+    """Posts the given content to Bluesky using TextBuilder for rich text."""
+    credentials = get_bluesky_credentials()
+    client = Client()
+
+    # Extract components from the content dictionary
+    text_segments = content.get("text_segments", [])
+    hashtag_terms = content.get("hashtag_terms", [])
+    link_url = content.get("link")
+    quest_title_for_embed = content.get("quest_title", "View Quest")
+    # For logging purposes, join text segments for a readable version of the post text
+    # This won't be the exact text sent, as TextBuilder handles spacing and facets.
+    log_text_preview = " ".join(text_segments)
+
+    try:
+        profile = client.login(credentials["handle"], credentials["password"])
+        logging.info(f"Successfully logged in to Bluesky as {profile.handle}")
+
+        text_builder = client_utils.TextBuilder()
+        first_segment = True
+        for segment in text_segments:
+            if not first_segment:
+                text_builder.text(" ")  # Add space between segments
+            text_builder.text(segment)
+            first_segment = False
+
+        # Add hashtags
+        for term in hashtag_terms:
+            if term:  # Ensure term is not empty
+                text_builder.text(" ").tag(
+                    term, term
+                )  # Adds a space before the hashtag text and then the tag itself
+
+        # Add the link at the end of the text part if it exists
+        # The visual card embed is separate
+        if link_url:
+            text_builder.text(" ").link(link_url, link_url)
+
+        # Prepare the embed card for the link
+        embed_payload = None
+        if link_url:
+            embed_external = models.AppBskyEmbedExternal.Main(
+                external=models.AppBskyEmbedExternal.External(
+                    uri=link_url,
+                    title=quest_title_for_embed,
+                    description="Check out this quest on Questable!",  # Generic description for the card
+                )
+            )
+            embed_payload = embed_external
+
+        # Build post record
+        # Note: Bluesky has a 300 grapheme limit for the post text.
+        # TextBuilder does not automatically truncate. We need to be mindful of the total length.
+        # For simplicity, we are currently relying on the prompt to Gemini and content assembly
+        # to keep it within limits. More robust truncation would be needed for longer content.
+        final_text = text_builder.build_text()
+        final_facets = text_builder.build_facets()
+
+        if len(final_text) > 300:
+            logging.warning(
+                f"Bluesky post text exceeds 300 chars ({len(final_text)}). Truncating text and clearing facets."
+            )
+            # Truncate text to fit, leaving space for "..."
+            max_len_for_text = 297
+            final_text = final_text[:max_len_for_text] + "..."
+            final_facets = []  # Clear facets as their byte offsets would be incorrect
+
+        post_record_data = models.AppBskyFeedPost.Record(
+            text=final_text,
+            facets=final_facets,
+            created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        )
+
+        if embed_payload:
+            post_record_data.embed = embed_payload
+
+        post_record = models.ComAtprotoRepoCreateRecord.Data(
+            repo=profile.did, collection="app.bsky.feed.post", record=post_record_data
+        )
+        response = client.com.atproto.repo.create_record(data=post_record)
+
+        logging.info(f"Successfully posted to Bluesky: {response.uri}")
+        db = firestore.client()
+        log_ref = db.collection("social_post_logs").document()
+        log_ref.set(
+            {
+                "platform": "Bluesky",
+                "quest_title": quest_title_for_embed,
+                "post_text_preview": log_text_preview,  # Log the preview
+                "post_uri": response.uri,
+                "status": "success",
+                "timestamp": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+    except Exception as e:
+        logging.error(f"Failed to post to Bluesky: {e}")
+        db = firestore.client()
+        log_ref = db.collection("social_post_logs").document()
+        log_ref.set(
+            {
+                "platform": "Bluesky",
+                "quest_title": quest_title_for_embed,
+                "post_text_preview": log_text_preview,  # Log the preview
+                "status": "error",
+                "error_message": str(e),
+                "timestamp": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        raise  # Re-raise the exception
+
+
+def generate_ai_text(genre: str, summary: str, quest_title: str) -> str:
+    """Generates a short, compelling AI snippet for a quest using Gemini."""
+    try:
+        api_key = get_gemini_api_key()
+        if not api_key:
+            logging.error("Gemini API key not available. Skipping AI text generation.")
+            return ""
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+
+        prompt = f"""Generate a very short and exciting social media teaser (around 15-25 words, and strictly under 160 characters) for a tabletop roleplaying quest titled '{quest_title}'.
+The quest is in the '{genre}' genre.
+Summary: '{summary}'.
+The teaser should be engaging and make people curious to check out the quest.
+Do not use hashtags in your response. Do not include the quest title or genre in your response unless it flows very naturally as part of the teaser.
+Focus on creating a hook or a sense of mystery/adventure.
+Example tone for a fantasy quest: "Ancient secrets whisper from forgotten ruins. Dare you uncover them?"
+Example tone for a sci-fi quest: "Cosmic anomalies detected. Your mission, should you choose to accept it..."
+Example tone for a horror quest: "A chilling presence lurks in the old manor. What terrors await inside?"
+"""
+
+        logging.info(f"Generating AI text for quest: {quest_title} (Genre: {genre})")
+        response = model.generate_content(prompt)
+
+        if response.parts:
+            ai_text = response.text.strip()
+            # Additional check for safety, though the prompt requests short text
+            if len(ai_text) > 160:
+                logging.warning(
+                    f"Generated AI text for '{quest_title}' is too long ({len(ai_text)} chars), truncating: {ai_text}"
+                )
+                ai_text = ai_text[:157] + "..."
+            logging.info(f"Successfully generated AI text: {ai_text}")
+            return ai_text
+        else:
+            logging.warning(
+                f"Gemini response for '{quest_title}' contained no parts. Prompt: {prompt}"
+            )
+            if hasattr(response, "prompt_feedback") and response.prompt_feedback:
+                logging.warning(f"Gemini prompt feedback: {response.prompt_feedback}")
+            return ""
+
+    except Exception as e:
+        logging.error(f"Error generating AI text for '{quest_title}': {e}")
+        return ""
+
+
+def generate_post_content(quest_data: dict) -> dict:
+    """
+    Generates components for the social media post based on the quest data.
+    """
+    # Extract data from quest_data
+    raw_quest_name = quest_data.get("title")
+    quest_name = (
+        raw_quest_name.title() if isinstance(raw_quest_name, str) else raw_quest_name
+    )
+    product_name = quest_data.get("productTitle")
+    game_system = quest_data.get("standardizedGameSystem")
+    genre = quest_data.get("genre")
+    summary = quest_data.get("summary", "")  # Get summary for AI
+    quest_id = quest_data.get("id")
+
+    # Base hashtag terms (without '#')
+    hashtag_terms = []
+    if game_system:
+        hashtag_terms.append(game_system.replace(" ", ""))
+    if genre:
+        hashtag_terms.append(genre.replace(" ", ""))
+    hashtag_terms.extend(["Questable", "ttrpg"])
+    # Ensure no empty strings if game_system or genre were empty
+    hashtag_terms = [term for term in hashtag_terms if term]
+
+    # Template-based post text components
+    post_text_template = (
+        f"New Quest: {quest_name}! From {product_name} ({game_system})."
+    )
+
+    deep_link = f"https://questable.app/#/quests/{quest_id}"
+
+    call_to_actions = [
+        "Explore this adventure!",
+        "Discover your next quest!",
+        "Embark on this journey!",
+        "What choices will you make?",
+        "Your story awaits!",
+    ]
+    call_to_action = random.choice(call_to_actions)
+
+    # AI Text Generation
+    ai_snippet = ""
+    if genre and summary and quest_name:  # Only generate if key fields are present
+        ai_snippet = generate_ai_text(genre, summary, quest_name)
+    else:
+        logging.warning(
+            f"Skipping AI text generation for quest ID {quest_id} due to missing genre, summary, or title."
+        )
+
+    # Assemble text segments
+    text_segments = [post_text_template]
+    if ai_snippet:
+        text_segments.append(ai_snippet)
+    else:
+        # Fallback if AI snippet is not generated, include genre explicitly if not in template already
+        if genre and genre not in post_text_template:
+            text_segments.append(f"Genre: {genre}.")
+
+    text_segments.append(call_to_action)
+
+    return {
+        "text_segments": [
+            segment for segment in text_segments if segment
+        ],  # Filter out any None or empty segments
+        "hashtag_terms": hashtag_terms,
+        "quest_title": quest_name,  # Already capitalized
+        "link": deep_link,
+    }

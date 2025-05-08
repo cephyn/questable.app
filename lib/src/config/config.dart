@@ -3,7 +3,7 @@
 
 import 'dart:developer';
 
-import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:cloud_functions/cloud_functions.dart'; // Added for calling Firebase Functions
 
 class Config {
   // Algolia search credentials
@@ -12,20 +12,23 @@ class Config {
   static const String algoliaQuestCardsIndex = 'questCards';
 
   // Google PSE Configuration
-  // Remote config keys
-  static const String _googleApiKeyRemoteConfigKey = 'GOOGLE_API_KEY';
-  static const String _googleSearchEngineIdRemoteConfigKey =
-      'GOOGLE_SEARCH_ENGINE_ID';
+  // Static variables to hold the fetched secrets
+  static String? _googleApiKey;
+  static String? _googleSearchEngineId;
 
-  // Getters for Google PSE credentials using Firebase Remote Config
+  // Getters for Google PSE credentials
   static String get googleApiKey {
-    return FirebaseRemoteConfig.instance
-        .getString(_googleApiKeyRemoteConfigKey);
+    if (_googleApiKey == null) {
+      log('Warning: Google API Key accessed before initialization or fetch failed.');
+    }
+    return _googleApiKey ?? ''; // Return empty string if null
   }
 
   static String get googleSearchEngineId {
-    return FirebaseRemoteConfig.instance
-        .getString(_googleSearchEngineIdRemoteConfigKey);
+    if (_googleSearchEngineId == null) {
+      log('Warning: Google Search Engine ID accessed before initialization or fetch failed.');
+    }
+    return _googleSearchEngineId ?? ''; // Return empty string if null
   }
 
   // RPG Publisher domains (priority 1)
@@ -71,27 +74,48 @@ class Config {
     'powells.com',
   ];
 
-  // Initialize Firebase Remote Config with default values
-  static Future<void> initializeRemoteConfig() async {
-    final remoteConfig = FirebaseRemoteConfig.instance;
-    await remoteConfig.setConfigSettings(RemoteConfigSettings(
-      fetchTimeout: const Duration(minutes: 1),
-      minimumFetchInterval: const Duration(hours: 1),
-    ));
-
-    // Set default values for remote config parameters
-    await remoteConfig.setDefaults({
-      _googleApiKeyRemoteConfigKey: '',
-      _googleSearchEngineIdRemoteConfigKey: '',
-    });
-
-    // Fetch remote config values
+  // Initialize and fetch Google Search Config from Cloud Function
+  static Future<void> initializeAppConfig() async {
     try {
-      await remoteConfig.fetchAndActivate();
+      // Call the Firebase Function to get Google Search credentials
+      final HttpsCallable callable =
+          FirebaseFunctions.instance.httpsCallable('get_google_search_config');
+      final HttpsCallableResult result = await callable.call();
+      final data = result.data as Map<String, dynamic>?;
+
+      if (data != null) {
+        _googleApiKey = data['apiKey'] as String?;
+        _googleSearchEngineId = data['searchEngineId'] as String?;
+        log('Successfully fetched Google Search config from Cloud Function.');
+        if (_googleApiKey == null || _googleSearchEngineId == null) {
+          log('Error: Google API Key or Search Engine ID is null after fetch.');
+        }
+      } else {
+        log('Error: No data received from get_google_search_config function.');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      log('FirebaseFunctionsException fetching Google config: ${e.code} - ${e.message}');
     } catch (e) {
-      // Handle fetch error, but continue with defaults or cached values
-      log('Error fetching remote config: $e');
+      // Handle any other errors, but continue with defaults or cached values
+      log('Error fetching Google search config: $e');
     }
+
+    // If you were using Firebase Remote Config for other values,
+    // its initialization logic would remain here.
+    // For example:
+    // final remoteConfig = FirebaseRemoteConfig.instance;
+    // await remoteConfig.setConfigSettings(RemoteConfigSettings(
+    //   fetchTimeout: const Duration(minutes: 1),
+    //   minimumFetchInterval: const Duration(hours: 1),
+    // ));
+    // await remoteConfig.setDefaults({
+    //   // ... other remote config defaults
+    // });
+    // try {
+    //   await remoteConfig.fetchAndActivate();
+    // } catch (e) {
+    //   log('Error fetching remote config: $e');
+    // }
   }
 
   // Private constructor to prevent instantiation
