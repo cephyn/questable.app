@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-This document outlines the plan for implementing an automated feature that selects quest cards from the application and posts them to various social media platforms. The goal is to increase engagement, drive traffic to the application, and showcase the variety of quests available. The system will initially support Bluesky, with future phases incorporating X (formerly Twitter) and Instagram.
+This document outlines the plan for implementing an automated feature that selects quest cards from the application and posts them to various social media platforms. The goal is to increase engagement, drive traffic to the application, and showcase the variety of quests available. The system will initially support Bluesky, with future phases incorporating X (formerly Twitter), Instagram, and Threads.net.
 
 ## 2. Goals
 
@@ -10,7 +10,7 @@ This document outlines the plan for implementing an automated feature that selec
 *   Increase visibility and discovery of quest cards.
 *   Drive user engagement and traffic to the application.
 *   Provide a consistent social media presence.
-*   Start with Bluesky integration and expand to other platforms (X, Instagram) in subsequent phases.
+*   Start with Bluesky integration and expand to other platforms (X, Instagram, Threads.net) in subsequent phases.
 
 ## 3. Scope
 
@@ -37,6 +37,7 @@ This document outlines the plan for implementing an automated feature that selec
     *   Phase 1: Posting to Bluesky.
     *   Phase 2: Adding posting capabilities for X.
     *   Phase 3: Adding posting capabilities for Instagram.
+    *   Phase 4: Adding posting capabilities for Threads.net.
 *   **Scheduling**: Implementing a twice-daily automated posting schedule using Firebase Scheduled Functions.
 *   **Configuration**: API keys managed via Firebase Remote Config.
 *   **Logging & Error Handling**:
@@ -60,27 +61,27 @@ This document outlines the plan for implementing an automated feature that selec
 ### Phase 1: MVP - Core Logic & Bluesky Integration
 
 *   **Quest Selection**:
-    *   Develop a Firebase Function to randomly select a public quest card from Firestore.
-    *   Eligibility criteria: Must be public, and have key fields populated (system, standardized game system, title, product title, summary, genre).
+    *   `[X]` Develop a Firebase Function to randomly select a public quest card from Firestore.
+    *   `[X]` Eligibility criteria: Must be public, and have key fields populated (system, standardized game system, title, product title, summary, genre).
 *   **Content Generation (MVP)**:
-    *   Extract quest name, product name, standardized game system, and genre from the quest card.
-    *   Generate game system and genre-specific hashtags.
-    *   Implement a template-based system for the structured portion of the post text.
-    *   Construct a direct deep link to the quest card.
-    *   Randomly select a Call to Action from a predefined list.
+    *   `[X]` Extract quest name, product name, standardized game system, and genre from the quest card.
+    *   `[X]` Generate game system and genre-specific hashtags.
+    *   `[X]` Implement a template-based system for the structured portion of the post text.
+    *   `[X]` Construct a direct deep link to the quest card.
+    *   `[X]` Randomly select a Call to Action from a predefined list.
 *   **Bluesky Integration**:
-    *   Implement API client for Bluesky within a Firebase Function.
-    *   Handle authentication (API keys from Firebase Remote Config) and posting.
+    *   `[X]` Implement API client for Bluesky within a Firebase Function.
+    *   `[X]` Handle authentication (API keys from Google Cloud Secret Manager) and posting.
 *   **Scheduling**:
-    *   Set up a Firebase Scheduled Function to trigger the posting process twice a day.
+    *   `[X]` Set up a Firebase Scheduled Function to trigger the posting process twice a day (10 AM & 7 PM).
 *   **Configuration**:
-    *   Store Bluesky API credentials in Firebase Remote Config.
+    *   `[X]` Store Bluesky API credentials in Google Cloud Secret Manager (retrieval implemented).
 *   **Logging**:
-    *   Basic logging for successful posts and errors to Firebase Logging. Email admin on errors.
+    *   `[X]` Basic logging for successful posts and errors to Firebase Logging. (Selection, posting success/errors to Firestore `social_post_logs`)
 *   **AI Text Generation (Stretch Goal for MVP, otherwise Phase 1.5)**:
-    *   Integrate Gemini to generate a dynamic, compelling text snippet based on quest genre and summary, to be appended to the template-based text.
+    *   `[X]` Integrate Gemini to generate a dynamic, compelling text snippet based on quest genre and summary, to be appended to the template-based text.
 *   **Image Handling (Post-MVP / Phase 2)**:
-    *   Initially, post to Bluesky without an image.
+    *   `[X]` Initially, post to Bluesky without an image. (Explicitly no image handling in this phase, text-only posts with link embeds).
 
 ### Phase 2: Platform Expansion (X), AI Text & Basic Image Handling
 
@@ -93,7 +94,7 @@ This document outlines the plan for implementing an automated feature that selec
 *   **X Integration**:
     *   Implement API client for X within a Firebase Function.
     *   Adapt post content (text length, image handling) for X's requirements.
-    *   Store X API credentials in Firebase Remote Config.
+    *   Store X API credentials in Google Cloud Secret Manager.
 *   **Content Generation Enhancements**:
     *   Refine text generation templates and AI prompts.
 *   **Error Handling**:
@@ -107,7 +108,7 @@ This document outlines the plan for implementing an automated feature that selec
 *   **Instagram Integration**:
     *   Implement API client for Instagram within a Firebase Function.
     *   Focus on image-centric posts, potentially requiring specific image aspect ratios or types.
-    *   Store Instagram API credentials in Firebase Remote Config.
+    *   Store Instagram API credentials in Google Cloud Secret Manager.
 *   **Admin Review Tool (Potential Feature)**:
     *   Develop a simple admin interface in the application to review scheduled/generated posts.
     *   Allow manual approval or edits before posting.
@@ -116,6 +117,27 @@ This document outlines the plan for implementing an automated feature that selec
     *   Implement more detailed monitoring and alerts.
 *   **Refinement**:
     *   Based on performance and feedback, refine quest selection logic (e.g., consider weighted randomness if pure random isn't ideal).
+
+### Phase 4: Threads.net Integration
+
+*   **Objective**: Extend social media integration to include posting to Threads.net.
+*   **Research & API Setup**:
+    *   Investigate the Threads.net API for automated posting capabilities. Refer to official documentation: https://developers.facebook.com/docs/threads/posts
+    *   Set up any necessary developer accounts and obtain API keys/tokens.
+    *   Securely store API credentials in Google Cloud Secret Manager.
+*   **Implementation**:
+    *   Develop a new Firebase Function or extend existing ones to handle posting to Threads.net.
+    *   Adapt content generation (text length, image/video requirements, link handling) for Threads.net specific formats and best practices.
+    *   Implement authentication and posting logic using the Threads.net API.
+*   **Image/Video Handling**:
+    *   Determine image and video requirements for Threads.net posts.
+    *   Integrate image/video uploading capabilities, leveraging existing image sourcing logic from Phase 2 & 3 where applicable.
+*   **Logging & Error Handling**:
+    *   Extend logging to include posts made to Threads.net (success, failures, API responses).
+    *   Update error handling and notification mechanisms to cover Threads.net integration.
+*   **Testing**:
+    *   Thoroughly test posting to Threads.net, including various content types (text, image, video if supported/planned).
+    *   Verify link functionality and overall post appearance.
 
 ## 5. Key Feature Components & Technical Considerations
 
@@ -129,8 +151,8 @@ This document outlines the plan for implementing an automated feature that selec
     *   **Links**: Deep link generation (existing web, future mobile).
     *   **Call to Action**: Random selection from a predefined list.
 *   **Social Media Posting Module (Firebase Functions)**:
-    *   Separate clients/SDKs for Bluesky, X, Instagram, managed within Firebase Functions.
-    *   Handling of authentication (API keys from Firebase Remote Config), rate limits, error responses for each platform.
+    *   Separate clients/SDKs for Bluesky, X, Instagram, Threads.net, managed within Firebase Functions.
+    *   Handling of authentication (API keys from Google Cloud Secret Manager), rate limits, error responses for each platform.
     *   Formatting content according to each platform's best practices.
 *   **Scheduling & Execution Environment**:
     *   Firebase Scheduled Functions for twice-daily execution.
@@ -138,7 +160,7 @@ This document outlines the plan for implementing an automated feature that selec
 *   **Direct Linking Mechanism**:
     *   Utilize existing deep linking for web; plan for mobile deep linking.
 *   **Configuration Management**:
-    *   Secure storage for API keys (Bluesky, X, Instagram) and other settings using Firebase Remote Config.
+    *   Secure storage for API keys (Bluesky, X, Instagram, Threads.net) and other settings using Google Cloud Secret Manager.
 *   **Logging, Monitoring, and Error Handling**:
     *   Structured logging to Firebase Logging (success/failure, API responses, errors).
     *   Email alerts to admin for critical failures or errors.
@@ -161,7 +183,7 @@ This document outlines the plan for implementing an automated feature that selec
     *   **Resolved**: Product name is a field in quest card. No master hashtag list yet; include game system & genre. Direct link exists. Create list of CTAs and pick randomly.
 
 5.  **Technical Implementation**:
-    *   **Resolved**: Firebase Scheduled Functions and Firebase Functions. API keys via Firebase Remote Config. Rate limits TBD.
+    *   **Resolved**: Firebase Scheduled Functions and Firebase Functions. API keys via Google Cloud Secret Manager. Rate limits TBD.
 
 6.  **Operational Considerations**:
     *   **Resolved**: Admin tool for review/approval (with full auto toggle) is a good idea. Log success/failure, API responses. Email admin on errors. Log partial failures. Ineligible if missing data.
@@ -174,7 +196,7 @@ This document outlines the plan for implementing an automated feature that selec
 
 ## 7. Success Criteria
 
-*   The system reliably posts to Bluesky (and later X, Instagram) twice a day.
+*   The system reliably posts to Bluesky (and later X, Instagram, Threads.net) twice a day.
 *   Posts contain accurate quest information (name, system, link).
 *   Posts include compelling text (template + AI) and, where possible/implemented, an appropriate image.
 *   The system operates autonomously (or via admin approval) with minimal manual intervention.

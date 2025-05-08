@@ -97,7 +97,7 @@ void main() async {
     );
 
     // Initialize Firebase Remote Config for secure access to API keys
-    await Config.initializeRemoteConfig();
+    // await Config.initializeRemoteConfig();
   } catch (e) {
     log('Firebase initialization error: $e');
     // Continue with app initialization even if Firebase fails
