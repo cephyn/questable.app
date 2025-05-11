@@ -8,3 +8,5 @@ firebase_admin>=6.8.0  # Ensure firebase_admin is included for Firestore operati
 atproto>=0.0.61  # For Bluesky API interaction
 google-cloud-secret-manager>=2.0.0  # For Google Cloud Secret Manager
 google-generativeai>=0.5.0 # Added for Gemini
+nltk>=3.8.1
+scikit-learn>=1.3.0 # For text similarity calculations

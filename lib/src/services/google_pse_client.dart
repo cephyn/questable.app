@@ -30,6 +30,7 @@ class GooglePSEClient {
           'https://www.googleapis.com/customsearch/v1?key=$apiKey&cx=$searchEngineId&q=$encodedQuery');
 
       log('Searching for: $query');
+      //log('Request URL: $url');
       final response = await _httpClient.get(url);
 
       if (response.statusCode != 200) {

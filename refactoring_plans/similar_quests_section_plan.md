@@ -104,7 +104,80 @@ This document outlines the plan for implementing a "Similar Quests" section on t
 * Similarity scores are pre-computed and cached with a timestamp, ensuring efficient retrieval.
 * The list of similar quests is limited to 10 entries, displayed with percentage-based similarity scores.
 
-## 10. Future Considerations
+## 10. Implementation Phases
+
+### Phase 1: Backend Development - Similarity Calculation and API Endpoint
+
+*   **Task 1.1: Finalize Similarity Algorithm.**
+    *   **Status: Completed**
+    *   Based on "Option 4: Hybrid Approach", defined initial specific weights for field matching (game system, genre, common monsters, environment) and text similarity (summaries and titles) in `functions/similarity_calculator.py`.
+    *   Implemented NLP for text similarity (tokenization, stopword removal, TF-IDF, cosine similarity) using `nltk` and `scikit-learn` in `_calculate_text_similarity` function within `functions/similarity_calculator.py`.
+    *   Added `nltk` and `scikit-learn` to `functions/requirements.txt`.
+*   **Task 1.2: Implement Similarity Score Calculation Logic.**
+    *   **Status: In Progress**
+    *   Developed a script (`functions/similarity_calculator.py`) that takes a quest ID as input.
+    *   Implemented logic for calculating field matching and text similarity scores (using the now enhanced `_calculate_text_similarity`), and combining them using the hybrid approach.
+    *   Currently integrating Firebase Firestore for actual data retrieval in `calculate_similarity_for_quest` (replacing placeholder data).
+    *   TODO: Finalize Firebase integration and test data retrieval.
+    *   TODO: Determine and implement storage for pre-computed similarity scores (e.g., a separate collection or adding to existing quest documents).
+*   **Task 1.3: Develop Pre-computation Mechanism.**
+    *   **Status: Not Started**
+    *   Create a mechanism to run the similarity score calculation for all new quests upon creation/upload.
+    *   Store the results along with a timestamp.
+*   **Task 1.4: Backend Unit & Integration Testing.**
+    *   **Status: Not Started**
+    *   Write unit tests for the similarity calculation logic.
+    *   Write integration tests for the API endpoint (if developed in the future).
+
+### Phase 2: Frontend Development - UI/UX Implementation
+
+*   **Task 2.1: Design Quest Preview Card Component.**
+    *   If not already existing, create a reusable UI component for a quest preview card that displays:
+        *   Quest name
+        *   Genre
+        *   Similarity score (e.g., "87% similar")
+*   **Task 2.2: Implement "Similar Quests" Section in Detail View.**
+    *   Add a new section titled "Similar Quests" below the main quest details in the quest card detail view.
+    *   On loading the quest detail view, call the new API endpoint to fetch similar quests.
+    *   Display up to 10 similar quest preview cards in this section.
+    *   Handle loading states (e.g., shimmer/skeleton loaders while fetching data).
+    *   Handle the case where no similar quests are found (e.g., display a message like "No similar quests found yet!").
+*   **Task 2.3: Styling and Responsiveness.**
+    *   Ensure the "Similar Quests" section and preview cards are styled according to the application's design guidelines.
+    *   Ensure the layout is responsive across different screen sizes (web and mobile).
+*   **Task 2.4: Frontend Unit & Component Testing.**
+    *   Write unit tests for any new frontend logic.
+    *   Write component tests for the quest preview card and the "Similar Quests" section.
+
+### Phase 3: Integration and End-to-End Testing
+
+*   **Task 3.1: Integrate Frontend with Backend API.**
+    *   Connect the frontend UI to the live backend API endpoint.
+    *   Verify data flow and error handling between frontend and backend.
+*   **Task 3.2: Perform End-to-End Testing.**
+    *   Test the entire user flow:
+        *   Navigate to a quest detail view.
+        *   Verify the "Similar Quests" section loads correctly.
+        *   Verify the displayed quests and similarity scores are accurate (based on manual checks or a small test dataset).
+        *   Verify behavior when no similar quests are found.
+    *   Test on different devices/browsers as per project standards.
+*   **Task 3.3: Address Bugs and Refine.**
+    *   Fix any bugs identified during testing.
+    *   Make any necessary refinements to UI/UX or performance.
+
+### Phase 4: Deployment & Monitoring
+
+*   **Task 4.1: Deploy Backend Changes.**
+    *   Deploy the updated backend (similarity calculation logic, pre-computation mechanism, new API endpoint) to the production environment.
+    *   Ensure the pre-computation script runs for all existing quests if not already handled.
+*   **Task 4.2: Deploy Frontend Changes.**
+    *   Deploy the updated frontend (quest detail view with "Similar Quests" section) to the production environment.
+*   **Task 4.3: Initial Monitoring.**
+    *   Monitor system performance (API response times, database load) after deployment.
+    *   Monitor for any errors or unexpected behavior.
+    *   (Optional, if analytics are added later) Monitor user interaction with the new section.
+
+## 12. Future Considerations
 
 * Implement advanced machine learning models for similarity calculation.
 * Allow users to customize similarity criteria (e.g., prioritize genre over game system).

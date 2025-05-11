@@ -22,7 +22,8 @@ import re  # Added
 # from markitdown import MarkItDown # Commented out as it's likely an uninstalled library and not used by core features
 from google.cloud import secretmanager  # Added for Secret Manager
 from io import BytesIO
-from atproto import Client, models, client_utils  # For Bluesky, added client_utils
+from atproto import Client, models, client_utils
+from markitdown import MarkItDown  # For Bluesky, added client_utils
 import google.generativeai as genai  # Added for Gemini
 
 # Set root logger level to INFO for better visibility in Cloud Run if default is higher
@@ -36,18 +37,20 @@ logging.basicConfig(level=logging.DEBUG)
 initialize_app()
 
 
-@https_fn.on_call()
-def on_call_example(req: https_fn.CallableRequest) -> any:
-    return {"text": req.data["text"]}
-
-
 # @https_fn.on_call()
-# def pdf_to_md(req: https_fn.CallableRequest) -> any:
-#     url = req.data["url"]
-#     md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
-#     result = md.convert(url)
-#
-#     return result.text_content
+# def on_call_example(req: https_fn.CallableRequest) -> any:
+#     return {"text": req.data["text"]}
+
+
+@https_fn.on_call(
+    memory=options.MemoryOption.GB_2,
+)
+def pdf_to_md(req: https_fn.CallableRequest) -> any:
+    url = req.data["url"]
+    md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
+    result = md.convert(url)
+
+    return result.text_content
 
 
 # Game System Standardization Functions
@@ -202,8 +205,9 @@ def record_system_mapping_metrics(match_result, original_system):
 
 # On Create - Ingestion-time standardization for new quest cards
 @firestore_fn.on_document_created(
-    document="questCards/{questId}"
-)  # Temporarily disabled for testing scheduled_game_system_cleanup
+    document="questCards/{questId}",
+    memory=options.MemoryOption.GB_1,
+)
 def standardize_new_quest_card(
     event: firestore_fn.Event[firestore_fn.DocumentSnapshot],
 ) -> None:
@@ -275,7 +279,8 @@ def standardize_new_quest_card(
 
 # On Update - Handle game system changes in quest cards
 @firestore_fn.on_document_updated(
-    document="questCards/{questId}"
+    document="questCards/{questId}",
+    memory=options.MemoryOption.MB_512,
 )  # Temporarily disabled for testing scheduled_game_system_cleanup
 def handle_quest_card_update(
     event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]],
@@ -344,7 +349,10 @@ def handle_quest_card_update(
 
 
 # Scheduled Background Cleanup Process - runs daily at midnight
-@scheduler_fn.on_schedule(schedule="0 0 * * *")
+@scheduler_fn.on_schedule(
+    schedule="0 0 * * *",
+    memory=options.MemoryOption.MB_512,
+)
 def scheduled_game_system_cleanup(event: scheduler_fn.ScheduledEvent) -> None:
     """Daily scheduled job to clean up game system standardization"""
     try:
@@ -593,7 +601,9 @@ def _calculate_standardization_stats() -> dict:
 
 
 # MODIFIED Callable function to get current standardization stats
-@https_fn.on_call()
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_512,
+)
 def get_standardization_stats(req: https_fn.CallableRequest = None) -> dict:
     """Get current statistics for game system standardization (calls helper)."""
     # Simply call the internal helper function
@@ -601,7 +611,9 @@ def get_standardization_stats(req: https_fn.CallableRequest = None) -> dict:
 
 
 # Callable function for users to report incorrect mappings
-@https_fn.on_call()
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_512,
+)
 def report_incorrect_mapping(req: https_fn.CallableRequest) -> dict:
     """Allow users to report incorrect game system mappings"""
     try:
@@ -649,7 +661,10 @@ def report_incorrect_mapping(req: https_fn.CallableRequest) -> dict:
 
 
 # Trigger to process user feedback and improve the system
-@firestore_fn.on_document_created(document="system_mapping_feedback/{feedbackId}")
+@firestore_fn.on_document_created(
+    document="system_mapping_feedback/{feedbackId}",
+    memory=options.MemoryOption.MB_512,
+)
 def process_system_mapping_feedback(
     event: firestore_fn.Event[firestore_fn.DocumentSnapshot],
 ) -> None:
@@ -834,7 +849,10 @@ def delete_collection(coll_ref, batch_size):
     return deleted
 
 
-@firestore_fn.on_document_deleted(document="users/{userId}")  # Changed decorator
+@firestore_fn.on_document_deleted(
+    document="users/{userId}",
+    memory=options.MemoryOption.MB_512,
+)  # Changed decorator
 def on_user_delete(event: firestore_fn.Event) -> None:  # Changed signature
     """Cleans up user data from Firestore when a user document is deleted."""  # Updated docstring
     userId = event.params["userId"]  # Changed to get userId from event.params
@@ -1012,7 +1030,9 @@ def access_secret_version(
         return None
 
 
-@https_fn.on_call()
+@https_fn.on_call(
+    memory=options.MemoryOption.MB_512,
+)
 def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response | dict:
     """
     Fetches Google API Key and Search Engine ID from Google Cloud Secret Manager.
