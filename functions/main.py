@@ -905,7 +905,7 @@ def on_user_delete(event: firestore_fn.Event) -> None:  # Changed signature
 
 @scheduler_fn.on_schedule(
     schedule="0 14,23 * * *",  # Runs at 14:00 UTC (10 AM ET) and 23:00 UTC (7 PM ET)
-    memory=options.MemoryOption.MB_512,  # Corrected memory allocation
+    memory=options.MemoryOption.GB_1,  # Corrected memory allocation
 )
 def select_quest_and_post_to_bluesky(event: scheduler_fn.ScheduledEvent) -> None:
     """
@@ -1281,9 +1281,10 @@ def generate_post_content(quest_data: dict) -> dict:
     hashtag_terms = [term for term in hashtag_terms if term]
 
     # Template-based post text components
-    post_text_template = (
-        f"New Quest: {quest_name}! From {product_name} ({game_system})."
-    )
+    if quest_name.lower() == product_name.lower():
+        post_text_template = f"New Quest: {quest_name}! ({game_system})."
+    else:
+        post_text_template = f"New Quest: {quest_name}! From {product_name} ({game_system})."
 
     deep_link = f"https://questable.app/#/quests/{quest_id}"
 
@@ -1293,6 +1294,15 @@ def generate_post_content(quest_data: dict) -> dict:
         "Embark on this journey!",
         "What choices will you make?",
         "Your story awaits!",
+        "Claim your destiny!",
+        "The challenge begins now!",
+        "Will you answer the call?",
+        "Shape your own fate!",
+        "Dive into the unknown!",
+        "Start your legend!",
+        "The next chapter unfolds!",
+        "Where will your path lead?",
+        "Make your move!",
     ]
     call_to_action = random.choice(call_to_actions)
 

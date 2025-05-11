@@ -33,6 +33,13 @@ class _MigrationToolsState extends State<MigrationTools> {
   int _populatedLowercaseCount = 0;
   int _processedLowercaseCount = 0;
 
+  // New state variables for backfilling productTitle
+  bool _isBackfillingProductTitle = false;
+  String _backfillProductTitleStatus = '';
+  bool _backfillProductTitleSuccess = false;
+  int _backfilledProductTitleCount = 0;
+  int _processedProductTitleCount = 0;
+
   @override
   Widget build(BuildContext context) {
     final userContext = Provider.of<UserContext>(context);
@@ -252,6 +259,63 @@ class _MigrationToolsState extends State<MigrationTools> {
                               ],
                             )
                           : const Text('Populate Lowercase Field'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20), // Add some padding at the bottom
+
+            // Fifth card: Backfill productTitle from title
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Backfill Missing Product Titles',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'This tool scans quest cards and populates the `productTitle` field '
+                      'with the value from the `title` field if `productTitle` is missing or blank. '
+                      'Safe to re-run.',
+                    ),
+                    const SizedBox(height: 16),
+                    if (_backfillProductTitleStatus.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        color: _backfillProductTitleSuccess
+                            ? Colors.green.shade100
+                            : _isBackfillingProductTitle
+                                ? Colors.blue.shade100
+                                : Colors.red.shade100,
+                        width: double.infinity,
+                        child: Text(_backfillProductTitleStatus),
+                      ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _isBackfillingProductTitle
+                          ? null
+                          : _runBackfillProductTitleMigration,
+                      child: _isBackfillingProductTitle
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                SizedBox(width: 8),
+                                Text('Backfilling...'),
+                              ],
+                            )
+                          : const Text('Backfill Product Titles'),
                     ),
                   ],
                 ),
@@ -672,6 +736,130 @@ class _MigrationToolsState extends State<MigrationTools> {
         });
       }
       // Optionally try to commit the current batch on error
+    }
+  }
+
+  /// Runs the process to backfill productTitle from title if productTitle is blank or missing
+  Future<void> _runBackfillProductTitleMigration() async {
+    setState(() {
+      _isBackfillingProductTitle = true;
+      _backfillProductTitleStatus = 'Starting product title backfill... Fetching first batch.';
+      _backfillProductTitleSuccess = false;
+      _backfilledProductTitleCount = 0;
+      _processedProductTitleCount = 0;
+    });
+
+    final firestore = FirebaseFirestore.instance;
+    final questCardsRef = firestore.collection('questCards');
+    const batchSize = 400; // Firestore batch limit is 500 operations
+    int batchCounter = 0;
+    WriteBatch batch = firestore.batch();
+    DocumentSnapshot? lastDoc;
+
+    try {
+      while (true) {
+        Query query =
+            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        if (lastDoc != null) {
+          query = query.startAfterDocument(lastDoc);
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _backfillProductTitleStatus =
+              'Fetching next batch (processed: $_processedProductTitleCount)...';
+        });
+
+        final snapshot = await query.get();
+
+        if (snapshot.docs.isEmpty) {
+          log('No more documents found for product title backfill.');
+          break; 
+        }
+
+        lastDoc = snapshot.docs.last;
+        
+        for (final doc in snapshot.docs) {
+          _processedProductTitleCount++;
+          final data = doc.data() as Map<String, dynamic>?;
+          
+          String? title;
+          String? productTitle;
+
+          if (data != null) {
+            if (data.containsKey('title') && data['title'] is String) {
+              title = data['title'] as String;
+            }
+            if (data.containsKey('productTitle')) {
+              productTitle = data['productTitle'] as String?;
+            }
+          }
+
+          // Check if productTitle is null, empty, or just whitespace
+          bool productTitleIsBlank = productTitle == null || productTitle.trim().isEmpty;
+
+          if (productTitleIsBlank && title != null && title.trim().isNotEmpty) {
+            batch.update(doc.reference, {'productTitle': title.trim()});
+            batchCounter++;
+            _backfilledProductTitleCount++;
+
+            if (batchCounter >= batchSize) {
+              if (!mounted) return;
+              setState(() {
+                _backfillProductTitleStatus =
+                    'Committing batch (Processed: $_processedProductTitleCount, Updated: $_backfilledProductTitleCount)...';
+              });
+              log('Committing product title backfill batch...');
+              await batch.commit();
+              log('Product title backfill batch committed.');
+              batch = firestore.batch(); 
+              batchCounter = 0;
+              await Future.delayed(const Duration(milliseconds: 50));
+            }
+          }
+          
+          if (_processedProductTitleCount % 100 == 0 && mounted) {
+            setState(() {
+              _backfillProductTitleStatus =
+                  'Processing... (Processed: $_processedProductTitleCount, Updated: $_backfilledProductTitleCount)';
+            });
+          }
+        }
+        if (!mounted) return;
+        setState(() {
+          _backfillProductTitleStatus =
+              'Finished processing batch. (Total Processed: $_processedProductTitleCount, Total Updated: $_backfilledProductTitleCount)';
+        });
+      }
+
+      if (batchCounter > 0) {
+        if (!mounted) return;
+        setState(() {
+          _backfillProductTitleStatus = 'Committing final product title backfill batch...';
+        });
+        log('Committing final product title backfill batch ($batchCounter operations)...');
+        await batch.commit();
+        log('Final product title backfill batch committed.');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isBackfillingProductTitle = false;
+          _backfillProductTitleStatus =
+              'Product title backfill complete! Processed: $_processedProductTitleCount, Updated: $_backfilledProductTitleCount';
+          _backfillProductTitleSuccess = true;
+        });
+      }
+    } catch (e, s) {
+      log('Error during product title backfill: $e', stackTrace: s);
+      if (mounted) {
+        setState(() {
+          _isBackfillingProductTitle = false;
+          _backfillProductTitleStatus =
+              'Error during product title backfill: $e. Processed: $_processedProductTitleCount, Updated: $_backfilledProductTitleCount';
+          _backfillProductTitleSuccess = false;
+        });
+      }
     }
   }
 }
