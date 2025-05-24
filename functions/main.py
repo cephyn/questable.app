@@ -1124,7 +1124,7 @@ def post_to_bluesky(content: dict):
         # Add hashtags
         for term in hashtag_terms:
             if term:  # Ensure term is not empty
-                text_builder.text(" ").tag(
+                text_builder.text(" #").tag(
                     term, term
                 )  # Adds a space before the hashtag text and then the tag itself
 
