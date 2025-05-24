@@ -265,6 +265,13 @@ class _AddQuestCardState extends State<EditQuestCard> {
                     _questCard.authors =
                         _processListField(authorsController.text);
                     _questCard.productTitle = productTitleController.text;
+
+                    // If productTitle is blank, set it to title
+                    if (_questCard.productTitle == null || _questCard.productTitle!.trim().isEmpty) {
+                      _questCard.productTitle = _questCard.title;
+                      log('Product title was blank, set to title: ${_questCard.title}');
+                    }
+
                     _questCard.publisher = publisherController.text;
                     _questCard.publicationYear = yearController.text;
                     _questCard.genre = genreController.text;

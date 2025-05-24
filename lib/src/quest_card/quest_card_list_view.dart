@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart'; // Add this import
 import 'package:quest_cards/src/filters/active_filter_chips.dart';
 import 'package:quest_cards/src/filters/filter_drawer.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
+import 'package:quest_cards/src/quest_card/quest_card_edit.dart'; // Added import for EditQuestCard
 import 'package:quest_cards/src/role_based_widgets/role_based_delete_documents_buttons.dart';
 import 'package:quest_cards/src/services/firebase_auth_service.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
@@ -342,7 +343,13 @@ class _QuestCardListViewState extends State<QuestCardListView> {
                         IconButton(
                           icon: const Icon(Icons.edit),
                           onPressed: () {
-                            context.go('/quests/$docId/edit');
+                            // context.go(\'/quests/$docId/edit\'); // Original GoRouter navigation
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditQuestCard(docId: docId),
+                              ),
+                            );
                           },
                           tooltip: 'Edit Quest',
                         ),

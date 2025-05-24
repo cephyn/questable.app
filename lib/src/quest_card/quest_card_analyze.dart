@@ -240,6 +240,12 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       questCard.uploadedBy = auth.getCurrentUser().email;
       log('AI analysis complete. Title: ${questCard.title}');
 
+      // If productTitle is blank, set it to title
+      if (questCard.productTitle == null || questCard.productTitle!.trim().isEmpty) {
+        questCard.productTitle = questCard.title;
+        log('Product title was blank after AI analysis, set to title: ${questCard.title}');
+      }
+
       // Wait for purchase link search to complete and add to QuestCard if found
       String? purchaseLink = await purchaseLinkFuture;
       if (purchaseLink != null && purchaseLink.isNotEmpty) {
@@ -313,6 +319,12 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       for (int i = 0; i < questCardSchemas.length; i++) {
         QuestCard q = QuestCard.fromJson(questCardSchemas[i]);
         q.uploadedBy = currentUserEmail;
+
+        // If productTitle is blank, set it to title
+        if (q.productTitle == null || q.productTitle!.trim().isEmpty) {
+          q.productTitle = q.title;
+          log('Product title was blank after AI analysis for multi-file, set to title: ${q.title}');
+        }
 
         String? titleLower = q.title?.toLowerCase();
 
