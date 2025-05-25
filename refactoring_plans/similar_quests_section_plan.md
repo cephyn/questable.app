@@ -115,45 +115,81 @@ This document outlines the plan for implementing a "Similar Quests" section on t
     *   Added `nltk` and `scikit-learn` to `functions/requirements.txt`.
 *   **Task 1.2: Implement Similarity Score Calculation Logic.**
     *   **Status: In Progress**
-    *   Developed a script (`functions/similarity_calculator.py`) that takes a quest ID as input.
+    *   **Status: Completed**
+    *   Developed a script (`functions/similarity_calculator.py`) that takes a quest ID as input, retrieves quest data from Firebase Firestore, and calculates similarity scores.
     *   Implemented logic for calculating field matching and text similarity scores (using the now enhanced `_calculate_text_similarity`), and combining them using the hybrid approach.
-    *   Currently integrating Firebase Firestore for actual data retrieval in `calculate_similarity_for_quest` (replacing placeholder data).
-    *   TODO: Finalize Firebase integration and test data retrieval.
-    *   TODO: Determine and implement storage for pre-computed similarity scores (e.g., a separate collection or adding to existing quest documents).
+    *   Firebase Firestore integration for data retrieval within `calculate_similarity_for_quest` is complete.
+    *   Pre-computed similarity scores (top 10) are stored in a subcollection named `similarQuests` under each quest document in Firestore. Old entries are cleared on re-computation.
 *   **Task 1.3: Develop Pre-computation Mechanism.**
-    *   **Status: Not Started**
-    *   Create a mechanism to run the similarity score calculation for all new quests upon creation/upload.
-    *   Store the results along with a timestamp.
+    *   **Status: Completed**
+    *   Implemented a Cloud Function (`on_new_quest_created_calculate_similarity` in `functions/main.py`) triggered by new document creation in the `questCards` collection.
+    *   This function calls `similarity_calculator.calculate_similarity_for_quest` to compute and store scores for new quests. Results (including a timestamp) are stored as per Task 1.2.
 *   **Task 1.4: Backend Unit & Integration Testing.**
-    *   **Status: Not Started**
-    *   Write unit tests for the similarity calculation logic.
-    *   Write integration tests for the API endpoint (if developed in the future).
+    *   **Status: Completed**
+    *   Unit tests for the similarity calculation logic (`similarity_calculator.py`) have been written and are passing.
+    *   Integration tests for a future API endpoint are not applicable at this stage as the current pre-computation mechanism is a Cloud Function triggered by Firestore events.
 
 ### Phase 2: Frontend Development - UI/UX Implementation
 
-*   **Task 2.1: Design Quest Preview Card Component.**
-    *   If not already existing, create a reusable UI component for a quest preview card that displays:
-        *   Quest name
-        *   Genre
-        *   Similarity score (e.g., "87% similar")
-*   **Task 2.2: Implement "Similar Quests" Section in Detail View.**
-    *   Add a new section titled "Similar Quests" below the main quest details in the quest card detail view.
-    *   On loading the quest detail view, call the new API endpoint to fetch similar quests.
-    *   Display up to 10 similar quest preview cards in this section.
-    *   Handle loading states (e.g., shimmer/skeleton loaders while fetching data).
-    *   Handle the case where no similar quests are found (e.g., display a message like "No similar quests found yet!").
+### Task 2.1: Design Quest Preview Card Component
+- **Status:** Completed
+- **Details:** Created a reusable Flutter UI component `SimilarQuestPreviewCard` in `lib/src/widgets/similar_quest_preview_card.dart`. The component displays the quest name, genre, and similarity score.
+- **Files:** `lib/src/widgets/similar_quest_preview_card.dart`
+
+### Task 2.2: Implement "Similar Quests" Section in Detail View
+- **Status:** Completed
+- **Details:** 
+    - Added a new method `getSimilarQuests` to `FirestoreService` (`lib/src/services/firestore_service.dart`) to fetch similar quest data (ID and score) from the `similarQuests` subcollection.
+    - In `QuestCardDetailsView` (`lib/src/quest_card/quest_card_details_view.dart`):
+        - Added state variables `_similarQuests` and `_isLoadingSimilarQuests`.
+        - Implemented `_loadSimilarQuests` method to fetch similar quest IDs and scores, then fetch full quest details (title, genre) for each similar quest.
+        - Called `_loadSimilarQuests` in `initState`.
+        - Added `_buildSimilarQuestsSection` widget to display a "Similar Quests" title.
+        - This section shows a loading indicator (`CircularProgressIndicator`) while data is being fetched.
+        - If no similar quests are found, it displays "No similar quests found yet!".
+        - Otherwise, it displays a `ListView` of `SimilarQuestPreviewCard` widgets, populating them with the fetched quest name, genre, and similarity score.
+        - Integrated the `_buildSimilarQuestsSection` into the main `Column` of the `SingleChildScrollView` in the `_buildBody` method.
+- **Files:** 
+    - `lib/src/services/firestore_service.dart`
+    - `lib/src/quest_card/quest_card_details_view.dart`
+
 *   **Task 2.3: Styling and Responsiveness.**
-    *   Ensure the "Similar Quests" section and preview cards are styled according to the application's design guidelines.
-    *   Ensure the layout is responsive across different screen sizes (web and mobile).
+    - **Status:** Completed
+    - **Details:**
+        - In `similar_quest_preview_card.dart`: Set `elevation: 2.0` on the `Card` widget to match other cards in the detail view.
+        - In `quest_card_details_view.dart` (`_buildSimilarQuestsSection`):
+            - Wrapped each `SimilarQuestPreviewCard` in the `ListView.builder` with `Padding(padding: const EdgeInsets.symmetric(vertical: 4.0))` to provide vertical spacing between cards.
+        - The existing use of themed text styles (`Theme.of(context).textTheme`) and Flutter's responsive widgets (`Card`, `Column`, `ListView`, `Text`) ensures basic responsiveness and adherence to design guidelines.
+    - **Files:**
+        - `lib/src/widgets/similar_quest_preview_card.dart`
+        - `lib/src/quest_card/quest_card_details_view.dart`
+
 *   **Task 2.4: Frontend Unit & Component Testing.**
-    *   Write unit tests for any new frontend logic.
-    *   Write component tests for the quest preview card and the "Similar Quests" section.
+    - **Status:** Completed
+    - **Details:**
+        - Fixed the failing component test for `SimilarQuestPreviewCard` in `test/widgets/similar_quest_preview_card_test.dart`, ensuring it passes.
+        - Created `test/quest_card/quest_card_details_view_test.dart`.
+        - Wrote unit tests for the new frontend logic in `QuestCardDetailsView` (e.g., `_loadSimilarQuests` method, error handling).
+        - Wrote component tests for the overall "Similar Quests" section as rendered in `QuestCardDetailsView`, covering loading states, empty states, and list display. All tests are passing.
+    - **Files:**
+        - `test/widgets/similar_quest_preview_card_test.dart`
+        - `test/quest_card/quest_card_details_view_test.dart`
 
 ### Phase 3: Integration and End-to-End Testing
 
 *   **Task 3.1: Integrate Frontend with Backend API.**
-    *   Connect the frontend UI to the live backend API endpoint.
-    *   Verify data flow and error handling between frontend and backend.
+    *   **Status:** In Progress
+    *   **Details:**
+        *   The frontend (`QuestCardDetailsView` via `FirestoreService`) is designed to connect to Firestore to read similar quest data from the `similarQuests` subcollection. This data is pre-computed and populated by the backend Cloud Function (`on_new_quest_created_calculate_similarity`). This architecture establishes the "connection" and data flow via Firestore.
+        *   **Next Steps (Manual Verification):**
+            1.  Add a new quest document to the `questCards` collection in Firestore.
+            2.  Verify (e.g., via Firebase console logs) that the `on_new_quest_created_calculate_similarity` Cloud Function triggers and executes successfully.
+            3.  Confirm that the `similarQuests` subcollection is created/updated for the new quest, containing appropriate similar quest IDs and scores.
+            4.  In the Questable application, navigate to the detail view of this new quest.
+            5.  Verify that the "Similar Quests" section correctly loads and displays the data from the `similarQuests` subcollection (names, genres, scores).
+            6.  Test UI behavior for error/empty states:
+                *   If the `similarQuests` subcollection is empty or missing for a quest, confirm the "No similar quests found yet!" message is displayed (as designed in Task 2.2).
+                *   Review or test how `QuestCardDetailsView` handles potential Firestore read errors during the fetching of similar quests (e.g., network issues, permission errors) and ensure graceful error feedback to the user.
 *   **Task 3.2: Perform End-to-End Testing.**
     *   Test the entire user flow:
         *   Navigate to a quest detail view.

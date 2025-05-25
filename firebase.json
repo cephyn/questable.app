@@ -42,6 +42,9 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local"
+      ],
+      "include": [
+        "nltk_data/**"
       ]
     }
   ],

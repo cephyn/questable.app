@@ -23,8 +23,11 @@ import re  # Added
 from google.cloud import secretmanager  # Added for Secret Manager
 from io import BytesIO
 from atproto import Client, models, client_utils
-from markitdown import MarkItDown  # For Bluesky, added client_utils
+# from markitdown import MarkItDown  # For Bluesky, added client_utils # Commented out due to DLL load issues
 import google.generativeai as genai  # Added for Gemini
+
+# Import the similarity calculation function
+import similarity_calculator # Assuming similarity_calculator.py is in the same directory
 
 # Set root logger level to INFO for better visibility in Cloud Run if default is higher
 logging.getLogger().setLevel(logging.INFO)
@@ -42,15 +45,15 @@ initialize_app()
 #     return {"text": req.data["text"]}
 
 
-@https_fn.on_call(
-    memory=options.MemoryOption.GB_2,
-)
-def pdf_to_md(req: https_fn.CallableRequest) -> any:
-    url = req.data["url"]
-    md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
-    result = md.convert(url)
+# @https_fn.on_call(
+#     memory=options.MemoryOption.GB_2,
+# )
+# def pdf_to_md(req: https_fn.CallableRequest) -> any:
+#     url = req.data["url"]
+#     md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
+#     result = md.convert(url)
 
-    return result.text_content
+#     return result.text_content
 
 
 # Game System Standardization Functions
@@ -1354,3 +1357,24 @@ def generate_post_content(quest_data: dict) -> dict:
         "quest_title": quest_name,  # Already capitalized
         "link": deep_link,
     }
+
+
+@firestore_fn.on_document_created(document="questCards/{questId}", region="us-central1", memory=options.MemoryOption.GB_1, timeout_sec=540)
+def on_new_quest_created_calculate_similarity(event: firestore_fn.Event[firestore_fn.Change]) -> None:
+    """Cloud Function to calculate similarity scores when a new quest is created."""
+    quest_id = event.params["questId"]
+    logging.info(f"New quest created: {quest_id}. Triggering similarity calculation.")
+
+    try:
+        # Ensure Firebase is initialized for the similarity_calculator module if it manages its own initialization
+        # If similarity_calculator.py uses the global firebase_admin.initialize_app() from main.py,
+        # this call might not be strictly necessary here, but it's good for modularity.
+        if not hasattr(similarity_calculator, 'fb_db') or similarity_calculator.fb_db is None:
+            similarity_calculator._initialize_firebase() 
+            
+        similarity_calculator.calculate_similarity_for_quest(quest_id)
+        logging.info(f"Successfully calculated and stored similarities for quest: {quest_id}")
+    except Exception as e:
+        logging.error(f"Error calculating similarities for quest {quest_id}: {e}")
+        # Optionally, re-raise the exception if you want the function to be marked as failed
+        # raise
