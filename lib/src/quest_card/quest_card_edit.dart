@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 import 'package:quest_cards/src/widgets/game_system_autocomplete.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Added
+import 'package:quest_cards/src/services/email_service.dart'; // Added
 
 import '../util/utils.dart';
 import 'quest_card.dart';
@@ -23,16 +25,18 @@ class _AddQuestCardState extends State<EditQuestCard> {
   final _formKey = GlobalKey<FormState>();
   late QuestCard
       _questCard; // Changed from nullable to non-nullable with late initialization
+  Map<String, dynamic> _originalQuestCardData =
+      {}; // Added to store original data
   bool _isLoading = true;
   final FirestoreService firestoreService = FirestoreService();
+  final EmailService emailService = EmailService(); // Added
+  User? _currentUser; // Added
 
   @override
   void initState() {
     super.initState();
-    // Initialize with an empty quest card to avoid null issues
     _questCard = QuestCard();
-
-    // Load data from Firestore if editing an existing card
+    _loadCurrentUser(); // Added
     if (widget.docId.isNotEmpty) {
       _loadQuestCardData();
     } else {
@@ -40,6 +44,12 @@ class _AddQuestCardState extends State<EditQuestCard> {
         _isLoading = false;
       });
     }
+  }
+
+  void _loadCurrentUser() async {
+    _currentUser = FirebaseAuth.instance.currentUser;
+    // You might need to fetch custom claims or roles if you have an admin system
+    // For now, we'll just use the UID and email.
   }
 
   // Separate method to load quest card data
@@ -54,6 +64,7 @@ class _AddQuestCardState extends State<EditQuestCard> {
         Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
         setState(() {
           _questCard = QuestCard.fromJson(data);
+          _originalQuestCardData = Map.from(data); // Store original data
           _questCard.id = data['id']; // Ensure ID is preserved
           _isLoading = false;
           log('Loaded quest card: ${_questCard.toJson()}');
@@ -246,18 +257,11 @@ class _AddQuestCardState extends State<EditQuestCard> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    // Debug values before update
-                    log('Before update - Title: ${_questCard.title}');
-
-                    // Directly update the quest card from controllers
+                    // Collect form data into _questCard ONCE
                     _questCard.title = titleController.text;
-                    // Game system is updated via the GameSystemAutocompleteField
-                    _questCard.gameSystem = _questCard
-                        .gameSystem; // Will be updated through the autocomplete
-                    _questCard.standardizedGameSystem =
-                        standardizedGameSystem; // Set from autocomplete
+                    _questCard.standardizedGameSystem = standardizedGameSystem;
                     _questCard.edition = editionController.text;
                     _questCard.level = levelController.text;
                     _questCard.pageLength =
@@ -265,13 +269,10 @@ class _AddQuestCardState extends State<EditQuestCard> {
                     _questCard.authors =
                         _processListField(authorsController.text);
                     _questCard.productTitle = productTitleController.text;
-
-                    // If productTitle is blank, set it to title
-                    if (_questCard.productTitle == null || _questCard.productTitle!.trim().isEmpty) {
+                    if (_questCard.productTitle == null ||
+                        _questCard.productTitle!.trim().isEmpty) {
                       _questCard.productTitle = _questCard.title;
-                      log('Product title was blank, set to title: ${_questCard.title}');
                     }
-
                     _questCard.publisher = publisherController.text;
                     _questCard.publicationYear = yearController.text;
                     _questCard.genre = genreController.text;
@@ -287,36 +288,138 @@ class _AddQuestCardState extends State<EditQuestCard> {
                         _processListField(notableItemsController.text);
                     _questCard.summary = summaryController.text;
 
-                    // Set migration status if a standardized system was found
                     if (standardizedGameSystem != null) {
                       _questCard.systemMigrationStatus = 'completed';
                       _questCard.systemMigrationTimestamp = DateTime.now();
                     }
 
-                    // Debug values after update to confirm changes
-                    log('After update - Title: ${_questCard.title}');
-                    log('After update - Game System: ${_questCard.gameSystem}');
-                    log('After update - Standardized Game System: ${_questCard.standardizedGameSystem}');
-                    log('After update - Authors: ${_questCard.authors}');
+                    log('Updated _questCard from form: ${_questCard.toJson()}');
 
-                    // Full card logging for debugging
-                    log('Saving updated quest card: ${_questCard.toJson()}');
+                    // Perform Authorization Check
+                    log('[AUTH_CHECK] Starting permission checks for quest update/suggestion.');
+                    log('[AUTH_CHECK] Current User UID: ${_currentUser?.uid}');
+                    log('[AUTH_CHECK] Original Uploader UID from _originalQuestCardData: ${_originalQuestCardData['uploadedBy']}');
 
-                    // Save to Firestore
-                    if (docId.isEmpty) {
-                      firestoreService.addQuestCard(_questCard);
+                    bool isAdmin = false;
+                    if (_currentUser != null) {
+                      final userRoles = await firestoreService
+                          .getUserRoles(_currentUser!.uid);
+                      isAdmin = userRoles?.contains('admin') ?? false;
+                      log('[AUTH_CHECK] Fetched User Roles: $userRoles, Is Admin?: $isAdmin');
                     } else {
-                      log('Updating card with docId: $docId');
-                      firestoreService.updateQuestCard(docId, _questCard);
+                      log('[AUTH_CHECK] Current user is null, cannot determine admin status.');
                     }
 
-                    // Navigate with the correct docId
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            QuestCardDetailsView(docId: docId),
-                      ),
+                    final bool isUploader = _currentUser != null &&
+                        _originalQuestCardData['uploadedBy'] != null &&
+                        _originalQuestCardData['uploadedBy'] ==
+                            _currentUser!.uid;
+                    log('[AUTH_CHECK] Is Uploader?: $isUploader');
+
+                    final bool canUpdateDirectly = isAdmin || isUploader;
+                    log('[AUTH_CHECK] Decision: Can update directly (isAdmin || isUploader)?: $canUpdateDirectly');
+
+                    if (canUpdateDirectly) {
+                      log('[ACTION] User is admin or uploader. Attempting direct quest card update.');
+                      if (docId.isEmpty) {
+                        firestoreService
+                            .addQuestCard(_questCard)
+                            .then((newDocId) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  QuestCardDetailsView(docId: newDocId),
+                            ),
+                          );
+                        }).catchError((error) {
+                          log('[ERROR] Failed to add quest card: $error');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Error adding quest: $error')),
+                          );
+                        });
+                      } else {
+                        firestoreService
+                            .updateQuestCard(docId, _questCard)
+                            .then((_) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  QuestCardDetailsView(docId: docId),
+                            ),
+                          );
+                        }).catchError((error) {
+                          log('[ERROR] Failed to update quest card: $error');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Error updating quest: $error')),
+                          );
+                        });
+                      }
+                    } else {
+                      log('[ACTION] User is not admin or uploader. Preparing to send edit suggestion.');
+                      Map<String, dynamic> changes = {};
+                      Map<String, dynamic> updatedJson = _questCard.toJson();
+
+                      _originalQuestCardData.forEach((key, oldValue) {
+                        if (updatedJson.containsKey(key) &&
+                            updatedJson[key] != oldValue) {
+                          changes[key] = {
+                            'old': oldValue,
+                            'new': updatedJson[key]
+                          };
+                        }
+                      });
+                      // Add new keys that were not in original
+                      updatedJson.forEach((key, newValue) {
+                        if (!_originalQuestCardData.containsKey(key) &&
+                            newValue != null) {
+                          changes[key] = {'old': null, 'new': newValue};
+                        }
+                      });
+
+                      if (changes.isNotEmpty) {
+                        try {
+                          await emailService
+                              .sendQuestEditSuggestionEmailToAdmin(
+                            docId.isNotEmpty
+                                ? docId
+                                : _questCard.id ??
+                                    "NEW_QUEST_SUGGESTION", // Use actual docId or questCard.id
+                            _currentUser?.email ?? 'anonymous@questable.app',
+                            _questCard.title ?? 'Untitled Quest',
+                            changes,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Your edit suggestion has been sent for review.')),
+                          );
+                        } catch (e) {
+                          log('[ERROR] Failed to send suggestion email: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Error sending suggestion: $e')),
+                          );
+                        }
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('No changes detected to suggest.')),
+                        );
+                      }
+                      // Navigate back or to a neutral page
+                      Navigator.pop(context);
+                    }
+                  } else {
+                    log('Form validation failed.');
+                    // Optionally, show a SnackBar if form is invalid
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content:
+                              Text('Please correct the errors in the form.')),
                     );
                   }
                 },

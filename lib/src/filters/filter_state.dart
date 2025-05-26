@@ -336,17 +336,141 @@ class FilterState extends ChangeNotifier {
 
   /// Apply active filters to a Firestore query
   Query applyFiltersToQuery(Query query) {
-    // Always start by applying the isPublic filter
+    // Always start by applying the isPublic filter, as per existing logic
     Query filteredQuery = query.where('isPublic', isEqualTo: true);
 
     try {
       for (var filter in _filters) {
-        // Special handling for game system filters to support standardized systems
+        // Skip the special ownership filter here
+        if (filter.field == ownershipFilterField) continue;
+
+        // Special handling for the old 'gameSystem' field (if still used)
         if (filter.field == 'gameSystem') {
           filteredQuery = _applyGameSystemFilter(filteredQuery, filter);
           continue;
         }
 
+        // Specific handling for 'standardizedGameSystem'
+        if (filter.field == 'standardizedGameSystem') {
+          if (filter.value is String) {
+            String systemName = filter.value as String;
+            if (systemName.isNotEmpty) {
+              // Assuming 'equals' is the primary operator for a single string value from the widget
+              if (filter.operator == FilterOperator.equals) {
+                filteredQuery =
+                    filteredQuery.where(filter.field, isEqualTo: systemName);
+                developer.log(
+                    'Applying standardizedGameSystem filter (from String): isEqualTo "$systemName"',
+                    name: 'FilterState');
+              } else {
+                // Log if a different operator is used with a single string, though current UI setup implies 'equals'
+                developer.log(
+                    'Warning: Operator ${filter.operator} used with String value for standardizedGameSystem. Value: "$systemName". Applying as isEqualTo.',
+                    name: 'FilterState');
+                // Default to isEqualTo for a single string if operator is not explicitly handled or is unexpected
+                filteredQuery =
+                    filteredQuery.where(filter.field, isEqualTo: systemName);
+              }
+            } else {
+              developer.log(
+                  'Warning: standardizedGameSystem filter (from String) received an empty string. Skipping filter.',
+                  name: 'FilterState');
+            }
+          } else if (filter.value is List &&
+              (filter.value as List).isNotEmpty) {
+            List<dynamic> systemValueList = filter.value as List;
+
+            // Case 1: filter.value is List<String>.
+            // This could be parts of a single system (e.g., ['Pathfinder', '2nd Edition'])
+            // OR a list of multiple selected system names (e.g., ['Cypher System', 'D&D 5e']) if operator is whereIn.
+            if (systemValueList.every((item) => item is String)) {
+              List<String> stringListValue = systemValueList.cast<String>();
+
+              if (filter.operator == FilterOperator.whereIn) {
+                // If operator is whereIn, this list of strings is assumed to be a list of game system names.
+                // Each string is a distinct system name.
+                if (stringListValue.isNotEmpty) {
+                  // Firestore 'whereIn' requires a non-empty list and limits to 30 elements.
+                  if (stringListValue.length > 30) {
+                    developer.log(
+                        'Warning: standardizedGameSystem whereIn filter (from List<String>) has ${stringListValue.length} values. Firestore limits this to 30. The query may fail.',
+                        name: 'FilterState');
+                  }
+                  filteredQuery = filteredQuery.where(filter.field,
+                      whereIn: stringListValue);
+                  developer.log(
+                      'Applying standardizedGameSystem filter (from List<String>): whereIn $stringListValue',
+                      name: 'FilterState');
+                } else {
+                  developer.log(
+                      'Warning: standardizedGameSystem whereIn filter (from List<String>) received an empty list. Value: $stringListValue. Skipping filter.',
+                      name: 'FilterState');
+                }
+              } else {
+                // Operator is not whereIn (e.g., equals).
+                // Value might be ['Pathfinder'] or ['Pathfinder', '2nd Edition'].
+                // Since 'edition' is a separate field, we only use the first element for 'standardizedGameSystem'.
+                if (stringListValue.isNotEmpty) {
+                  String nameToQuery = stringListValue[
+                      0]; // Use the first element as the system name.
+                  filteredQuery =
+                      filteredQuery.where(filter.field, isEqualTo: nameToQuery);
+                  developer.log(
+                      'Applying standardizedGameSystem filter (from List<String>, non-whereIn): isEqualTo "$nameToQuery" (using first element). Assumes other parts like edition are separate filters.',
+                      name: 'FilterState');
+                } else {
+                  developer.log(
+                      'Warning: standardizedGameSystem filter (from List<String>, non-whereIn) received an empty list. Value: $stringListValue. Skipping filter.',
+                      name: 'FilterState');
+                }
+              }
+            } else if (systemValueList.every((item) =>
+                item is List && item.every((subItem) => subItem is String))) {
+              if (filter.operator == FilterOperator.whereIn) {
+                List<List<String>> listOfParts = systemValueList
+                    .map((e) => (e as List).cast<String>())
+                    .toList();
+                List<String> namesForWhereIn = listOfParts
+                    .map((parts) => parts.join(
+                        ' ')) // Convert each list of parts to a name string
+                    .toList();
+                if (namesForWhereIn.isNotEmpty) {
+                  // Firestore 'whereIn' requires a non-empty list.
+                  // Firestore also limits 'whereIn' array to 30 elements.
+                  if (namesForWhereIn.length > 30) {
+                    developer.log(
+                        'Warning: standardizedGameSystem whereIn filter has ${namesForWhereIn.length} values. Firestore limits this to 30. The query may fail.',
+                        name: 'FilterState');
+                  }
+                  filteredQuery = filteredQuery.where(filter.field,
+                      whereIn: namesForWhereIn);
+                  developer.log(
+                      'Applying standardizedGameSystem filter: whereIn $namesForWhereIn',
+                      name: 'FilterState');
+                } else {
+                  developer.log(
+                      'Warning: standardizedGameSystem whereIn filter resulted in an empty list of names. Value: $systemValueList. Skipping filter.',
+                      name: 'FilterState');
+                }
+              } else {
+                developer.log(
+                    'Warning: Operator ${filter.operator} used with List<List<String>> for standardizedGameSystem. Expected whereIn. Value: $systemValueList. Skipping filter.',
+                    name: 'FilterState');
+              }
+            } else {
+              developer.log(
+                  'Warning: Unsupported value structure for standardizedGameSystem. Value: $systemValueList. Skipping filter.',
+                  name: 'FilterState');
+            }
+          } else {
+            developer.log(
+                'Warning: Empty or invalid value for standardizedGameSystem (not a String or non-empty List). Value: ${filter.value}. Skipping filter.',
+                name: 'FilterState');
+          }
+          continue; // Processed standardizedGameSystem, skip general switch
+        }
+
+        // General filter handling for other fields
         switch (filter.operator) {
           case FilterOperator.equals:
             filteredQuery =
@@ -373,16 +497,31 @@ class FilterState extends ChangeNotifier {
                 filteredQuery.where(filter.field, arrayContains: filter.value);
             break;
           case FilterOperator.arrayContainsAny:
-            filteredQuery = filteredQuery.where(filter.field,
-                arrayContainsAny: filter.value as List);
+            if (filter.value is List && (filter.value as List).isNotEmpty) {
+              filteredQuery = filteredQuery.where(filter.field,
+                  arrayContainsAny: filter.value as List);
+            } else {
+              developer.log(
+                  'Warning: Value for arrayContainsAny on field ${filter.field} is not a List or is empty. Value: ${filter.value}. Skipping.',
+                  name: 'FilterState');
+            }
             break;
           case FilterOperator.whereIn:
-            filteredQuery = filteredQuery.where(filter.field,
-                whereIn: filter.value as List);
+            // This is for fields other than standardizedGameSystem
+            if (filter.value is List && (filter.value as List).isNotEmpty) {
+              filteredQuery = filteredQuery.where(filter.field,
+                  whereIn: filter.value as List);
+            } else {
+              developer.log(
+                  'Warning: Value for whereIn on field ${filter.field} is not a List or is empty. Value: ${filter.value}. Skipping.',
+                  name: 'FilterState');
+            }
             break;
           case FilterOperator.contains:
             // Firestore doesn't directly support string contains
-            // For production, you might want to implement a custom solution
+            developer.log(
+                'Warning: Firestore does not directly support string \'contains\' filter for field: ${filter.field}. Skipping.',
+                name: 'FilterState');
             break;
         }
       }
@@ -396,30 +535,39 @@ class FilterState extends ChangeNotifier {
         final logFile = File('error.log');
         final timestamp = DateTime.now().toString();
         logFile.writeAsStringSync(
-            '[$timestamp] Filter Error: $e\n$stackTrace\n\n',
+            '[$timestamp] Filter Error: $e\\n$stackTrace\\n\\n',
             mode: FileMode.append);
       } catch (logError) {
-        debugPrint('Failed to write error to log file: $logError');
+        developer.log('Failed to write error to log file: $logError',
+            name: 'Questable', error: logError);
       }
 
-      // Create a proper error dialog with clickable URL
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final errorUrl = e.toString();
-
-        // Check if the error is a URL or contains a URL
-        final urlRegExp = RegExp(r'https?:\/\/[^\s]+');
-        final match = urlRegExp.firstMatch(errorUrl);
-
-        String? url;
-        if (match != null) {
-          url = match.group(0);
-        }
-
-        showErrorDialog(errorUrl, url);
-      });
+      // Create a proper error dialog with clickable URL if one is present in the error message
+      try {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final errorString = e.toString();
+          // Corrected RegExp for URL matching (match until whitespace)
+          final urlRegExp = RegExp(r'https?://[^\\s]+');
+          final match = urlRegExp.firstMatch(errorString);
+          String? url;
+          if (match != null) {
+            url = match.group(0);
+          }
+          // Ensure showErrorDialog is robust or also wrapped in try-catch if it can throw
+          try {
+            showErrorDialog(errorString, url);
+          } catch (showDialogError) {
+            developer.log('Error calling showErrorDialog: $showDialogError',
+                name: 'Questable', error: showDialogError);
+          }
+        });
+      } catch (uiError) {
+        developer.log('Error in showErrorDialog callback scheduling: $uiError',
+            name: 'Questable', error: uiError);
+      }
 
       // Return the original query with just the isPublic filter
-      // to avoid completely failing the filtering operation
+      // to avoid completely failing the filtering operation, as per existing logic.
       return query.where('isPublic', isEqualTo: true);
     }
 

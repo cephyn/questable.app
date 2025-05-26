@@ -81,6 +81,15 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
 
+    // Emails collection - allow authenticated users to create emails
+    match /emails/{emailId} {
+      allow create: if request.auth != null;
+      // Optionally, restrict read, update, delete to admins or no one
+      allow read, update, delete: if request.auth != null &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
     // Default rule - deny all other access
     match /{document=**} {
       allow read, write: if false;

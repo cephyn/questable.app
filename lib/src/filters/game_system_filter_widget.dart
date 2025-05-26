@@ -23,7 +23,7 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
   // Store selected system name and edition names
   List<String> _selectedSystemNames = [];
   // Track expanded state for each system
-  final Map<String, bool> _systemExpansionState = {};
+  Map<String, bool> _systemExpansionState = {}; // Removed final
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -46,33 +46,75 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
   void _loadInitialSelection() {
     if (!mounted) return;
     final filterProvider = Provider.of<FilterProvider>(context, listen: false);
-    // Find the filter for 'standardizedGameSystem' using the correct getter
-    final systemFilter = filterProvider.filterState.filters // Use .filters
-        .firstWhereOrNull((f) => f.field == 'standardizedGameSystem');
+    final filters = filterProvider.filterState.filters;
 
-    if (systemFilter != null && systemFilter.value is List) {
-      setState(() {
-        _selectedSystemNames = List<String>.from(systemFilter.value);
-        // Initialize expansion state for selected systems that have editions
-        _systemExpansionState.clear(); // Clear previous state
-        for (var name in _selectedSystemNames) {
-          // Use the correct method from FilterProvider
-          final system = filterProvider.getSystemByName(name);
-          // Check if it's a main system name (not an edition name)
-          if (system != null && system.editions.isNotEmpty) {
-            // Expand if the main system is selected
-            if (_selectedSystemNames.contains(system.standardName)) {
-              _systemExpansionState[system.standardName] = true;
+    final systemFilter =
+        filters.firstWhereOrNull((f) => f.field == 'standardizedGameSystem');
+    final editionFilter = filters.firstWhereOrNull((f) => f.field == 'edition');
+
+    List<String> newSelectedNames = [];
+    Map<String, bool> newSystemExpansionState = {};
+
+    if (systemFilter != null &&
+        systemFilter.value is String &&
+        editionFilter != null &&
+        editionFilter.value is String) {
+      // Case: System AND Edition are selected
+      String systemName = systemFilter.value as String;
+      String editionShortNameValue = editionFilter.value as String;
+
+      final systemData = filterProvider.getSystemByName(systemName);
+      if (systemData != null) {
+        newSelectedNames.add(systemName); // Add parent system name
+
+        // Try to find the full edition name based on the short name
+        final editionData = systemData.editions.firstWhereOrNull((ed) {
+          String currentEditionShortName = ed.name;
+          if (ed.name.startsWith(systemName)) {
+            currentEditionShortName =
+                ed.name.substring(systemName.length).trim();
+          }
+          return currentEditionShortName == editionShortNameValue;
+        });
+
+        if (editionData != null) {
+          newSelectedNames.add(editionData.name); // Add full edition name
+          newSystemExpansionState[systemName] = true; // Expand parent
+        }
+      }
+    } else if (systemFilter != null) {
+      // Case: Only system(s) selected (value could be String for 'equals' or List for 'whereIn')
+      if (systemFilter.value is String) {
+        final systemName = systemFilter.value as String;
+        newSelectedNames.add(systemName);
+        // Check if this system (which might be an edition's full name) should expand its parent
+        for (var system_iter in filterProvider.standardGameSystems) {
+          if (system_iter.editions.any((ed) => ed.name == systemName)) {
+            newSystemExpansionState[system_iter.standardName] = true;
+            break;
+          }
+        }
+      } else if (systemFilter.value is List) {
+        newSelectedNames = List<String>.from(systemFilter.value as List);
+        for (var nameInSelection in newSelectedNames) {
+          // Check if this name (which might be an edition's full name) should expand its parent
+          for (var system_iter in filterProvider.standardGameSystems) {
+            if (system_iter.editions.any((ed) => ed.name == nameInSelection)) {
+              newSystemExpansionState[system_iter.standardName] = true;
+              break;
             }
           }
         }
-      });
-    } else {
-      setState(() {
-        _selectedSystemNames = [];
-        _systemExpansionState.clear();
-      });
+      }
     }
+
+    // Deduplicate newSelectedNames just in case
+    newSelectedNames = newSelectedNames.toSet().toList();
+
+    setState(() {
+      _selectedSystemNames = newSelectedNames;
+      _systemExpansionState = newSystemExpansionState;
+    });
   }
 
   @override
@@ -217,7 +259,9 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
                           // Disable if nothing selected
                           // Clear game system filters using the correct method
                           filterProvider.removeFilter('standardizedGameSystem');
-                          // No need to manually update state here, FilterProvider change will trigger rebuild
+                          filterProvider.removeFilter(
+                              'edition'); // Also remove edition filter
+                          // _selectedSystemNames will be cleared by _loadInitialSelection due to provider update
                         },
                   child: const Text('Clear Selection'),
                 ),
@@ -349,7 +393,9 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
           });
         },
         leading: Checkbox(
-          value: checkboxState == CheckboxState.selected,
+          value: checkboxState == CheckboxState.selected
+              ? true
+              : (checkboxState == CheckboxState.partial ? null : false),
           tristate: true, // Allow partial state
           onChanged: (bool? value) {
             // Toggling the main checkbox selects/deselects the system and its editions
@@ -415,19 +461,90 @@ class _GameSystemFilterWidgetState extends State<GameSystemFilterWidget> {
 
   /// Apply the current selections to the FilterProvider.
   void _applyFilters(FilterProvider filterProvider) {
-    // Ensure no duplicates before applying
-    final uniqueSelections = _selectedSystemNames.toSet().toList();
-    const String field = 'standardizedGameSystem';
+    filterProvider.removeFilter('standardizedGameSystem');
+    filterProvider.removeFilter('edition');
 
-    if (uniqueSelections.isEmpty) {
-      filterProvider.removeFilter(field);
-    } else {
-      // Call addFilter with field, value, and operator
+    // Use a Set for uniqueSeletedNames to avoid processing duplicates
+    final uniqueSelectedNames = _selectedSystemNames.toSet();
+
+    if (uniqueSelectedNames.isEmpty) {
+      // Notifying listeners is handled by FilterProvider/FilterState methods
+      return;
+    }
+
+    Set<String> involvedParentSystems = {};
+    // Map: ParentSystemName -> List of ShortEditionNames
+    Map<String, List<String>> specificEditions = {};
+    List<StandardGameSystem> allSystems = filterProvider.standardGameSystems;
+
+    for (String selectedName in uniqueSelectedNames) {
+      bool foundAsEdition = false;
+      for (var system in allSystems) {
+        // Check if selectedName is an edition of the current system
+        var editionMatch =
+            system.editions.firstWhereOrNull((ed) => ed.name == selectedName);
+
+        if (editionMatch != null) {
+          involvedParentSystems.add(system.standardName);
+
+          // Derive short edition name
+          String shortEditionName = selectedName; // Default to the full name
+          if (selectedName.startsWith(system.standardName)) {
+            // If full name starts with parent name, strip parent name part
+            shortEditionName =
+                selectedName.substring(system.standardName.length).trim();
+          }
+
+          // Only add to specificEditions if a non-empty short name is derived
+          if (shortEditionName.isNotEmpty) {
+            specificEditions
+                .putIfAbsent(system.standardName, () => [])
+                .add(shortEditionName);
+          }
+          // If shortEditionName is empty (e.g., edition name was identical to system name),
+          // it's not added as a specific edition filter, but the parent system is still included.
+
+          foundAsEdition = true;
+          break; // Found as edition, no need to check other systems for this selectedName
+        }
+      }
+
+      if (!foundAsEdition) {
+        // If not found as an edition, check if it's a known main system name
+        if (allSystems.any((sys) => sys.standardName == selectedName)) {
+          involvedParentSystems.add(selectedName);
+        }
+      }
+    }
+
+    if (involvedParentSystems.isEmpty) {
+      // No known systems or editions were part of the selection
+      return;
+    }
+
+    if (involvedParentSystems.length == 1) {
+      String parentSystem = involvedParentSystems.first;
       filterProvider.addFilter(
-        field,
-        uniqueSelections,
-        FilterOperator.whereIn, // Use whereIn for list selections
-      );
+          'standardizedGameSystem', parentSystem, FilterOperator.equals);
+
+      // Check if there are specific editions selected for this single parent system
+      if (specificEditions.containsKey(parentSystem)) {
+        List<String> editionsForThisParent = specificEditions[parentSystem]!;
+        if (editionsForThisParent.length == 1) {
+          filterProvider.addFilter(
+              'edition', editionsForThisParent.first, FilterOperator.equals);
+        } else if (editionsForThisParent.length > 1) {
+          filterProvider.addFilter(
+              'edition', editionsForThisParent, FilterOperator.whereIn);
+        }
+        // If editionsForThisParent is empty (e.g., all derived short names were empty), no edition filter is added.
+      }
+    } else {
+      // involvedParentSystems.length > 1
+      // Multiple parent systems involved, use OR logic for systems
+      filterProvider.addFilter('standardizedGameSystem',
+          involvedParentSystems.toList(), FilterOperator.whereIn);
+      // No specific 'edition' filter is applied when ORing across multiple different game systems.
     }
     // FilterProvider methods now notify listeners via FilterState listener
   }

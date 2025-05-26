@@ -92,9 +92,9 @@ This document outlines the plan for implementing an automated feature that selec
     *   If no image, attempt to find a game system logo or Questable logo as a fallback.
     *   Integrate image uploading with Bluesky posts.
 *   **X Integration**:
-    *   Implement API client for X within a Firebase Function.
-    *   Adapt post content (text length, image handling) for X's requirements.
-    *   Store X API credentials in Google Cloud Secret Manager.
+    *   `[/]` Implement API client for X within a Firebase Function.
+    *   `[/]` Adapt post content (text length, image handling) for X's requirements.
+    *   `[X]` Store X API credentials in Google Cloud Secret Manager.
 *   **Content Generation Enhancements**:
     *   Refine text generation templates and AI prompts.
 *   **Error Handling**:
