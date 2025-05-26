@@ -406,8 +406,38 @@ class FirestoreService {
   }
 
   Stream<DocumentSnapshot> getQuestCardStream(String docId) {
-    final questCardStream = questCards.doc(docId).snapshots();
-    return questCardStream;
+    return questCards.doc(docId).snapshots();
+  }
+
+  // Method to fetch similar quests for a given quest ID
+  Future<List<Map<String, dynamic>>> getSimilarQuests(String questId) async {
+    try {
+      final snapshot = await questCards
+          .doc(questId)
+          .collection('similarQuests')
+          .orderBy('score', descending: true) // Scores are 0.0 to 1.0
+          .limit(10) // Already limited to 10 by backend, but good practice
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) {
+          // The document ID is the similar quest's ID
+          // The document data contains the 'score'
+          return {
+            'questId': doc.id,
+            'score': doc.data()['score'] as double,
+            // Add other fields if they exist, e.g., 'genre', 'questName'
+            // For now, assuming only score is directly in similarQuests,
+            // and we'll fetch details separately.
+          };
+        }).toList();
+      } else {
+        return [];
+      }
+    } catch (e) {
+      log('Error fetching similar quests for quest $questId: $e');
+      return []; // Return empty list on error
+    }
   }
 
   //update

@@ -34,6 +34,8 @@ class PurchaseLinkService {
               marketplaceDomains: Config.marketplaceDomains,
             ),
         _cache = cache ?? PurchaseLinkCache() {
+    // log('PurchaseLinkService constructor: Config.googleApiKey at time of GooglePSEClient init is "${Config.googleApiKey}"');
+    // log('PurchaseLinkService constructor: Config.googleSearchEngineId at time of GooglePSEClient init is "${Config.googleSearchEngineId}"');
     // Validate configuration on initialization
     if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
       log('WARNING: Google API Key or Search Engine ID is not configured properly');

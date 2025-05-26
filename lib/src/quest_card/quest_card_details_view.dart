@@ -19,6 +19,7 @@ import 'package:provider/provider.dart';
 import 'package:quest_cards/src/services/user_service.dart'; // Added UserService import
 import 'package:quest_cards/src/providers/auth_provider.dart'
     as app_auth; // Added AuthProvider import with prefix
+import 'package:quest_cards/src/widgets/similar_quest_preview_card.dart';
 
 /// Displays detailed information about a QuestCard.
 class QuestCardDetailsView extends StatefulWidget {
@@ -39,6 +40,9 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
   bool _hasError = false;
   String _errorMessage = '';
 
+  List<Map<String, dynamic>> _similarQuests = [];
+  bool _isLoadingSimilarQuests = true;
+
   // Separate tap gesture recognizer for each clickable element
   // to avoid memory leaks
   final Map<String, GestureRecognizer> _recognizers = {};
@@ -48,6 +52,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
     super.initState();
     _userService = UserService(); // Initialize UserService
     _loadQuestCardData();
+    _loadSimilarQuests(); // Call to load similar quests
   }
 
   @override
@@ -92,6 +97,50 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
           _hasError = true;
           _errorMessage = 'Failed to load quest details: ${e.toString()}';
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSimilarQuests() async {
+    if (widget.docId.isEmpty) return; // Should not happen
+
+    setState(() {
+      _isLoadingSimilarQuests = true;
+    });
+
+    try {
+      final similarQuestsData =
+          await _firestoreService.getSimilarQuests(widget.docId);
+      List<Map<String, dynamic>> enrichedSimilarQuests = [];
+
+      for (var similarQuestData in similarQuestsData) {
+        final questSnapshot = await _firestoreService
+            .getQuestCardStream(similarQuestData['questId'])
+            .first;
+        if (questSnapshot.exists) {
+          final questData = questSnapshot.data() as Map<String, dynamic>;
+          enrichedSimilarQuests.add({
+            'questName': questData['title'] ?? 'Unknown Quest',
+            'questGenre': questData['genre'] ?? 'Unknown Genre',
+            'similarityScore': similarQuestData['score'] as double,
+            'docId': similarQuestData['questId'], // Keep docId for navigation
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _similarQuests = enrichedSimilarQuests;
+          _isLoadingSimilarQuests = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingSimilarQuests = false;
+          // Optionally, set an error message for similar quests
+          debugPrint('Error loading similar quests: $e');
         });
       }
     }
@@ -279,6 +328,8 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
             if (authProvider.isAuthenticated) _buildOwnershipSwitch(),
             const Divider(height: 32),
             _buildGameSystemFeedback(),
+            const Divider(height: 32), // Added divider
+            _buildSimilarQuestsSection(), // Added similar quests section
           ],
         ),
       ),
@@ -589,6 +640,63 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
       questId: widget.docId,
       originalSystem: _questCardData!['gameSystem'],
       standardizedSystem: _questCardData!['standardizedGameSystem'],
+    );
+  }
+
+  Widget _buildSimilarQuestsSection() {
+    if (_isLoadingSimilarQuests) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_similarQuests.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: Text('No similar quests found yet!')),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'Similar Quests',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+        ),
+        ListView.builder(
+          shrinkWrap: true, // Important for ListView inside Column
+          physics:
+              const NeverScrollableScrollPhysics(), // Disable scrolling for inner ListView
+          itemCount: _similarQuests.length,
+          itemBuilder: (context, index) {
+            final similarQuest = _similarQuests[index];
+            final String questId =
+                similarQuest['docId'] as String; // Get questId
+            return Padding(
+              padding: const EdgeInsets.symmetric(
+                  vertical: 4.0, horizontal: 8.0), // Added horizontal padding
+              child: SimilarQuestPreviewCard(
+                questId: questId, // Pass questId
+                questName: similarQuest['questName'] as String,
+                questGenre: similarQuest['questGenre'] as String,
+                similarityScore: similarQuest['similarityScore'] as double,
+                onTap: () {
+                  // Handle tap
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          QuestCardDetailsView(docId: questId),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 

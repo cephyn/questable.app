@@ -8,7 +8,7 @@ import '../config/config.dart';
 /// Controller for handling the purchase link backfill process
 class PurchaseLinkBackfillController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final PurchaseLinkService _purchaseLinkService = PurchaseLinkService();
+  PurchaseLinkService? _purchaseLinkService; // Made nullable
 
   StreamController<BackfillStats>? _statsStreamController;
   BackfillStats _currentStats = BackfillStats.empty();
@@ -20,6 +20,13 @@ class PurchaseLinkBackfillController {
     _statsStreamController = StreamController<BackfillStats>();
 
     try {
+      // Ensure configuration is initialized before proceeding
+      await Config.initializeAppConfig();
+      log('Configuration initialized in controller. API Key: ${Config.googleApiKey}, Engine ID: ${Config.googleSearchEngineId}');
+
+      // Now that config is loaded, initialize the service
+      _purchaseLinkService = PurchaseLinkService();
+
       // Validate configuration before starting
       if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
         log('ERROR: Google API Key or Search Engine ID is missing');
@@ -131,8 +138,8 @@ class PurchaseLinkBackfillController {
 
             // Search for purchase link
             log('Searching for purchase link for: $title');
-            final String? purchaseLink =
-                await _purchaseLinkService.findPurchaseLink(questCardData);
+            final String? purchaseLink = await _purchaseLinkService!
+                .findPurchaseLink(questCardData); // Added null assertion
 
             // Update firestore with link if found
             if (purchaseLink != null && purchaseLink.isNotEmpty) {
