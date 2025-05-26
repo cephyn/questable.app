@@ -115,9 +115,27 @@ class QuestCard {
     // Migration status fields
     systemMigrationStatus = json['systemMigrationStatus'];
     // Note: Search results may format timestamps differently
-    systemMigrationTimestamp = json['systemMigrationTimestamp'] != null
-        ? (json['systemMigrationTimestamp'] as dynamic).toDate()
-        : null;
+    final algoliaTimestampValue = json['systemMigrationTimestamp'];
+    if (algoliaTimestampValue != null) {
+      if (algoliaTimestampValue is int) {
+        systemMigrationTimestamp =
+            DateTime.fromMillisecondsSinceEpoch(algoliaTimestampValue);
+      } else if (algoliaTimestampValue is double) {
+        // Algolia might send timestamps as double for precision
+        systemMigrationTimestamp =
+            DateTime.fromMillisecondsSinceEpoch(algoliaTimestampValue.toInt());
+      } else if (algoliaTimestampValue is String) {
+        // Attempt to parse if it's a string (e.g., ISO 8601)
+        systemMigrationTimestamp = DateTime.tryParse(algoliaTimestampValue);
+      } else {
+        // Log a warning if the type is unexpected for a timestamp from Algolia
+        print(
+            'Warning: systemMigrationTimestamp from Algolia has unexpected type: \${algoliaTimestampValue.runtimeType}. Value: \$algoliaTimestampValue');
+        systemMigrationTimestamp = null;
+      }
+    } else {
+      systemMigrationTimestamp = null;
+    }
   }
 
   String generateUniqueHash() {

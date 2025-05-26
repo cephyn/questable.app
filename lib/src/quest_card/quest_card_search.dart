@@ -6,6 +6,7 @@ import '../search/hits_page.dart';
 import '../services/firestore_service.dart';
 import '../util/utils.dart';
 import '../config/config.dart'; // Import configuration file
+import 'package:go_router/go_router.dart'; // Import go_router
 
 class QuestCardSearch extends StatefulWidget {
   const QuestCardSearch({super.key});
@@ -273,16 +274,24 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
               itemCount: _currentPageItems.length,
               itemBuilder: (context, index) {
                 final item = _currentPageItems[index];
+                final questId = item.objectId ?? item.id; // Get the quest ID
                 return Card(
                   margin:
                       const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                   elevation: 4,
                   child: InkWell(
-                    onTap: () => Navigator.pushNamed(
-                      context,
-                      '/questCardDetails',
-                      arguments: {'docId': item.objectId ?? item.id},
-                    ),
+                    onTap: () {
+                      if (questId != null) {
+                        // Use go_router to navigate
+                        context.push('/quests/$questId');
+                      } else {
+                        // Handle cases where questId might be null, perhaps show a snackbar
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Error: Quest ID is missing.')),
+                        );
+                      }
+                    },
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
