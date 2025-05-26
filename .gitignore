@@ -10,6 +10,7 @@
 .svn/
 migrate_working_dir/
 firebase_config.json
+serviceAccountKey.json
 
 # IntelliJ related
 *.iml
