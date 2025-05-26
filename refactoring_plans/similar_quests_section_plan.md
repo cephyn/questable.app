@@ -204,8 +204,9 @@ This document outlines the plan for implementing a "Similar Quests" section on t
 ### Phase 4: Deployment & Monitoring
 
 *   **Task 4.1: Deploy Backend Changes.**
-    *   Deploy the updated backend (similarity calculation logic, pre-computation mechanism, new API endpoint) to the production environment.
+    *   Deploy the updated backend (similarity calculation logic, pre-computation mechanism) to the production environment.
     *   Ensure the pre-computation script runs for all existing quests if not already handled.
+        *   **Admin Tool Created**: An admin script `functions/admin_update_all_similar_quests.py` has been created to manually trigger similarity re-computation for all existing quests. This script can be run after deployment or as needed.
 *   **Task 4.2: Deploy Frontend Changes.**
     *   Deploy the updated frontend (quest detail view with "Similar Quests" section) to the production environment.
 *   **Task 4.3: Initial Monitoring.**
