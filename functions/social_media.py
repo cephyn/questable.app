@@ -75,7 +75,7 @@ def generate_post_content(quest_data):
     summary = quest_data.get("summary", "No summary available.")
     quest_id = quest_data.get("id")
 
-    deep_link = f"https://questable.web.app/#/quest/{quest_id}" 
+    deep_link = f"https://questable.app/#/quest/{quest_id}" 
 
     hashtag_terms = []
     if game_system:
