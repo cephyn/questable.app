@@ -1,7 +1,7 @@
 firebase_functions>=0.4.2  # Updated to a version that includes auth_fn
 google.api_core
 google.cloud
-markitdown[pdf,docx]
+markitdown[pdf,docx]>=0.1.2  # For Markdown processing and PDF/Docx generation
 firebase_admin>=6.8.0  # Ensure firebase_admin is included for Firestore operations
 # Add any other necessary libraries for Bluesky API, etc.
 # For example, if a specific Bluesky library is chosen:

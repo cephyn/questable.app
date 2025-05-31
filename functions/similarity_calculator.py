@@ -1,10 +1,7 @@
 # functions/similarity_calculator.py
 # Likely imports:
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import nltk # Keep for nltk.data.path
+# All other NLTK/sklearn imports moved to be lazy loaded
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -18,96 +15,41 @@ def _initialize_firebase():
     global fb_db
     if not firebase_admin._apps:
         firebase_admin.initialize_app()
-        print("Firebase Admin SDK initialized.")
-    else:
-        print("Firebase Admin SDK already initialized.")
+        # print("Firebase Admin SDK initialized.") # Commented out for production
+    # else:
+        # print("Firebase Admin SDK already initialized.") # Commented out for production
     fb_db = firestore.client()
 
 
 # --- NLTK Data Setup ---
 NLTK_DATA_DIR_NAME = "nltk_data"
-# In Cloud Functions, __file__ should point to the deployed script's location, e.g., /workspace/similarity_calculator.py
+# In Cloud Functions, __file__ should point to the deployed script\'s location, e.g., /workspace/similarity_calculator.py
 # So, NLTK_DATA_PATH should become /workspace/nltk_data
 NLTK_DATA_PATH = os.path.join(os.path.dirname(__file__), NLTK_DATA_DIR_NAME)
-
-# --- BEGIN AGGRESSIVE DEBUGGING FOR CLOUD DEPLOYMENT ---
-print(f"--- NLTK Deployment Debug ---")
-print(f"Script path (__file__): {__file__}")
-print(f"Calculated NLTK_DATA_PATH: {NLTK_DATA_PATH}")
-print(f"Current working directory (os.getcwd()): {os.getcwd()}")
-
-print(f"Listing contents of /workspace (os.listdir('/workspace')):")
-try:
-    print(os.listdir("/workspace"))
-except Exception as e:
-    print(f"Error listing /workspace: {e}")
-
-if os.path.exists(NLTK_DATA_PATH):
-    print(f"Contents of NLTK_DATA_PATH ({NLTK_DATA_PATH}): {os.listdir(NLTK_DATA_PATH)}")
-    
-    tokenizers_path = os.path.join(NLTK_DATA_PATH, 'tokenizers')
-    if os.path.exists(tokenizers_path):
-        print(f"Contents of tokenizers_path ({tokenizers_path}): {os.listdir(tokenizers_path)}")
-        
-        punkt_path = os.path.join(tokenizers_path, 'punkt')
-        if os.path.exists(punkt_path):
-            print(f"Contents of punkt_path ({punkt_path}): {os.listdir(punkt_path)}")
-            # Specifically check for the pickle file
-            english_pickle_py3 = os.path.join(punkt_path, 'PY3', 'english.pickle')
-            english_pickle = os.path.join(punkt_path, 'english.pickle')
-            print(f"Exists - {english_pickle_py3}: {os.path.exists(english_pickle_py3)}")
-            print(f"Exists - {english_pickle}: {os.path.exists(english_pickle)}")
-        else:
-            print(f"Punkt directory ({punkt_path}) does NOT exist.")
-            
-        # Check for punkt.zip as well
-        punkt_zip_path = os.path.join(tokenizers_path, 'punkt.zip')
-        print(f"Exists - {punkt_zip_path}: {os.path.exists(punkt_zip_path)}")
-
-    else:
-        print(f"Tokenizers directory ({tokenizers_path}) does NOT exist.")
-        
-    corpora_path = os.path.join(NLTK_DATA_PATH, 'corpora')
-    if os.path.exists(corpora_path):
-        print(f"Contents of corpora_path ({corpora_path}): {os.listdir(corpora_path)}")
-        stopwords_path = os.path.join(corpora_path, 'stopwords')
-        if os.path.exists(stopwords_path):
-            print(f"Contents of stopwords_path ({stopwords_path}): {os.listdir(stopwords_path)}")
-        else:
-            print(f"Stopwords directory ({stopwords_path}) does NOT exist.")
-        stopwords_zip_path = os.path.join(corpora_path, 'stopwords.zip')
-        print(f"Exists - {stopwords_zip_path}: {os.path.exists(stopwords_zip_path)}")
-    else:
-        print(f"Corpora directory ({corpora_path}) does NOT exist.")
-else:
-    print(f"NLTK_DATA_PATH ({NLTK_DATA_PATH}) does NOT exist in the cloud environment.")
-
-print(f"--- End NLTK Deployment Debug ---")
-# --- END AGGRESSIVE DEBUGGING ---
-
 
 if NLTK_DATA_PATH not in nltk.data.path:
     nltk.data.path.insert(0, NLTK_DATA_PATH)
 
-# For debugging in Cloud Function logs:
-print(f"NLTK data search paths configured: {nltk.data.path}")
+_stopwords_cache = None
+_punkt_initialized = False
 
-# Attempt to pre-load the tokenizer to catch issues early
-print("--- Attempting NLTK Punkt Pre-load ---")
-try:
-    print(f"Attempting word_tokenize with a test sentence to pre-load Punkt...")
-    test_tokens = nltk.word_tokenize("This is a test sentence for Punkt pre-loading.")
-    print(f"Punkt pre-load successful. Test tokens: {test_tokens[:5]}...")
-    
-    print(f"Attempting to load stopwords...")
-    sw = nltk.corpus.stopwords.words('english')
-    print(f"Stopwords loaded successfully. Count: {len(sw)}.")
-    
-except Exception as e:
-    print(f"ERROR during NLTK pre-load: {e}")
-print("--- End NLTK Punkt Pre-load ---")
+# Removed NLTK pre-loading from global scope to prevent deployment timeouts.
+# These will be loaded on-demand by _ensure_nltk_resources().
+# print("--- Attempting NLTK Punkt Pre-load ---")
+# try:
+#     print(f"Attempting word_tokenize with a test sentence to pre-load Punkt...")
+#     test_tokens = nltk.word_tokenize("This is a test sentence for Punkt pre-loading.")
+#     print(f"Punkt pre-load successful. Test tokens: {test_tokens[:5]}...")
+#
+#     print(f"Attempting to load stopwords...")
+#     sw = nltk.corpus.stopwords.words('english')
+#     print(f"Stopwords loaded successfully. Count: {len(sw)}.")
+#
+# except Exception as e:
+#     print(f"ERROR during NLTK pre-load: {e}")
+# print("--- End NLTK Punkt Pre-load ---")
 
-# You can also add more detailed logging about what's actually in NLTK_DATA_PATH in the cloud:
+# You can also add more detailed logging about what\'s actually in NLTK_DATA_PATH in the cloud:
 # if os.path.exists(NLTK_DATA_PATH):
 #     print(f"Contents of {NLTK_DATA_PATH} in cloud: {os.listdir(NLTK_DATA_PATH)}")
 #     tokenizers_path = os.path.join(NLTK_DATA_PATH, 'tokenizers')
@@ -126,8 +68,9 @@ def _setup_nltk_data_for_packaging():
     nltk_data directory. This directory MUST then be packaged and deployed.
     This function is intended to be run locally BEFORE deployment.
     """
+    from nltk.tokenize import word_tokenize # LAZY IMPORT for this function
+    from nltk.corpus import stopwords # LAZY IMPORT for this function
     print(f"--- Running NLTK Data Setup for Local Packaging ---")
-    
     # NLTK_DATA_PATH is defined at the module level, e.g., os.path.join(os.path.dirname(__file__), "nltk_data")
     print(f"Target local NLTK data directory: {NLTK_DATA_PATH}")
 
@@ -139,14 +82,14 @@ def _setup_nltk_data_for_packaging():
 
     resources_to_download = ["punkt", "stopwords", "punkt_tab"]
 
-    # Download resources. NLTK places them in subdirectories like 'tokenizers' or 'corpora' within download_dir.
+    # Download resources. NLTK places them in subdirectories like \'tokenizers\' or \'corpora\' within download_dir.
     for resource_name in resources_to_download:
-        print(f"Downloading NLTK resource: '{resource_name}' to {NLTK_DATA_PATH} (NLTK will use subdirs)...")
+        print(f"Downloading NLTK resource: \'{resource_name}\' to {NLTK_DATA_PATH} (NLTK will use subdirs)...")
         try:
             nltk.download(resource_name, download_dir=NLTK_DATA_PATH)
-            print(f"Successfully downloaded '{resource_name}'.")
+            print(f"Successfully downloaded \'{resource_name}\'.")
         except Exception as e:
-            print(f"ERROR downloading NLTK resource '{resource_name}': {e}")
+            print(f"ERROR downloading NLTK resource \'{resource_name}\': {e}")
             print("Please ensure network connectivity and that NLTK can write to the target.")
             return # Stop if a download fails
 
@@ -157,15 +100,15 @@ def _setup_nltk_data_for_packaging():
         nltk.data.path.insert(0, NLTK_DATA_PATH)
     
     try:
-        # Trigger NLTK to unpack 'punkt' if it hasn't already from the .zip
-        print("Verifying/Unpacking 'punkt' tokenizer locally...")
+        # Trigger NLTK to unpack \'punkt\' if it hasn\'t already from the .zip
+        print("Verifying/Unpacking \'punkt\' tokenizer locally...")
         word_tokenize("test sentence for punkt unpacking")
-        print("'punkt' tokenizer ready locally.")
+        print("\'punkt\' tokenizer ready locally.")
 
-        # Trigger NLTK to unpack 'stopwords' if it hasn't already
-        print("Verifying/Unpacking 'stopwords' locally...")
+        # Trigger NLTK to unpack \'stopwords\' if it hasn\'t already
+        print("Verifying/Unpacking \'stopwords\' locally...")
         stopwords.words("english")
-        print("'stopwords' ready locally.")
+        print("\'stopwords\' ready locally.")
     except Exception as e:
         print(f"ERROR during local NLTK resource test (unpacking): {e}")
         # Restore nltk.data.path before returning on error
@@ -201,7 +144,7 @@ def _setup_nltk_data_for_packaging():
                 print(f"Warning: Could not remove .DS_Store file {ds_store_file}: {e}")
 
     print(f"--- NLTK Data Setup for Local Packaging Complete ---")
-    print(f"Ensure the directory '{NLTK_DATA_PATH}' (now with unzipped contents and no zips) is deployed.")
+    print(f"Ensure the directory \'{NLTK_DATA_PATH}\' (now with unzipped contents and no zips) is deployed.")
 
 # --- Configuration for Similarity Algorithm (from Task 1.1) ---
 FIELD_MATCH_WEIGHTS = {
@@ -272,7 +215,7 @@ def calculate_similarity_for_quest(quest_id: str) -> list:
         )
 
         # 3.2. Calculate text similarity score (titles & summaries)
-        # For simplicity, let's assume titles and summaries are weighted equally for the text score.
+        # For simplicity, let\'s assume titles and summaries are weighted equally for the text score.
         # A more sophisticated approach might weight them differently or combine them before TF-IDF.
         title_similarity = _calculate_text_similarity(
             target_quest_data.get("title", ""), other_quest.get("title", "")
@@ -300,7 +243,7 @@ def calculate_similarity_for_quest(quest_id: str) -> list:
     # 6. Store these top N similarities in Firestore
     if top_n_similarities:
         print(
-            f"Storing top {len(top_n_similarities)} similar quests for {quest_id} in subcollection '{SIMILAR_QUESTS_SUBCOLLECTION}'..."
+            f"Storing top {len(top_n_similarities)} similar quests for {quest_id} in subcollection \'{SIMILAR_QUESTS_SUBCOLLECTION}\'..."
         )
         target_quest_ref = fb_db.collection("questCards").document(quest_id)
         subcollection_ref = target_quest_ref.collection(SIMILAR_QUESTS_SUBCOLLECTION)
@@ -310,7 +253,7 @@ def calculate_similarity_for_quest(quest_id: str) -> list:
 
         # Delete existing documents
         # Note: Listing and deleting in a loop can be less efficient for very large subcollections,
-        # but for a small number (e.g., <100) of similar quests, it's generally acceptable.
+        # but for a small number (e.g., <100) of similar quests, it\'s generally acceptable.
         # For Cloud Functions, consider time limits.
         # A more robust way for larger subcollections might involve a recursive delete helper if needed.
         existing_similar_docs = subcollection_ref.stream()
@@ -409,11 +352,17 @@ def _calculate_text_similarity(text1: str, text2: str) -> float:
     Calculates cosine similarity between two texts using TF-IDF.
     Uses nltk for tokenization/stopwords and scikit-learn for TF-IDF.
     """
+    from nltk.tokenize import word_tokenize # LAZY IMPORT
+    from sklearn.feature_extraction.text import TfidfVectorizer # LAZY IMPORT
+    from sklearn.metrics.pairwise import cosine_similarity # LAZY IMPORT
+    
+    _ensure_nltk_resources() # Ensure NLTK resources are loaded
+
     # Explicitly check for two empty strings at the beginning
     if not text1 and not text2:
         return 1.0
 
-    stop_words_set = set(stopwords.words("english"))
+    stop_words_set = _stopwords_cache if _stopwords_cache is not None else set()
 
     def preprocess(text_content):
         tokens = word_tokenize(text_content.lower())
@@ -433,10 +382,9 @@ def _calculate_text_similarity(text1: str, text2: str) -> float:
     elif not processed_text1 or not processed_text2:
         return 0.0  # One is empty, the other is not, so no similarity
 
-    vectorizer = TfidfVectorizer()
     try:
         # Create TF-IDF vectors for both processed texts
-        tfidf_matrix = vectorizer.fit_transform([processed_text1, processed_text2])
+        tfidf_matrix = TfidfVectorizer().fit_transform([processed_text1, processed_text2])
     except ValueError:
         # This can happen if vocabulary is empty (e.g., texts contained only characters not part of TF-IDF's default token pattern)
         return 0.0
@@ -448,6 +396,38 @@ def _calculate_text_similarity(text1: str, text2: str) -> float:
 
     # similarity_matrix is a 2D array, e.g., [[value]], so extract the value
     return float(similarity_matrix[0][0])
+
+
+def _ensure_nltk_resources():
+    """
+    Ensures NLTK\'s Punkt tokenizer and stopwords are loaded.
+    This function is called before NLTK operations that depend on these resources.
+    """
+    global _stopwords_cache, _punkt_initialized
+
+    if not _punkt_initialized:
+        from nltk.tokenize import word_tokenize # LAZY IMPORT
+        try:
+            # print("Ensuring NLTK Punkt tokenizer is ready (first-time use)...")
+            # A light operation to trigger NLTK\'s internal loading of Punkt if needed.
+            # NLTK\'s word_tokenize handles its own lazy loading of \'punkt\'.
+            # This call ensures it happens before we rely on it in loops.
+            word_tokenize("test") 
+            # print("NLTK Punkt tokenizer should be ready.")
+            _punkt_initialized = True
+        except Exception as e:
+            print(f"ERROR initializing NLTK Punkt tokenizer: {e}")
+            # Depending on severity, you might re-raise or handle (e.g., proceed without tokenization)
+
+    if _stopwords_cache is None:
+        from nltk.corpus import stopwords # LAZY IMPORT
+        try:
+            # print("Loading NLTK stopwords (first-time use)...")
+            _stopwords_cache = set(stopwords.words("english"))
+            # print(f"NLTK stopwords loaded. Count: {len(_stopwords_cache)}")
+        except Exception as e:
+            print(f"ERROR loading NLTK stopwords: {e}")
+            _stopwords_cache = set() # Fallback to empty set if loading fails
 
 
 # Example usage (for testing locally)
