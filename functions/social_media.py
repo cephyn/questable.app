@@ -75,13 +75,13 @@ def generate_post_content(quest_data):
     summary = quest_data.get("summary", "No summary available.")
     quest_id = quest_data.get("id")
 
-    deep_link = f"https://questable.app/#/quest/{quest_id}" 
+    deep_link = f"https://questable.app/#/quests/{quest_id}" 
 
     hashtag_terms = []
     if game_system:
-        hashtag_terms.append(game_system.replace(" ", ""))
+        hashtag_terms.append(f"#{game_system.replace(' ', '')}")
     if genre:
-        hashtag_terms.append(genre.replace(" ", ""))
+        hashtag_terms.append(f"#{genre.replace(' ', '')}")
     hashtag_terms.extend(["#Questable", "#ttrpg"])
     # Ensure no empty strings if game_system or genre were empty
     hashtag_terms = [term for term in hashtag_terms if term]
