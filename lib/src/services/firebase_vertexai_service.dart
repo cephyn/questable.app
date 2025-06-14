@@ -17,7 +17,7 @@ class FirebaseVertexaiService {
       FirebaseStorageService();
 
   // AI configuration
-  final String aiModel = 'gemini-2.5-flash';
+  final String aiModel = 'gemini-2.0-flash';
   final String systemInstruction =
       'You are an expert at extracting RPG Adventures from text documents and producing structured data. Correct any spelling mistakes. Your task is to extract relevant details from the provided text and output it in JSON format according to the provided response schema. The definition of an RPG Adventure is: An RPG adventure is a narrative-driven scenario within a role-playing game where players guide characters through challenges and exploration to advance a storyline.';
 
@@ -29,7 +29,7 @@ class FirebaseVertexaiService {
   /// Creates a GenerativeModel with the specified schema
   GenerativeModel _createModel(Schema schema,
       {bool setSystemInstruction = true}) {
-    return FirebaseAI.googleAI().generativeModel(
+    return FirebaseAI.vertexAI().generativeModel(
       model: aiModel,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
