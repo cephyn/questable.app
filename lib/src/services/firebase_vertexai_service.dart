@@ -3,7 +3,7 @@ import 'dart:developer';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_vertexai/firebase_vertexai.dart';
+import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/foundation.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart';
 import 'package:quest_cards/src/services/purchase_link_service.dart';
@@ -17,7 +17,7 @@ class FirebaseVertexaiService {
       FirebaseStorageService();
 
   // AI configuration
-  final String aiModel = 'gemini-2.0-flash';
+  final String aiModel = 'gemini-2.5-flash';
   final String systemInstruction =
       'You are an expert at extracting RPG Adventures from text documents and producing structured data. Correct any spelling mistakes. Your task is to extract relevant details from the provided text and output it in JSON format according to the provided response schema. The definition of an RPG Adventure is: An RPG adventure is a narrative-driven scenario within a role-playing game where players guide characters through challenges and exploration to advance a storyline.';
 
@@ -29,7 +29,7 @@ class FirebaseVertexaiService {
   /// Creates a GenerativeModel with the specified schema
   GenerativeModel _createModel(Schema schema,
       {bool setSystemInstruction = true}) {
-    return FirebaseVertexAI.instance.generativeModel(
+    return FirebaseAI.googleAI().generativeModel(
       model: aiModel,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',

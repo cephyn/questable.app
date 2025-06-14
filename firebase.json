@@ -46,6 +46,11 @@
       "include": [
         "nltk_data/**"
       ]
+    },
+    {
+      "source": "functions_node",
+      "codebase": "node-functions",
+      "runtime": "nodejs22"
     }
   ],
   "emulators": {

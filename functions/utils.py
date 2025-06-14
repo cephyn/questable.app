@@ -9,9 +9,9 @@ from google.cloud import secretmanager
 
 def get_secret(secret_name, project_id="766749273273"):
     """Get a secret from Google Cloud Secret Manager."""
-    client = secretmanager.SecretManagerServiceClient()
+    secret_manager_client = secretmanager.SecretManagerServiceClient()
     secret_version_name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
-    response = client.access_secret_version(name=secret_version_name)
+    response = secret_manager_client.access_secret_version(name=secret_version_name)
     return response.payload.data.decode("UTF-8")
 
 

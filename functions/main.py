@@ -72,7 +72,7 @@ def pdf_to_md(req: https_fn.CallableRequest) -> any:
 
     return result.text_content
 
-@https_fn.on_call()
+@https_fn.on_call(memory=options.MemoryOption.MB_512)
 def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response | dict:
     """
     Fetches Google API Key and Search Engine ID from Google Cloud Secret Manager.
@@ -82,9 +82,8 @@ def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response
     google_search_engine_id_secret_id = "GOOGLE_SEARCH_ENGINE_ID"
 
     try:
-        api_key = get_secret(project_id, google_api_key_secret_id)
-        search_engine_id = get_secret(
-            project_id, google_search_engine_id_secret_id
+        api_key = get_secret(google_api_key_secret_id, project_id)
+        search_engine_id = get_secret(google_search_engine_id_secret_id, project_id
         )
 
         if not api_key:

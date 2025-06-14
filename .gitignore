@@ -13,6 +13,17 @@ firebase_config.json
 serviceAccountKey.json
 *.cache
 
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+# Optional: Common Node.js build output folder
+dist/
+.env
+
 # IntelliJ related
 *.iml
 *.ipr
