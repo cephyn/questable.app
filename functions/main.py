@@ -61,16 +61,16 @@ def on_new_quest_card_created(event: firestore_fn.Event[firestore_fn.Change]) ->
         # Optionally, re-raise the exception if you want the function to be marked as failed
         # raise e
 
-@https_fn.on_call(
-    memory=options.MemoryOption.GB_2,
-)
-def pdf_to_md(req: https_fn.CallableRequest) -> any:
-    from markitdown import MarkItDown # LAZY IMPORT
-    url = req.data["url"]
-    md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
-    result = md.convert(url)
+# @https_fn.on_call(
+#     memory=options.MemoryOption.GB_2,
+# )
+# def pdf_to_md(req: https_fn.CallableRequest) -> any:
+#     from markitdown import MarkItDown # LAZY IMPORT
+#     url = req.data["url"]
+#     md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
+#     result = md.convert(url)
 
-    return result.text_content
+#     return result.text_content
 
 @https_fn.on_call(memory=options.MemoryOption.MB_512)
 def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response | dict:
