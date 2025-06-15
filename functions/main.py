@@ -159,7 +159,8 @@ def proxy_fetch_url(req: https_fn.CallableRequest) -> https_fn.Response | dict:
         return {
             "statusCode": response.status_code,
             "headers": dict(response.headers),
-            "content": response.text  # Or response.content for binary data
+            # Omitting or truncating the content field to reduce payload size
+            "content": response.text[:1000] if len(response.text) > 1000 else response.text
         }
 
     except requests.exceptions.Timeout as e:
