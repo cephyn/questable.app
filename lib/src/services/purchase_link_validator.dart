@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'package:http/http.dart' as http;
 import '../config/config.dart';
+import 'package:cloud_functions/cloud_functions.dart'; // Added for Firebase Functions
 
 /// Priority levels for domains
 class DomainPriority {
@@ -200,48 +201,58 @@ class PurchaseLinkValidator {
     }
   }
 
-  /// Checks if a URL is accessible
+  /// Verifies if a URL is accessible by making a HEAD request via proxy
   ///
   /// [url] is the URL to check
-  /// Returns true if the URL is accessible
+  /// Returns true if accessible, false otherwise
   Future<bool> isUrlAccessible(String url) async {
+    log('Checking accessibility for URL (via proxy): $url');
     try {
-      // Parse the URL
-      final uri = Uri.parse(url);
+      // Initialize FirebaseFunctions instance
+      // Ensure your Firebase project is correctly configured in your Flutter app
+      FirebaseFunctions functions = FirebaseFunctions.instance;
+      // You might need to specify the region if your functions are not in us-central1
+      // FirebaseFunctions.instanceFor(region: 'your-region');
 
-      // Add a user agent to avoid being blocked
-      final headers = {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      };
+      final HttpsCallable callable = functions.httpsCallable('proxy_fetch_url');
+      final HttpsCallableResult result = await callable.call(<String, dynamic>{
+        'targetUrl': url,
+      });
 
-      // Try a HEAD request first (faster, less bandwidth)
-      try {
-        final response = await _httpClient
-            .head(uri, headers: headers)
-            .timeout(const Duration(seconds: 5));
+      // Log the raw proxy response for debugging
+      log('Proxy response data: ${result.data}');
 
-        log('URL accessibility HEAD check: ${response.statusCode}');
-
-        // If we get a successful response, we're good
-        if (response.statusCode >= 200 && response.statusCode < 400) {
-          return true;
-        }
-      } catch (_) {
-        // HEAD request failed, we'll try GET next
-        log('HEAD request failed for $url, trying GET');
+      // Check the statusCode returned by the proxy function
+      // This statusCode is from the target URL's response
+      if (result.data != null && result.data['statusCode'] != null) {
+        final int statusCode = result.data['statusCode'];
+        log('Proxy target URL ($url) responded with status code: $statusCode');
+        return statusCode >= 200 && statusCode < 300; // 2xx codes indicate success
+      } else {
+        log('Proxy response did not include a statusCode for $url.');
+        return false;
       }
-
-      // If HEAD failed or returned an error, try a GET request
-      // Some servers don't properly support HEAD requests
-      final response = await _httpClient
-          .get(uri, headers: headers)
-          .timeout(const Duration(seconds: 5));
-
-      log('URL accessibility GET check: ${response.statusCode}');
-      return response.statusCode >= 200 && response.statusCode < 400;
+    } on FirebaseFunctionsException catch (e) {
+      log('FirebaseFunctionsException while checking URL $url: ${e.code} - ${e.message}');
+      if (e.details != null) {
+        log('FirebaseFunctionsException details: ${e.details}');
+      }
+      // Specific handling for common errors from the proxy
+      if (e.details != null && e.details is Map) {
+        final detailsMap = e.details as Map<String, dynamic>;
+        if (detailsMap.containsKey('message')) {
+          final String proxyErrorMessage = detailsMap['message'] as String;
+          if (proxyErrorMessage.contains('timed out')) {
+            log('URL $url timed out via proxy.');
+            // Consider if timeout should be treated as not accessible or a temporary issue
+          } else if (proxyErrorMessage.contains('Failed to fetch content')) {
+            log('URL $url failed to fetch via proxy (e.g., 403, 404, 500 from target).');
+          }
+        }
+      }
+      return false; // URL is not accessible if the proxy call fails or target returns error
     } catch (e) {
-      log('URL accessibility check failed: $e');
+      log('Generic error checking URL accessibility via proxy for $url: $e');
       return false;
     }
   }
