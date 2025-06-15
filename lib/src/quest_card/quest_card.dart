@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart'; // Added Firestore import for Timestamp type
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_ai/firebase_ai.dart';
@@ -29,6 +30,8 @@ class QuestCard {
   String? systemMigrationStatus; // New field to track migration status
   DateTime?
       systemMigrationTimestamp; // New field to track when migration occurred
+  String? uploaderEmail; // Added field for uploader's email
+  DateTime? uploadedTimestamp; // Added field for upload timestamp
 
   QuestCard(
       {this.id,
@@ -54,7 +57,9 @@ class QuestCard {
       this.uploadedBy,
       this.isPublic = true,
       this.systemMigrationStatus,
-      this.systemMigrationTimestamp}); // Default to true for public access
+      this.systemMigrationTimestamp,
+      this.uploaderEmail, // Added to constructor
+      this.uploadedTimestamp}); // Added to constructor // Default to true for public access
 
   QuestCard.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -82,9 +87,46 @@ class QuestCard {
     isPublic = json['isPublic'] ?? true;
     // Migration status fields
     systemMigrationStatus = json['systemMigrationStatus'];
-    systemMigrationTimestamp = json['systemMigrationTimestamp'] != null
-        ? (json['systemMigrationTimestamp'] as dynamic).toDate()
-        : null;
+
+    // Updated timestamp parsing for systemMigrationTimestamp
+    final smtValue = json['systemMigrationTimestamp'];
+    if (smtValue != null) {
+      if (smtValue is Timestamp) {
+        // Check if it's a Firestore Timestamp
+        systemMigrationTimestamp = smtValue.toDate();
+      } else if (smtValue is String) {
+        // Check if it's a String
+        systemMigrationTimestamp = DateTime.tryParse(smtValue);
+      } else {
+        // Log or handle other unexpected types
+        print(
+            'Warning: systemMigrationTimestamp in fromJson has unexpected type: \${smtValue.runtimeType}');
+        systemMigrationTimestamp = null;
+      }
+    } else {
+      systemMigrationTimestamp = null;
+    }
+
+    uploaderEmail = json['uploaderEmail'];
+
+    // Updated timestamp parsing for uploadedTimestamp
+    final utValue = json['uploadedTimestamp'];
+    if (utValue != null) {
+      if (utValue is Timestamp) {
+        // Check if it's a Firestore Timestamp
+        uploadedTimestamp = utValue.toDate();
+      } else if (utValue is String) {
+        // Check if it's a String
+        uploadedTimestamp = DateTime.tryParse(utValue);
+      } else {
+        // Log or handle other unexpected types
+        print(
+            'Warning: uploadedTimestamp in fromJson has unexpected type: \${utValue.runtimeType}');
+        uploadedTimestamp = null;
+      }
+    } else {
+      uploadedTimestamp = null;
+    }
   }
 
   QuestCard.fromSearchJson(Map<String, dynamic> json) {
@@ -136,6 +178,26 @@ class QuestCard {
     } else {
       systemMigrationTimestamp = null;
     }
+    uploaderEmail = json['uploaderEmail']; // Added to fromSearchJson
+    // Handle uploadedTimestamp from Algolia similarly to systemMigrationTimestamp
+    final algoliaUploadedTimestampValue = json['uploadedTimestamp']; // Added to fromSearchJson
+    if (algoliaUploadedTimestampValue != null) {
+      if (algoliaUploadedTimestampValue is int) {
+        uploadedTimestamp =
+            DateTime.fromMillisecondsSinceEpoch(algoliaUploadedTimestampValue);
+      } else if (algoliaUploadedTimestampValue is double) {
+        uploadedTimestamp = DateTime.fromMillisecondsSinceEpoch(
+            algoliaUploadedTimestampValue.toInt());
+      } else if (algoliaUploadedTimestampValue is String) {
+        uploadedTimestamp = DateTime.tryParse(algoliaUploadedTimestampValue);
+      } else {
+        print(
+            'Warning: uploadedTimestamp from Algolia has unexpected type: \${algoliaUploadedTimestampValue.runtimeType}. Value: \$algoliaUploadedTimestampValue');
+        uploadedTimestamp = null;
+      }
+    } else {
+      uploadedTimestamp = null;
+    }
   }
 
   String generateUniqueHash() {
@@ -171,6 +233,8 @@ class QuestCard {
       'isPublic': isPublic, // Include in JSON output
       'systemMigrationStatus': systemMigrationStatus,
       'systemMigrationTimestamp': systemMigrationTimestamp,
+      'uploaderEmail': uploaderEmail, // Added to toJson
+      'uploadedTimestamp': uploadedTimestamp, // Added to toJson
     };
   }
 
@@ -198,40 +262,47 @@ class QuestCard {
           Schema.integer(description: 'The number of pages in the adventure.'),
       'authors': Schema.array(
           items: Schema.string(),
-          description: 'The author(s) of the adventure.'),
-      'publisher':
-          Schema.string(description: 'The publisher of the adventure.'),
-      'publicationYear': Schema.string(
-          description: 'The year in which the adventure was published.'),
-      'genre': Schema.string(
-          description:
-              'The genre the adventure best fits in. Examples include fantasy, science fiction, etc.'),
+          description: 'A list of authors who wrote the adventure.'),
+      'publisher': Schema.string(description: 'The publisher of the adventure.'),
+      'publicationYear':
+          Schema.string(description: 'The year the adventure was published.'),
       'setting': Schema.string(
           description:
-              'The fictional world the adventure is set in, or the type of fictional world if one is not declared.'),
+              'The game world or setting the adventure takes place in.'),
       'environments': Schema.array(
           items: Schema.string(),
           description:
-              'The environment(s), biomes, structures in which the adventure takes place, both outdoor and indoor.'),
+              'A list of typical environments featured in the adventure (e.g., dungeon, forest, city).'),
       'link': Schema.string(
-          //format: 'uri',
-          description:
-              'A web link to where the adventure may be purchased or downloaded. Validate the web site exists, otherwise generate an empty string.'),
+          description: 'A URL link to where the adventure can be found.'),
       'bossVillains': Schema.array(
           items: Schema.string(),
-          description:
-              'The final adversary (or adversaries) that must be overcome in the adventure.'),
+          description: 'A list of major villains or bosses in the adventure.'),
       'commonMonsters': Schema.array(
           items: Schema.string(),
           description:
-              'The common foes found throughout the adventure that can often be found in any adventure in the genre.'),
+              'A list of common monsters or enemies found in the adventure.'),
       'notableItems': Schema.array(
           items: Schema.string(),
           description:
-              'Any unique or notable item(s) that could be acquired as treasure in the adventure.'),
-      'summary': Schema.string(
+              'A list of notable magic items or important objects in the adventure.'),
+      'summary': Schema.string(description: 'A brief summary of the adventure.'),
+      'genre': Schema.string(description: 'The genre of the adventure.'),
+      'uploadedBy': Schema.string(
+          description: 'The user ID of the person who uploaded the quest card.'),
+      'uploaderEmail': Schema.string(
+          description: "The email of the user who uploaded the quest card."), // Added to AI Schema
+      'uploadedTimestamp': Schema.string( // Representing as String for schema, will be DateTime in Dart
+          format: 'date-time',
+          description: "The timestamp when the quest card was uploaded."), // Added to AI Schema
+      'isPublic': Schema.boolean(
+          description: 'Indicates if the quest card is publicly visible.'),
+      'systemMigrationStatus': Schema.string(
+          description: 'The migration status of the quest card, if applicable.'),
+      'systemMigrationTimestamp': Schema.string(
+          format: 'date-time',
           description:
-              'A short summary of the adventure, without spoilers. Limit to around 100 words.'),
+              'The timestamp when the quest card was migrated to the new system, if applicable.'),
     });
   }
 

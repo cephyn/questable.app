@@ -220,7 +220,7 @@ class PurchaseLinkValidator {
       });
 
       // Log the raw proxy response for debugging
-      log('Proxy response data: ${result.data}');
+      //log('Proxy response data: ${result.data}');
 
       // Check the statusCode returned by the proxy function
       // This statusCode is from the target URL's response
