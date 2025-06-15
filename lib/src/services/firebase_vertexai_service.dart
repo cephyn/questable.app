@@ -22,7 +22,7 @@ class FirebaseVertexaiService {
       'You are an expert at extracting RPG Adventures from text documents and producing structured data. Correct any spelling mistakes. Your task is to extract relevant details from the provided text and output it in JSON format according to the provided response schema. The definition of an RPG Adventure is: An RPG adventure is a narrative-driven scenario within a role-playing game where players guide characters through challenges and exploration to advance a storyline.';
 
   // Model generation parameters
-  final double temperature = 0.7;
+  final double temperature = 1.0;
   final double topP = 0.95;
   final int topK = 40;
 
