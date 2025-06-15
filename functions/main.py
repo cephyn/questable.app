@@ -15,6 +15,7 @@ from firebase_admin import (
     firestore,
 )
 import logging  # Added
+import requests # Added for the proxy function
 # from markitdown import MarkItDown # Importing MarkItDown for PDF to Markdown conversion # MOVED TO pdf_to_md
 
 # Import the similarity calculation function
@@ -61,18 +62,18 @@ def on_new_quest_card_created(event: firestore_fn.Event[firestore_fn.Change]) ->
         # Optionally, re-raise the exception if you want the function to be marked as failed
         # raise e
 
-@https_fn.on_call(
-    memory=options.MemoryOption.GB_2,
-)
-def pdf_to_md(req: https_fn.CallableRequest) -> any:
-    from markitdown import MarkItDown # LAZY IMPORT
-    url = req.data["url"]
-    md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
-    result = md.convert(url)
+# @https_fn.on_call(
+#     memory=options.MemoryOption.GB_2,
+# )
+# def pdf_to_md(req: https_fn.CallableRequest) -> any:
+#     from markitdown import MarkItDown # LAZY IMPORT
+#     url = req.data["url"]
+#     md = MarkItDown(enable_plugins=False)  # Set to True to enable plugins
+#     result = md.convert(url)
 
-    return result.text_content
+#     return result.text_content
 
-@https_fn.on_call()
+@https_fn.on_call(memory=options.MemoryOption.MB_512)
 def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response | dict:
     """
     Fetches Google API Key and Search Engine ID from Google Cloud Secret Manager.
@@ -82,9 +83,8 @@ def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response
     google_search_engine_id_secret_id = "GOOGLE_SEARCH_ENGINE_ID"
 
     try:
-        api_key = get_secret(project_id, google_api_key_secret_id)
-        search_engine_id = get_secret(
-            project_id, google_search_engine_id_secret_id
+        api_key = get_secret(google_api_key_secret_id, project_id)
+        search_engine_id = get_secret(google_search_engine_id_secret_id, project_id
         )
 
         if not api_key:
@@ -120,4 +120,73 @@ def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response
             message="An internal error occurred while fetching Google search configuration.",
             details=str(e),
         )
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_512) # Added new proxy function
+def proxy_fetch_url(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """
+    Acts as a proxy to fetch content from a URL to bypass CORS issues.
+    Expects 'targetUrl' in the request data.
+    """
+    target_url = req.data.get("targetUrl")
+
+    if not target_url:
+        logging.error("Proxy request missing 'targetUrl'")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="The function must be called with a 'targetUrl' argument."
+        )
+
+    logging.info(f"Proxying request to: {target_url}")
+
+    try:
+        # Using a session object can be beneficial for performance if multiple requests are made to the same host
+        with requests.Session() as session:
+            # It's good practice to set a User-Agent that's representative of your app/service
+            headers = {
+                "User-Agent": "QuestableAppProxy/1.0 (+https://questable.app)"
+            }
+            # Make a GET request. For HEAD requests, use session.head()
+            # The original error was for a HEAD request, but for validation, GET might be more common.
+            # If only headers are needed, change to session.head() and adjust response handling.
+            response = session.get(target_url, headers=headers, timeout=20) # 20 seconds timeout
+
+        # Raise an exception for bad status codes (4xx or 5xx)
+        response.raise_for_status()
+
+        # Return relevant parts of the response
+        # Be mindful of not returning excessively large responses if only a status or specific headers are needed.
+        return {
+            "statusCode": response.status_code,
+            "headers": dict(response.headers),
+            # Omitting or truncating the content field to reduce payload size
+            "content": response.text[:1000] if len(response.text) > 1000 else response.text
+        }
+
+    except requests.exceptions.Timeout as e:
+        logging.error(f"Timeout error fetching {target_url}: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.DEADLINE_EXCEEDED,
+            message=f"The request to {target_url} timed out.",
+            details=str(e)
+        )
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching {target_url}: {e}")
+        # Include status code in the error if available (e.g., for 403 Forbidden)
+        status_code = e.response.status_code if e.response is not None else "N/A"
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAVAILABLE, # Or more specific based on e.response.status_code
+            message=f"Failed to fetch content from {target_url}. Status: {status_code}",
+            details=str(e)
+        )
+    except Exception as e:
+        logging.error(f"Unexpected error in proxy_fetch_url for {target_url}: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="An internal error occurred while proxying the request.",
+            details=str(e)
+        )
+
+# Make sure to deploy this function after adding it.
+# firebase deploy --only functions
 

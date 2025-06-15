@@ -293,12 +293,31 @@ class _AddQuestCardState extends State<EditQuestCard> {
                       _questCard.systemMigrationTimestamp = DateTime.now();
                     }
 
+                    // Populate uploader information for new quest cards
+                    if (widget.docId.isEmpty) { // This indicates a new quest card
+                      log('[INFO] New card detected (docId is empty). Current _questCard.uploadedBy before update: ${_questCard.uploadedBy}');
+                      if (_currentUser != null) {
+                        _questCard.uploadedBy = _currentUser!.uid; // Store UID
+                        _questCard.uploaderEmail = _currentUser!.email; // Store email
+                        _questCard.uploadedTimestamp = DateTime.now(); // Store timestamp
+                        log('[INFO] Set uploader info for new quest: UID: ${_currentUser!.uid}, Email: ${_currentUser!.email}, Timestamp: ${_questCard.uploadedTimestamp}');
+                        log('[INFO] _questCard.uploadedBy after update: ${_questCard.uploadedBy}');
+                      } else {
+                        log('[ERROR] Current user is null when attempting to set uploader information for a new quest card.');
+                      }
+                    } else {
+                        log('[INFO] Existing card detected (docId: ${widget.docId}). Uploader info not changed on _questCard object directly here.');
+                    }
+
                     log('Updated _questCard from form: ${_questCard.toJson()}');
 
                     // Perform Authorization Check
                     log('[AUTH_CHECK] Starting permission checks for quest update/suggestion.');
                     log('[AUTH_CHECK] Current User UID: ${_currentUser?.uid}');
-                    log('[AUTH_CHECK] Original Uploader UID from _originalQuestCardData: ${_originalQuestCardData['uploadedBy']}');
+                    // Ensure you are logging the correct field for comparison.
+                    // If 'uploadedBy' in Firestore stores the UID, this log is correct.
+                    // If 'uploadedBy' in Firestore stores the email, this log will highlight the mismatch type.
+                    log('[AUTH_CHECK] Original Uploader Identifier from _originalQuestCardData["uploadedBy"]: ${_originalQuestCardData['uploadedBy']}');
 
                     bool isAdmin = false;
                     if (_currentUser != null) {
@@ -310,14 +329,22 @@ class _AddQuestCardState extends State<EditQuestCard> {
                       log('[AUTH_CHECK] Current user is null, cannot determine admin status.');
                     }
 
+                    // Corrected: Compare current user's UID with the stored uploader UID.
+                    // This assumes _originalQuestCardData['uploadedBy'] stores the UID.
+                    final String? originalUploaderUid = _originalQuestCardData['uploadedBy'] as String?;
                     final bool isUploader = _currentUser != null &&
-                        _originalQuestCardData['uploadedBy'] != null &&
-                        _originalQuestCardData['uploadedBy'] ==
-                            _currentUser!.uid;
-                    log('[AUTH_CHECK] Is Uploader?: $isUploader');
+                        originalUploaderUid != null &&
+                        originalUploaderUid == _currentUser!.uid;
+                    log('[AUTH_CHECK] Is Uploader (UID match)?: $isUploader');
 
-                    final bool canUpdateDirectly = isAdmin || isUploader;
-                    log('[AUTH_CHECK] Decision: Can update directly (isAdmin || isUploader)?: $canUpdateDirectly');
+                    bool canUpdateDirectly = isAdmin || isUploader;
+                    // For new cards, the creator should always be able to save it.
+                    if (widget.docId.isEmpty) {
+                        log('[AUTH_CHECK] New card: Allowing direct update.');
+                        canUpdateDirectly = true;
+                    }
+
+                    log('[AUTH_CHECK] Decision: Can update directly?: $canUpdateDirectly');
 
                     if (canUpdateDirectly) {
                       log('[ACTION] User is admin or uploader. Attempting direct quest card update.');

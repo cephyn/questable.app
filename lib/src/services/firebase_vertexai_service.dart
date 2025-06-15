@@ -29,7 +29,7 @@ class FirebaseVertexaiService {
   /// Creates a GenerativeModel with the specified schema
   GenerativeModel _createModel(Schema schema,
       {bool setSystemInstruction = true}) {
-    return FirebaseAI.googleAI().generativeModel(
+    return FirebaseAI.vertexAI().generativeModel(
       model: aiModel,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',

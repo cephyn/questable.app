@@ -59,7 +59,7 @@ class EmailService {
 
     await emails.add({
       'to': [
-        {'email': 'admin@questable.app', 'name': 'Questable Admin'}
+        {'email': 'busywyvern@gmail.com', 'name': 'Questable Admin'}
       ],
       'from': {
         'email': 'noreply@questable.app',

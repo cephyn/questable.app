@@ -10,6 +10,7 @@ import 'package:quest_cards/src/services/email_service.dart';
 import 'package:quest_cards/src/services/firebase_functions_service.dart';
 import 'package:quest_cards/src/services/firebase_storage_service.dart';
 import 'package:quest_cards/src/services/purchase_link_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Added import for Timestamp
 
 import '../services/firebase_auth_service.dart';
 import '../services/firebase_vertexai_service.dart';
@@ -237,7 +238,20 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       Map<String, dynamic> questCardSchema = jsonDecode(await metadataFuture);
       var purchaseLinkFuture = _searchForPurchaseLink(questCardSchema);
       QuestCard questCard = QuestCard.fromJson(questCardSchema);
-      questCard.uploadedBy = auth.getCurrentUser().email;
+
+      // Set uploader information
+      final currentUser = auth.getCurrentUser();
+      if (currentUser != null) {
+        questCard.uploadedBy = currentUser.uid;
+        questCard.uploaderEmail = currentUser.email;
+        questCard.uploadedTimestamp = DateTime.now();
+        log('Set uploader info: UID - ${currentUser.uid}, Email - ${currentUser.email}');
+      } else {
+        log('Error: Current user is null, cannot set uploader information.');
+        // Handle cases where user might not be available, though this should ideally not happen here
+        // For example, by throwing an error or setting default/anonymous values if appropriate
+      }
+      
       log('AI analysis complete. Title: ${questCard.title}');
 
       // If productTitle is blank, set it to title
@@ -312,13 +326,28 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       log('Found ${existingTitles.length} existing titles.');
       // --- End Batch Duplicate Check ---
 
-      String currentUserEmail =
-          auth.getCurrentUser().email ?? 'unknown@example.com';
+      final currentUser = auth.getCurrentUser();
+      String? currentUserId;
+      String? currentUserEmail;
+
+      if (currentUser != null) {
+        currentUserId = currentUser.uid;
+        currentUserEmail = currentUser.email;
+        log('Current user for multi-file: UID - $currentUserId, Email - $currentUserEmail');
+      } else {
+        log('Error: Current user is null for multi-file analysis. UploadedBy and uploaderEmail will be null.');
+        // Decide how to handle this - throw error, or allow anonymous if your model supports it
+      }
+
 
       // Process results: identify duplicates and prepare new cards
       for (int i = 0; i < questCardSchemas.length; i++) {
         QuestCard q = QuestCard.fromJson(questCardSchemas[i]);
-        q.uploadedBy = currentUserEmail;
+        
+        // Set uploader information
+        q.uploadedBy = currentUserId;
+        q.uploaderEmail = currentUserEmail;
+        q.uploadedTimestamp = DateTime.now();
 
         // If productTitle is blank, set it to title
         if (q.productTitle == null || q.productTitle!.trim().isEmpty) {

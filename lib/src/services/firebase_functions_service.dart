@@ -27,7 +27,7 @@ class FirebaseFunctionsService {
     try {
       url = await firebaseStorageService.uploadFile(platformFile);
       var x = await FirebaseFunctions.instance
-          .httpsCallable('pdf_to_md')
+          .httpsCallable('convertToMarkdown')
           .call({'url': url});
       return x.data.toString();
     } catch (e) {
