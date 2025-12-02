@@ -6,60 +6,99 @@ Handles content generation and posting to various social platforms.
 import logging
 import datetime
 import random
-import re
 from firebase_functions import scheduler_fn, options
 from firebase_admin import firestore
-from atproto import Client, models, client_utils
-import tweepy
-import google.generativeai as genai  # Added for Gemini
+"""Heavy third‑party SDKs (atproto, google.genai, mastodon) are lazily imported
+inside the functions that actually use them to reduce cold start import time."""
 
 from utils import get_secret, log_social_post_attempt
 
+# Optional caches for reused clients/models during a warm container lifecycle
+_firestore_client = None  # type: ignore
+_gemini_client = None  # type: ignore  # Cached google-genai Client
+
+
+def _get_db():
+    global _firestore_client
+    if _firestore_client is None:
+        _firestore_client = firestore.client()
+    return _firestore_client
+
 
 def generate_ai_text(genre: str, summary: str, quest_title: str) -> str:
-    """Generates a short, compelling AI snippet for a quest using Gemini."""
+    """Generates a short, compelling AI snippet for a quest using the new google-genai Client.
+
+    Adapted for the `google-genai` package (import path: `from google import genai`).
+    We cache a single Client instance for warm invocations to reduce latency.
+    """
     try:
-        api_key = get_secret("gemini_api_key")  # Fetch the Gemini API key from Secret Manager
+        api_key = get_secret("gemini_api_key")
         if not api_key:
-            logging.error("Gemini API key not available. Skipping AI text generation.")
+            logging.info("Gemini API key missing; skipping AI text generation.")
             return ""
 
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        # Lazy import & singleton client creation (new google-genai library)
+        from google import genai  # type: ignore
+        global _gemini_client
+        if _gemini_client is None:
+            _gemini_client = genai.Client(api_key=api_key)
+        client = _gemini_client
 
-        prompt = f"""Generate a very short and exciting social media teaser (around 15-25 words, and strictly under 150 characters) for a tabletop roleplaying quest titled '{quest_title}'.
+        prompt = f"""Generate a very short and exciting social media teaser (around 15–25 words, and strictly under 150 characters) for a tabletop roleplaying quest titled '{quest_title}'.
 The quest is in the '{genre}' genre.
 Summary: '{summary}'.
 The teaser should be engaging and make people curious to check out the quest.
 Do not use hashtags in your response. Do not include the quest title or genre in your response unless it flows very naturally as part of the teaser.
-Focus on creating a hook or a sense of mystery/adventure.
+Focus on creating either a hook or a sense of mystery/adventure.
 Example tone for a fantasy quest: "Ancient secrets whisper from forgotten ruins. Dare you uncover them?"
 Example tone for a sci-fi quest: "Cosmic anomalies detected. Your mission, should you choose to accept it..."
 Example tone for a horror quest: "A chilling presence lurks in the old manor. What terrors await inside?"
 """
 
         logging.info(f"Generating AI text for quest: {quest_title} (Genre: {genre})")
-        response = model.generate_content(prompt)
+        # New API call pattern
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+        )
 
-        if response.parts:
-            ai_text = response.text.strip()
-            # Additional check for safety, though the prompt requests short text
-            if len(ai_text) > 160:
-                logging.warning(
-                    f"Generated AI text for '{quest_title}' is too long ({len(ai_text)} chars), truncating: {ai_text}"
-                )
-                ai_text = ai_text[:157] + "..."
-            logging.info(f"Successfully generated AI text: {ai_text}")
-            return ai_text
-        else:
-            logging.warning(
-                f"Gemini response for '{quest_title}' contained no parts. Prompt: {prompt}"
-            )
-            if hasattr(response, "prompt_feedback") and response.prompt_feedback:
-                logging.warning(f"Gemini prompt feedback: {response.prompt_feedback}")
+        # Preferred simple accessor (google-genai surfaces .text similar to prior SDK)
+        ai_text: str | None = getattr(response, "text", None)
+
+        if not ai_text:
+            # Fallback: attempt to extract first part text if .text missing/empty
+            try:
+                candidates = getattr(response, "candidates", []) or []
+                for cand in candidates:
+                    content = getattr(cand, "content", None)
+                    if content and getattr(content, "parts", None):
+                        part0 = content.parts[0]
+                        maybe_text = getattr(part0, "text", None)
+                        if maybe_text:
+                            ai_text = maybe_text
+                            break
+            except Exception as inner_exc:  # pragma: no cover (defensive path)
+                logging.debug(f"Fallback parse of genai response failed: {inner_exc}")
+
+        if not ai_text:
+            logging.warning("Gemini response returned no text; returning empty string.")
+            # Log any safety / prompt feedback metadata if present
+            for attr in ("prompt_feedback", "usage_metadata"):
+                meta_val = getattr(response, attr, None)
+                if meta_val:
+                    logging.debug(f"Gemini {attr}: {meta_val}")
             return ""
 
-    except Exception as e:
+        ai_text = ai_text.strip()
+        if len(ai_text) > 160:
+            logging.warning(
+                f"Generated AI text for '{quest_title}' is too long ({len(ai_text)} chars), truncating." 
+            )
+            ai_text = ai_text[:157] + "..."
+        logging.info(f"Successfully generated AI text: {ai_text}")
+        return ai_text
+
+    except Exception as e:  # Broad catch to avoid failing the whole function
         logging.error(f"Error generating AI text for '{quest_title}': {e}")
         return ""
 
@@ -160,7 +199,9 @@ def get_bluesky_credentials() -> dict:
 
 
 def post_to_bluesky(content: dict):
-    """Posts the given content to Bluesky using TextBuilder for rich text."""
+    """Posts the given content to Bluesky using TextBuilder for rich text (lazy import)."""
+    # Lazy import heavy atproto libs only if we actually attempt a Bluesky post
+    from atproto import Client, models, client_utils  # type: ignore
     credentials = get_bluesky_credentials()
     client = Client()
 
@@ -241,7 +282,7 @@ def post_to_bluesky(content: dict):
         response = client.com.atproto.repo.create_record(data=post_record)
 
         logging.info(f"Successfully posted to Bluesky: {response.uri}")
-        db = firestore.client()
+        db = _get_db()
         log_ref = db.collection("social_post_logs").document()
         log_ref.set(
             {
@@ -256,7 +297,7 @@ def post_to_bluesky(content: dict):
 
     except Exception as e:
         logging.error(f"Failed to post to Bluesky: {e}")
-        db = firestore.client()
+        db = _get_db()
         log_ref = db.collection("social_post_logs").document()
         log_ref.set(
             {
@@ -271,20 +312,37 @@ def post_to_bluesky(content: dict):
         raise  # Re-raise the exception
 
 
-def post_to_x(content):
-    """Post content to X (formerly Twitter) platform."""
-    logging.info("Attempting to post to X...")
+def post_to_mastodon(content):
+    """
+    Post content to Mastodon platform.
+    
+    Required secrets in Google Cloud Secret Manager:
+    - mastodon_instance_url: The base URL of your Mastodon instance (e.g., "https://mastodon.social")
+    - mastodon_access_token: Your Mastodon application access token
+    
+    To get these credentials:
+    1. Go to your Mastodon instance (e.g., mastodon.social)
+    2. Navigate to Preferences > Development > New Application
+    3. Create a new application with write:statuses permission
+    4. Copy the access token and instance URL to Secret Manager
+    """
+    logging.info("Attempting to post to Mastodon...")
     try:
-        consumer_key = get_secret("twitter_api_key")
-        consumer_secret = get_secret("twitter_api_key_secret")
-        access_token = get_secret("twitter_access_token")
-        access_token_secret = get_secret("twitter_access_token_secret")
+        # Lazy import Mastodon SDK only when needed
+        from mastodon import Mastodon  # type: ignore
+        # Get Mastodon credentials from Secret Manager
+        instance_url = get_secret("mastodon_instance_url")  # e.g., "https://mastodon.social"
+        access_token = get_secret("mastodon_access_token")
 
-        client = tweepy.Client(
-            consumer_key=consumer_key,
-            consumer_secret=consumer_secret,
+        if not instance_url or not access_token:
+            logging.error("Mastodon instance URL or access token not found in Secret Manager.")
+            log_social_post_attempt(content["quest_id"], "Mastodon", "error", "Missing credentials")
+            return
+
+        # Create Mastodon client
+        mastodon = Mastodon(
             access_token=access_token,
-            access_token_secret=access_token_secret
+            api_base_url=instance_url
         )
 
         text_segments = content.get("text_segments", [])
@@ -297,7 +355,7 @@ def post_to_x(content):
 
         hashtags_string = ""
         if hashtag_terms:
-            valid_hashtags = [f"#{term.replace(' ', '')}" for term in hashtag_terms if term]
+            valid_hashtags = [term for term in hashtag_terms if term]
             if valid_hashtags:
                 hashtags_string = " ".join(valid_hashtags)
 
@@ -308,33 +366,42 @@ def post_to_x(content):
             post_text_to_truncate = constructed_body
         elif hashtags_string:
             post_text_to_truncate = hashtags_string
-        
-        limit = 280
-        link_placeholder_len = 23 # t.co link length
-        final_tweet_text: str
+
+        # Mastodon has a 500 character limit
+        limit = 500
+        final_post_text: str
 
         if embed_link:
-            available_char_for_text = limit - link_placeholder_len - 1 # 1 for space before link
+            # Mastodon doesn't use link shortening like Twitter, so we use the full URL length
+            available_char_for_text = limit - len(embed_link) - 1  # 1 for space before link
             if len(post_text_to_truncate) > available_char_for_text:
                 text_part = post_text_to_truncate[:available_char_for_text - 3] + "..."
             else:
                 text_part = post_text_to_truncate
-            final_tweet_text = f"{text_part} {embed_link}"
+            final_post_text = f"{text_part} {embed_link}"
         else:
             if len(post_text_to_truncate) > limit:
                 text_part = post_text_to_truncate[:limit - 3] + "..."
             else:
                 text_part = post_text_to_truncate
-            final_tweet_text = text_part
+            final_post_text = text_part
 
-        response = client.create_tweet(text=final_tweet_text)
+        # Post to Mastodon
+        response = mastodon.toot(final_post_text)
 
-        logging.info(f"Successfully posted to X. Tweet ID: {response.data['id']}")
-        log_social_post_attempt(content["quest_id"], "X", "success", final_tweet_text, link=embed_link, post_id=response.data['id'])
+        logging.info(f"Successfully posted to Mastodon. Toot ID: {response['id']}")
+        log_social_post_attempt(
+            content["quest_id"], 
+            "Mastodon", 
+            "success", 
+            final_post_text, 
+            link=embed_link, 
+            post_id=response['id']
+        )
 
     except Exception as e:
-        logging.error(f"Error posting to X: {e}. Check if 'x_consumer_key', 'x_consumer_secret', 'x_access_token', 'x_access_token_secret' are correctly set in Secret Manager.")
-        log_social_post_attempt(content["quest_id"], "X", "error", str(e), link=content.get("link"))
+        logging.error(f"Error posting to Mastodon: {e}. Check if 'mastodon_instance_url' and 'mastodon_access_token' are correctly set in Secret Manager.")
+        log_social_post_attempt(content["quest_id"], "Mastodon", "error", str(e), link=content.get("link"))
 
 
 @scheduler_fn.on_schedule(
@@ -345,7 +412,7 @@ def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) ->
     """
     Selects a random public quest card from Firestore and posts to social media.
     """
-    db = firestore.client()
+    db = _get_db()
     quests_ref = db.collection("questCards") 
     query = quests_ref.where("isPublic", "==", True)
     logging.info("Querying for public quest cards...")
@@ -389,7 +456,11 @@ def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) ->
         logging.error(f"Failed to generate content or quest_id missing for selected_quest: {selected_quest.get('id')}")
         return
 
-    logging.info(f"Generated content for quest ID {generated_content.get('quest_id')}: {generated_content.get('text')}")
+    logging.info(
+        "Generated content for quest ID %s: %s",
+        generated_content.get('quest_id'),
+        " | ".join(generated_content.get("text_segments", [])),
+    )
 
     try:
         post_to_bluesky(generated_content)
@@ -397,8 +468,8 @@ def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) ->
         logging.error(f"Bluesky posting failed in main scheduler for quest {generated_content.get('quest_id')}: {e}")
 
     try:
-        post_to_x(generated_content)
+        post_to_mastodon(generated_content)
     except Exception as e:
-        logging.error(f"X posting failed in main scheduler for quest {generated_content.get('quest_id')}: {e}")
+        logging.error(f"Mastodon posting failed in main scheduler for quest {generated_content.get('quest_id')}: {e}")
 
     logging.info(f"select_quest_and_post_to_social_media function completed for quest {generated_content.get('quest_id')}.")

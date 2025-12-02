@@ -38,6 +38,7 @@
       "codebase": "default",
       "ignore": [
         "venv",
+        ".venv",
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
