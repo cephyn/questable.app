@@ -1,2 +1,1 @@
-// This file is no longer used. Algolia search functionality has been removed.
-// HitsPage class is deprecated and kept only for reference.
+// Previously used for Algolia search; removed from active codebase.

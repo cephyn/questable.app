@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
@@ -89,20 +90,29 @@ class AuthGate extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      ElevatedButton.icon(
+                          ElevatedButton.icon(
                         icon: const Icon(Icons.login),
                         label: const Text('Continue with Google'),
                         onPressed: () async {
                           try {
-                            // Start Google Sign-In flow
-                            final googleUser = await GoogleSignIn.instance.authenticate();
-                            // `authenticate` returns a non-null GoogleSignInAccount in v7.x
-                            final googleAuth = googleUser.authentication;
-                            final credential = fb_auth.GoogleAuthProvider.credential(
-                              idToken: googleAuth.idToken,
-                            );
-                            await fb_auth.FirebaseAuth.instance
-                                .signInWithCredential(credential);
+                            // Use platform-appropriate Google sign-in flow.
+                            if (kIsWeb) {
+                              // On web use FirebaseAuth popup flow
+                              final provider = fb_auth.GoogleAuthProvider();
+                              await fb_auth.FirebaseAuth.instance
+                                  .signInWithPopup(provider);
+                            } else {
+                              // On mobile/desktop use google_sign_in plugin
+                              final googleUser =
+                                  await GoogleSignIn.instance.authenticate();
+                              final googleAuth = googleUser.authentication;
+                              final credential =
+                                  fb_auth.GoogleAuthProvider.credential(
+                                idToken: googleAuth.idToken,
+                              );
+                              await fb_auth.FirebaseAuth.instance
+                                  .signInWithCredential(credential);
+                            }
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Google sign-in failed: $e')),

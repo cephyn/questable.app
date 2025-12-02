@@ -132,7 +132,8 @@ class _AddQuestCardState extends State<EditQuestCard> {
         TextEditingController(text: _questCard.notableItems?.join(", ") ?? '');
     final summaryController = TextEditingController(text: _questCard.summary);
 
-    // Track standardized game system
+    // Track typed and standardized game system values
+    String? gameSystemValue = _questCard.gameSystem;
     String? standardizedGameSystem = _questCard.standardizedGameSystem;
 
     // Add disposal of controllers
@@ -185,7 +186,8 @@ class _AddQuestCardState extends State<EditQuestCard> {
                 initialValue: _questCard.gameSystem,
                 isRequired: false,
                 onChanged: (value, standardized) {
-                  // Update the standardized game system
+                  // Update both the typed and standardized game system values
+                  gameSystemValue = value;
                   standardizedGameSystem = standardized;
                   log('Game system changed to: $value, standardized as: $standardized');
                 },
@@ -261,6 +263,8 @@ class _AddQuestCardState extends State<EditQuestCard> {
                   if (_formKey.currentState!.validate()) {
                     // Collect form data into _questCard ONCE
                     _questCard.title = titleController.text;
+                    // Persist both the raw typed value and the standardized one
+                    _questCard.gameSystem = gameSystemValue;
                     _questCard.standardizedGameSystem = standardizedGameSystem;
                     _questCard.edition = editionController.text;
                     _questCard.level = levelController.text;
@@ -352,6 +356,9 @@ class _AddQuestCardState extends State<EditQuestCard> {
                         firestoreService
                             .addQuestCard(_questCard)
                             .then((newDocId) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Saved game system: ${_questCard.gameSystem ?? "(none)"}')),
+                          );
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
@@ -370,6 +377,9 @@ class _AddQuestCardState extends State<EditQuestCard> {
                         firestoreService
                             .updateQuestCard(docId, _questCard)
                             .then((_) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Saved game system: ${_questCard.gameSystem ?? "(none)"}')),
+                          );
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(

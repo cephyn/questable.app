@@ -43,6 +43,7 @@ class FirestoreService {
           questCard.title?.toLowerCase(), // Ensure title is stored lowercase
       'productTitle': questCard.productTitle,
       'gameSystem': questCard.gameSystem,
+        'standardizedGameSystem': questCard.standardizedGameSystem,
       'gameSystem_lowercase':
           questCard.gameSystem?.toLowerCase(), // Add lowercase field
       'edition': questCard.edition,
@@ -63,6 +64,15 @@ class FirestoreService {
       'classification': questCard.classification,
       'uploadedBy': questCard.uploadedBy,
       'isPublic': questCard.isPublic, // Add isPublic field
+        'systemMigrationStatus': questCard.systemMigrationStatus,
+        'systemMigrationTimestamp': questCard.systemMigrationTimestamp != null
+          ? Timestamp.fromDate(questCard.systemMigrationTimestamp!)
+          : null,
+        'uploaderEmail': questCard.uploaderEmail,
+        'uploadedTimestamp':
+          questCard.uploadedTimestamp != null
+            ? Timestamp.fromDate(questCard.uploadedTimestamp!)
+            : null,
     }).then((DocumentReference ref) {
       docId = ref.id;
     });
@@ -470,6 +480,16 @@ class FirestoreService {
       'classification': questCard.classification,
       'uploadedBy': questCard.uploadedBy,
       'isPublic': questCard.isPublic, // Add isPublic field
+        'standardizedGameSystem': questCard.standardizedGameSystem,
+        'systemMigrationStatus': questCard.systemMigrationStatus,
+        'systemMigrationTimestamp': questCard.systemMigrationTimestamp != null
+          ? Timestamp.fromDate(questCard.systemMigrationTimestamp!)
+          : null,
+        'uploaderEmail': questCard.uploaderEmail,
+        'uploadedTimestamp':
+          questCard.uploadedTimestamp != null
+            ? Timestamp.fromDate(questCard.uploadedTimestamp!)
+            : null,
       // Keep standardizedGameSystem fields if they exist, don't overwrite on general update
       // 'standardizedGameSystem': questCard.standardizedGameSystem, // Handled separately
       // 'systemMigrationStatus': questCard.systemMigrationStatus, // Handled separately

@@ -213,14 +213,14 @@ class _HomePageState extends State<HomePage> {
         selectedIcon: Icon(Icons.search),
         label: 'Search', // Index 3
       ),
-      const NavigationDestination(
+      if (isAdmin) const NavigationDestination(
         icon: Icon(Icons.people_alt_outlined),
         selectedIcon: Icon(Icons.people_alt),
-        label: 'Users', // Index 4
+        label: 'Users', // Shown only to admins
       ),
       // Admin Destinations
       if (isAdmin) ...[
-        const NavigationDestination(
+          const NavigationDestination(
           icon: Icon(Icons.admin_panel_settings_outlined),
           selectedIcon: Icon(Icons.admin_panel_settings),
           label: 'Migrate', // Index 5
@@ -291,43 +291,37 @@ class _HomePageState extends State<HomePage> {
             });
           }
 
-          // Determine the page widget for the logged-in user
-          Widget page;
-          switch (effectiveSelectedIndex) {
-            case 0:
-              page = QuestCardListView(questCardList: []);
-              break; // Browse
-            case 1:
-              page = EditQuestCard(docId: '');
-              break; // Add Quest
-            case 2:
-              page = QuestCardAnalyze();
-              break; // Analyze
-            case 3:
-              page = QuestCardSearch();
-              break; // Search
-            case 4:
-              page = LocalUserList();
-              break; // Users
-            // Admin pages (protected by destination list and this switch)
-            case 5:
-              page = isAdmin
-                  ? MigrationTools()
-                  : QuestCardListView(questCardList: []);
-              break;
-            case 6:
-              page = isAdmin
-                  ? PurchaseLinkBackfill()
-                  : QuestCardListView(questCardList: []);
-              break;
-            case 7:
-              page = isAdmin
-                  ? GameSystemAdminView()
-                  : QuestCardListView(questCardList: []);
-              break;
-            default:
-              page = QuestCardListView(questCardList: []); // Fallback
+          // Build the list of pages in the same order as the destinations
+          final List<Widget> pages = [
+            QuestCardListView(questCardList: []), // Browse
+            EditQuestCard(docId: ''), // Add Quest
+            QuestCardAnalyze(), // Analyze
+            QuestCardSearch(), // Search
+          ];
+
+          if (isAdmin) {
+            pages.add(LocalUserList()); // Users (admin only)
+            // Admin-only pages
+            pages.addAll([
+              MigrationTools(), // Migrate
+              PurchaseLinkBackfill(), // Backfill
+              GameSystemAdminView(), // Systems
+            ]);
           }
+
+          // Ensure selectedIndex is still valid for the pages list
+          if (effectiveSelectedIndex >= pages.length) {
+            effectiveSelectedIndex = 0;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _selectedIndex = 0;
+                });
+              }
+            });
+          }
+
+          final Widget page = pages[effectiveSelectedIndex];
 
           // Build the final Scaffold with AppBar and AdaptiveScaffold body
           return Scaffold(

@@ -54,6 +54,7 @@
       "runtime": "nodejs22"
     }
   ],
+  "extensions": {},
   "emulators": {
     "functions": {
       "port": 5001
