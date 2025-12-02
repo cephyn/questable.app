@@ -23,7 +23,6 @@ dependencies:
   firebase_remote_config: ^6.1.2
   firebase_storage: ^13.0.4
   firebase_ui_auth: ^3.0.1
-  firebase_ui_oauth_google: ^2.0.1
   fl_chart: ^1.0.0
   flutter:
     sdk: flutter
@@ -33,7 +32,7 @@ dependencies:
     sdk: flutter
   fluttertoast: ^9.0.0
   google_fonts: ^6.2.1
-  google_sign_in: ^6.2.2
+  google_sign_in: ^7.2.0
   infinite_scroll_pagination: ^5.0.0
   mime: ^2.0.0
   provider: ^6.1.2

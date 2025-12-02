@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:quest_cards/src/services/firebase_auth_service.dart';
 
 import '../app.dart';
@@ -70,18 +72,45 @@ class AuthGate extends StatelessWidget {
               footerBuilder: (context, action) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 16),
-                  child: RichText(
-                    text: TextSpan(
-                      children: <TextSpan>[
-                        TextSpan(
-                            text:
-                                'By signing in, you agree to our terms and conditions. All information listed in this website is user-generated or AI-generated and may not be accurate. Please use at your own risk. We do not verify the data listed for a Quest\'s content. Please verify the information before using it in your game. If you find the information is incorrect, please correct it. Please do not maliciously alter data. We reserve the right to remove any data we find to be incorrect or malicious. We reserve the right to ban users who maliciously alter data.'),
-                        Utils.createHyperlink(
-                            'mailto: admin@questable.app', 'Contact us '),
-                        TextSpan(text: 'for any questions or concerns.'),
-                      ],
-                      style: TextStyle(color: Colors.grey),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          children: <TextSpan>[
+                            TextSpan(
+                                text:
+                                    'By signing in, you agree to our terms and conditions. All information listed in this website is user-generated or AI-generated and may not be accurate. Please use at your own risk.'),
+                            Utils.createHyperlink(
+                                'mailto: admin@questable.app', ' Contact us '),
+                            TextSpan(text: 'for any questions or concerns.'),
+                          ],
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.login),
+                        label: const Text('Continue with Google'),
+                        onPressed: () async {
+                          try {
+                            // Start Google Sign-In flow
+                            final googleUser = await GoogleSignIn.instance.authenticate();
+                            // `authenticate` returns a non-null GoogleSignInAccount in v7.x
+                            final googleAuth = googleUser.authentication;
+                            final credential = fb_auth.GoogleAuthProvider.credential(
+                              idToken: googleAuth.idToken,
+                            );
+                            await fb_auth.FirebaseAuth.instance
+                                .signInWithCredential(credential);
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Google sign-in failed: $e')),
+                            );
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 );
               },

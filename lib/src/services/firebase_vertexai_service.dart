@@ -12,12 +12,12 @@ import 'firebase_storage_service.dart';
 import 'dart:math' hide log;
 
 /// Service to interact with Firebase Vertex AI for RPG adventure extraction
-class FirebaseVertexaiService {
+class FirebaseAiService {
   final FirebaseStorageService firebaseStorageService =
       FirebaseStorageService();
 
   // AI configuration
-  final String aiModel = 'gemini-2.0-flash';
+  final String aiModel = 'gemini-2.5-flash';
   final String systemInstruction =
       'You are an expert at extracting RPG Adventures from text documents and producing structured data. Correct any spelling mistakes. Your task is to extract relevant details from the provided text and output it in JSON format according to the provided response schema. The definition of an RPG Adventure is: An RPG adventure is a narrative-driven scenario within a role-playing game where players guide characters through challenges and exploration to advance a storyline.';
 
@@ -72,7 +72,7 @@ class FirebaseVertexaiService {
       final tokenCount = await model.countTokens([
         Content.multi([prompt, filePart])
       ]);
-      log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+      log('Token count: ${tokenCount.totalTokens}');
 
       // Generate content
       final response = await model.generateContent([
@@ -376,7 +376,7 @@ Instructions:
           Content.multi([prompt, filePart])
         ]);
 
-        log('Token count: ${tokenCount.totalTokens}, billable characters: ${tokenCount.totalBillableCharacters}');
+        log('Token count: ${tokenCount.totalTokens}');
       } catch (tokenCountError) {
         // Continue even if token counting fails
         log('Warning: Failed to count tokens: $tokenCountError');
