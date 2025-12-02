@@ -93,9 +93,7 @@ class AuthDialogHelper {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AuthGate(
-          onAuthenticated: onAuthenticated,
-        ),
+        builder: (context) => AuthGate(),
       ),
     );
   }

@@ -62,8 +62,12 @@ class LocalUserList extends StatelessWidget {
                               );
                             },
                           ),
-                          rbDeleteDocumentsButtons.deleteUserButton(
-                              auth.getCurrentUser().uid, user.uid),
+                          Builder(builder: (context) {
+                            final currentUser = auth.getCurrentUser();
+                            if (currentUser == null) return Container();
+                            return rbDeleteDocumentsButtons
+                                .deleteUserButton(currentUser.uid, user.uid);
+                          }),
                         ],
                       ),
                     ),

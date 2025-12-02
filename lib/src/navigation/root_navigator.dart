@@ -192,14 +192,7 @@ class RootNavigatorState extends State<RootNavigator>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AuthGate(
-          onAuthenticated: () {
-            // This will be called when authentication is successful
-            if (mounted) {
-              handlePostAuthAction(context);
-            }
-          },
-        ),
+        builder: (context) => AuthGate(),
       ),
     );
   }

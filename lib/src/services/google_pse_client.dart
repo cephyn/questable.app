@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
-import '../config/config.dart';
 
 /// A class to handle communication with Google Programmable Search Engine
 class GooglePSEClient {
