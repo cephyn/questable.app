@@ -7,11 +7,6 @@ import 'dart:developer';
 import 'package:cloud_functions/cloud_functions.dart'; // Added for calling Firebase Functions
 
 class Config {
-  // Algolia search credentials
-  static const String algoliaAppId = 'XDZDKQL54G';
-  static const String algoliaApiKey = 'd2137698a7e4631b3e06c2e839a72bac';
-  static const String algoliaQuestCardsIndex = 'questCards';
-
   // Google PSE Configuration
   // Static variables to hold the fetched secrets
   static String? _googleApiKey;

@@ -156,43 +156,42 @@ class QuestCard {
     isPublic = json['isPublic'] ?? true;
     // Migration status fields
     systemMigrationStatus = json['systemMigrationStatus'];
-    // Note: Search results may format timestamps differently
-    final algoliaTimestampValue = json['systemMigrationTimestamp'];
-    if (algoliaTimestampValue != null) {
-      if (algoliaTimestampValue is int) {
+    // Handle timestamps
+    final timestampValue = json['systemMigrationTimestamp'];
+    if (timestampValue != null) {
+      if (timestampValue is int) {
         systemMigrationTimestamp =
-            DateTime.fromMillisecondsSinceEpoch(algoliaTimestampValue);
-      } else if (algoliaTimestampValue is double) {
-        // Algolia might send timestamps as double for precision
+            DateTime.fromMillisecondsSinceEpoch(timestampValue);
+      } else if (timestampValue is double) {
         systemMigrationTimestamp =
-            DateTime.fromMillisecondsSinceEpoch(algoliaTimestampValue.toInt());
-      } else if (algoliaTimestampValue is String) {
-        // Attempt to parse if it's a string (e.g., ISO 8601)
-        systemMigrationTimestamp = DateTime.tryParse(algoliaTimestampValue);
+            DateTime.fromMillisecondsSinceEpoch(timestampValue.toInt());
+      } else if (timestampValue is String) {
+        systemMigrationTimestamp = DateTime.tryParse(timestampValue);
       } else {
-        // Log a warning if the type is unexpected for a timestamp from Algolia
+        final type = timestampValue.runtimeType;
         print(
-            'Warning: systemMigrationTimestamp from Algolia has unexpected type: \${algoliaTimestampValue.runtimeType}. Value: \$algoliaTimestampValue');
+            'Warning: systemMigrationTimestamp has unexpected type: $type. Value: $timestampValue');
         systemMigrationTimestamp = null;
       }
     } else {
       systemMigrationTimestamp = null;
     }
-    uploaderEmail = json['uploaderEmail']; // Added to fromSearchJson
-    // Handle uploadedTimestamp from Algolia similarly to systemMigrationTimestamp
-    final algoliaUploadedTimestampValue = json['uploadedTimestamp']; // Added to fromSearchJson
-    if (algoliaUploadedTimestampValue != null) {
-      if (algoliaUploadedTimestampValue is int) {
+    uploaderEmail = json['uploaderEmail'];
+    // Handle uploadedTimestamp
+    final uploadedTimestampValue = json['uploadedTimestamp'];
+    if (uploadedTimestampValue != null) {
+      if (uploadedTimestampValue is int) {
         uploadedTimestamp =
-            DateTime.fromMillisecondsSinceEpoch(algoliaUploadedTimestampValue);
-      } else if (algoliaUploadedTimestampValue is double) {
+            DateTime.fromMillisecondsSinceEpoch(uploadedTimestampValue);
+      } else if (uploadedTimestampValue is double) {
         uploadedTimestamp = DateTime.fromMillisecondsSinceEpoch(
-            algoliaUploadedTimestampValue.toInt());
-      } else if (algoliaUploadedTimestampValue is String) {
-        uploadedTimestamp = DateTime.tryParse(algoliaUploadedTimestampValue);
+            uploadedTimestampValue.toInt());
+      } else if (uploadedTimestampValue is String) {
+        uploadedTimestamp = DateTime.tryParse(uploadedTimestampValue);
       } else {
+        final type = uploadedTimestampValue.runtimeType;
         print(
-            'Warning: uploadedTimestamp from Algolia has unexpected type: \${algoliaUploadedTimestampValue.runtimeType}. Value: \$algoliaUploadedTimestampValue');
+            'Warning: uploadedTimestamp has unexpected type: $type. Value: $uploadedTimestampValue');
         uploadedTimestamp = null;
       }
     } else {
