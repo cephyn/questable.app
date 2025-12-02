@@ -2,6 +2,13 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper to check admin role quickly
+    function isAdmin(uid) {
+      return uid != null &&
+        exists(/databases/$(database)/documents/users/$(uid)) &&
+        get(/databases/$(database)/documents/users/$(uid)).data.roles.hasAny(['admin']);
+    }
+
     // Quest cards collection - allow public read access with optimized filter support
     match /questCards/{document=**} {
       // Allow read access without authentication, including filtered queries
@@ -79,6 +86,22 @@ service cloud.firestore {
       allow read, write: if request.auth != null &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
+    // Backfill runs - logs of administrative backfill operations
+    match /backfill_runs/{runId} {
+      // Allow admins to read run history and details
+      allow read: if request.auth != null && isAdmin(request.auth.uid);
+      // Only server code (admin SDK) should write run entries; prevent client writes.
+      allow write: if false;
+    }
+
+    // Search index documents - used by admin tooling for diagnostics
+    match /questSearchIndex/{docId} {
+      // Allow admin read access so MigrationTools & dashboard can inspect index entries
+      allow read: if request.auth != null && isAdmin(request.auth.uid);
+      // Index documents are written by trusted backend code (admin SDK); disallow client write
+      allow write: if false;
     }
 
     // Emails collection - allow authenticated users to create emails
