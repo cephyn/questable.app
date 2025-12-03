@@ -1,6 +1,7 @@
 # functions/similarity_calculator.py
 # Likely imports:
-import nltk # Keep for nltk.data.path
+import nltk  # Keep for nltk.data.path
+
 # All other NLTK/sklearn imports moved to be lazy loaded
 import os
 import firebase_admin
@@ -17,7 +18,7 @@ def _initialize_firebase():
         firebase_admin.initialize_app()
         # print("Firebase Admin SDK initialized.") # Commented out for production
     # else:
-        # print("Firebase Admin SDK already initialized.") # Commented out for production
+    # print("Firebase Admin SDK already initialized.") # Commented out for production
     fb_db = firestore.client()
 
 
@@ -32,6 +33,10 @@ if NLTK_DATA_PATH not in nltk.data.path:
 
 _stopwords_cache = None
 _punkt_initialized = False
+
+# Module-level references so tests can monkeypatch them easily
+word_tokenize = None
+stopwords = None
 
 # Removed NLTK pre-loading from global scope to prevent deployment timeouts.
 # These will be loaded on-demand by _ensure_nltk_resources().
@@ -64,12 +69,13 @@ _punkt_initialized = False
 
 def _setup_nltk_data_for_packaging():
     """
-    Ensures NLTK data (stopwords, punkt) is downloaded and UNZIPPED to the local 
+    Ensures NLTK data (stopwords, punkt) is downloaded and UNZIPPED to the local
     nltk_data directory. This directory MUST then be packaged and deployed.
     This function is intended to be run locally BEFORE deployment.
     """
-    from nltk.tokenize import word_tokenize # LAZY IMPORT for this function
-    from nltk.corpus import stopwords # LAZY IMPORT for this function
+    from nltk.tokenize import word_tokenize  # LAZY IMPORT for this function
+    from nltk.corpus import stopwords  # LAZY IMPORT for this function
+
     print(f"--- Running NLTK Data Setup for Local Packaging ---")
     # NLTK_DATA_PATH is defined at the module level, e.g., os.path.join(os.path.dirname(__file__), "nltk_data")
     print(f"Target local NLTK data directory: {NLTK_DATA_PATH}")
@@ -84,31 +90,35 @@ def _setup_nltk_data_for_packaging():
 
     # Download resources. NLTK places them in subdirectories like \'tokenizers\' or \'corpora\' within download_dir.
     for resource_name in resources_to_download:
-        print(f"Downloading NLTK resource: \'{resource_name}\' to {NLTK_DATA_PATH} (NLTK will use subdirs)...")
+        print(
+            f"Downloading NLTK resource: '{resource_name}' to {NLTK_DATA_PATH} (NLTK will use subdirs)..."
+        )
         try:
             nltk.download(resource_name, download_dir=NLTK_DATA_PATH)
-            print(f"Successfully downloaded \'{resource_name}\'.")
+            print(f"Successfully downloaded '{resource_name}'.")
         except Exception as e:
-            print(f"ERROR downloading NLTK resource \'{resource_name}\': {e}")
-            print("Please ensure network connectivity and that NLTK can write to the target.")
-            return # Stop if a download fails
+            print(f"ERROR downloading NLTK resource '{resource_name}': {e}")
+            print(
+                "Please ensure network connectivity and that NLTK can write to the target."
+            )
+            return  # Stop if a download fails
 
     # Temporarily modify nltk.data.path to include our target NLTK_DATA_PATH
     # This ensures that when we call NLTK functions, they use and unpack from our specific directory.
     original_nltk_data_path_list = list(nltk.data.path)
     if NLTK_DATA_PATH not in nltk.data.path:
         nltk.data.path.insert(0, NLTK_DATA_PATH)
-    
+
     try:
         # Trigger NLTK to unpack \'punkt\' if it hasn\'t already from the .zip
-        print("Verifying/Unpacking \'punkt\' tokenizer locally...")
+        print("Verifying/Unpacking 'punkt' tokenizer locally...")
         word_tokenize("test sentence for punkt unpacking")
-        print("\'punkt\' tokenizer ready locally.")
+        print("'punkt' tokenizer ready locally.")
 
         # Trigger NLTK to unpack \'stopwords\' if it hasn\'t already
-        print("Verifying/Unpacking \'stopwords\' locally...")
+        print("Verifying/Unpacking 'stopwords' locally...")
         stopwords.words("english")
-        print("\'stopwords\' ready locally.")
+        print("'stopwords' ready locally.")
     except Exception as e:
         print(f"ERROR during local NLTK resource test (unpacking): {e}")
         # Restore nltk.data.path before returning on error
@@ -131,8 +141,10 @@ def _setup_nltk_data_for_packaging():
             except Exception as e:
                 print(f"Warning: Could not remove .zip file {zip_file_path}: {e}")
         else:
-            print(f".zip file not found (already removed or never existed): {zip_file_path}")
-            
+            print(
+                f".zip file not found (already removed or never existed): {zip_file_path}"
+            )
+
     # Clean up .DS_Store files (common on macOS)
     for root, dirs, files in os.walk(NLTK_DATA_PATH):
         if ".DS_Store" in files:
@@ -144,7 +156,10 @@ def _setup_nltk_data_for_packaging():
                 print(f"Warning: Could not remove .DS_Store file {ds_store_file}: {e}")
 
     print(f"--- NLTK Data Setup for Local Packaging Complete ---")
-    print(f"Ensure the directory \'{NLTK_DATA_PATH}\' (now with unzipped contents and no zips) is deployed.")
+    print(
+        f"Ensure the directory '{NLTK_DATA_PATH}' (now with unzipped contents and no zips) is deployed."
+    )
+
 
 # --- Configuration for Similarity Algorithm (from Task 1.1) ---
 FIELD_MATCH_WEIGHTS = {
@@ -243,7 +258,7 @@ def calculate_similarity_for_quest(quest_id: str) -> list:
     # 6. Store these top N similarities in Firestore
     if top_n_similarities:
         print(
-            f"Storing top {len(top_n_similarities)} similar quests for {quest_id} in subcollection \'{SIMILAR_QUESTS_SUBCOLLECTION}\'..."
+            f"Storing top {len(top_n_similarities)} similar quests for {quest_id} in subcollection '{SIMILAR_QUESTS_SUBCOLLECTION}'..."
         )
         target_quest_ref = fb_db.collection("questCards").document(quest_id)
         subcollection_ref = target_quest_ref.collection(SIMILAR_QUESTS_SUBCOLLECTION)
@@ -352,11 +367,12 @@ def _calculate_text_similarity(text1: str, text2: str) -> float:
     Calculates cosine similarity between two texts using TF-IDF.
     Uses nltk for tokenization/stopwords and scikit-learn for TF-IDF.
     """
-    from nltk.tokenize import word_tokenize # LAZY IMPORT
-    from sklearn.feature_extraction.text import TfidfVectorizer # LAZY IMPORT
-    from sklearn.metrics.pairwise import cosine_similarity # LAZY IMPORT
-    
-    _ensure_nltk_resources() # Ensure NLTK resources are loaded
+    # Prefer a module-level word_tokenize (makes testing/mocking easier).
+    # Fall back to importing on-demand if it isn't set.
+    from sklearn.feature_extraction.text import TfidfVectorizer  # LAZY IMPORT
+    from sklearn.metrics.pairwise import cosine_similarity  # LAZY IMPORT
+
+    _ensure_nltk_resources()  # Ensure NLTK resources are loaded
 
     # Explicitly check for two empty strings at the beginning
     if not text1 and not text2:
@@ -365,7 +381,10 @@ def _calculate_text_similarity(text1: str, text2: str) -> float:
     stop_words_set = _stopwords_cache if _stopwords_cache is not None else set()
 
     def preprocess(text_content):
-        tokens = word_tokenize(text_content.lower())
+        wt = word_tokenize
+        if wt is None:
+            from nltk.tokenize import word_tokenize as wt
+        tokens = wt(text_content.lower())
         # Keep only alphanumeric words and remove stopwords
         return " ".join(
             [word for word in tokens if word.isalnum() and word not in stop_words_set]
@@ -384,7 +403,9 @@ def _calculate_text_similarity(text1: str, text2: str) -> float:
 
     try:
         # Create TF-IDF vectors for both processed texts
-        tfidf_matrix = TfidfVectorizer().fit_transform([processed_text1, processed_text2])
+        tfidf_matrix = TfidfVectorizer().fit_transform(
+            [processed_text1, processed_text2]
+        )
     except ValueError:
         # This can happen if vocabulary is empty (e.g., texts contained only characters not part of TF-IDF's default token pattern)
         return 0.0
@@ -405,14 +426,21 @@ def _ensure_nltk_resources():
     """
     global _stopwords_cache, _punkt_initialized
 
+    global word_tokenize, stopwords
+
     if not _punkt_initialized:
-        from nltk.tokenize import word_tokenize # LAZY IMPORT
+        try:
+            from nltk.tokenize import word_tokenize as _wt
+
+            word_tokenize = _wt
+        except Exception:
+            word_tokenize = None
         try:
             # print("Ensuring NLTK Punkt tokenizer is ready (first-time use)...")
             # A light operation to trigger NLTK\'s internal loading of Punkt if needed.
             # NLTK\'s word_tokenize handles its own lazy loading of \'punkt\'.
             # This call ensures it happens before we rely on it in loops.
-            word_tokenize("test") 
+            word_tokenize("test")
             # print("NLTK Punkt tokenizer should be ready.")
             _punkt_initialized = True
         except Exception as e:
@@ -420,14 +448,19 @@ def _ensure_nltk_resources():
             # Depending on severity, you might re-raise or handle (e.g., proceed without tokenization)
 
     if _stopwords_cache is None:
-        from nltk.corpus import stopwords # LAZY IMPORT
+        try:
+            from nltk.corpus import stopwords as _sw  # LAZY IMPORT
+
+            stopwords = _sw
+        except Exception:
+            stopwords = None
         try:
             # print("Loading NLTK stopwords (first-time use)...")
             _stopwords_cache = set(stopwords.words("english"))
             # print(f"NLTK stopwords loaded. Count: {len(_stopwords_cache)}")
         except Exception as e:
             print(f"ERROR loading NLTK stopwords: {e}")
-            _stopwords_cache = set() # Fallback to empty set if loading fails
+            _stopwords_cache = set()  # Fallback to empty set if loading fails
 
 
 # Example usage (for testing locally)

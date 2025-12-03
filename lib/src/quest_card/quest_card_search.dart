@@ -1,12 +1,10 @@
-import 'package:algolia_helper_flutter/algolia_helper_flutter.dart';
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:quest_cards/src/quest_card/quest_card.dart';
-import 'dart:async'; // Import for Timer
-import '../search/hits_page.dart';
-import '../services/firestore_service.dart';
+import 'package:go_router/go_router.dart';
+
 import '../util/utils.dart';
-import '../config/config.dart'; // Import configuration file
-import 'package:go_router/go_router.dart'; // Import go_router
 
 class QuestCardSearch extends StatefulWidget {
   const QuestCardSearch({super.key});
@@ -16,390 +14,239 @@ class QuestCardSearch extends StatefulWidget {
 }
 
 class _QuestCardSearchState extends State<QuestCardSearch> {
-  final FirestoreService firestoreService = FirestoreService();
+  final TextEditingController _controller = TextEditingController();
 
-  final _questCardSearcher = HitsSearcher(
-      applicationID: Config.algoliaAppId,
-      apiKey: Config.algoliaApiKey,
-      indexName: Config.algoliaQuestCardsIndex);
+  static const int _pageSize = 10;
 
-  final _filterState = FilterState();
-  late final _facetList = _questCardSearcher.buildFacetList(
-    filterState: _filterState,
-    attribute: 'gameSystem',
-  );
-  final GlobalKey<ScaffoldState> _mainScaffoldKey = GlobalKey();
+  String _currentQuery = '';
+  bool _isSearching = false;
+  Timer? _debounce;
 
-  final _searchTextController = TextEditingController();
-  Timer? _debounce; // Add debounce timer
+  // Simple paging state
+  int _currentPage = 1;
+  int _total = 0;
+  final List<Map<String, dynamic>> _hits = [];
 
-  // State for manual pagination
-  int _currentPage = 0;
-  int _totalPages = 0;
-  List<QuestCard> _currentPageItems = [];
-  bool _isLoading = false;
-  String? _lastQuery;
-  String? _errorMessage; // Add error message state variable
-
-  Stream<SearchMetadata> get searchMetadata =>
-      _questCardSearcher.responses.map(SearchMetadata.fromResponse);
-  Stream<HitsPage> get _searchPage =>
-      _questCardSearcher.responses.map(HitsPage.fromResponse);
+  // Suggestions
+  List<String> _suggestions = [];
 
   @override
   void initState() {
     super.initState();
-    _initSearch();
-  }
+    Utils.setBrowserTabTitle('Search Quests');
 
-  void _initSearch() {
-    _searchTextController.addListener(_onSearchTextChanged);
-    _search(_searchTextController.text, 0); // Initial search on page 0
-    _searchPage.listen(_onSearchPageUpdated,
-        onError: _handleSearchError // Add error handler
-        );
-  }
-
-  // Handle search errors
-  void _handleSearchError(dynamic error) {
-    setState(() {
-      _isLoading = false;
-
-      // Parse the error message to display a more user-friendly message
-      if (error.toString().contains("Index quest_cards does not exist") ||
-          error.toString().contains("404")) {
-        _errorMessage = "Search index not found. Please contact support.";
-      } else if (error.toString().contains("403")) {
-        _errorMessage = "Authentication error. Please contact support.";
-      } else if (error.toString().contains("Network")) {
-        _errorMessage =
-            "Network error. Please check your connection and try again.";
-      } else {
-        _errorMessage = "Search failed: ${error.toString()}";
-      }
-    });
-
-    // Log the detailed error for debugging
-    debugPrint("Algolia search error: $error");
-  }
-
-  // Helper method to trigger search
-  void _search(String query, int page) {
-    setState(() {
-      _isLoading = true;
-      _lastQuery = query; // Store the last query for pagination
-    });
-    _questCardSearcher.applyState(
-      (state) => state.copyWith(
-        query: query,
-        page: page,
-        hitsPerPage: 20, // Keep hitsPerPage or adjust as needed
-      ),
-    );
-  }
-
-  void _onSearchTextChanged() {
-    // Implement debouncing for search
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (_searchTextController.text != _lastQuery) {
-        _search(_searchTextController.text, 0);
-      }
-    });
-  }
-
-  void _onSearchPageUpdated(HitsPage page) {
-    setState(() {
-      _currentPageItems = page.items;
-      _currentPage = page.pageKey;
-      _totalPages = page.totalPages; // Make sure HitsPage includes totalPages
-      _isLoading = false;
-      _errorMessage = null; // Clear any error messages on successful search
-    });
-  }
-
-  void _nextPage() {
-    if (_currentPage < _totalPages - 1) {
-      // Use Algolia's native pagination
-      _questCardSearcher.applyState(
-        (state) => state.copyWith(
-          page: _currentPage + 1,
-        ),
-      );
-      setState(() {
-        _isLoading = true;
-      });
-    }
-  }
-
-  void _previousPage() {
-    if (_currentPage > 0) {
-      // Use Algolia's native pagination
-      _questCardSearcher.applyState(
-        (state) => state.copyWith(
-          page: _currentPage - 1,
-        ),
-      );
-      setState(() {
-        _isLoading = true;
-      });
-    }
+    // no special listeners; use explicit _fetchPage
   }
 
   @override
   void dispose() {
-    _searchTextController.dispose();
-    _questCardSearcher.dispose();
-    _filterState.dispose();
-    _facetList.dispose();
+    _controller.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _fetchPage(int pageKey) async {
+    if (_currentQuery.isEmpty) {
+      setState(() {
+        _hits.clear();
+        _total = 0;
+        _currentPage = 1;
+      });
+      return;
+    }
+
+    try {
+      setState(() => _isSearching = true);
+
+      final callable = FirebaseFunctions.instance.httpsCallable('search_quests');
+      final resp = await callable.call({
+        'query': _currentQuery,
+        'page': pageKey,
+        'pageSize': _pageSize,
+      });
+
+      final data = Map<String, dynamic>.from(resp.data ?? {});
+      final total = data['total'] as int? ?? 0;
+      final hits = (data['hits'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          [];
+
+      if (pageKey == 1) {
+        _hits.clear();
+      }
+      _hits.addAll(hits);
+      setState(() {
+        _total = total;
+        _currentPage = pageKey;
+      });
+    } catch (e, st) {
+      debugPrint('Search fetch error: $e\n$st');
+    } finally {
+      setState(() => _isSearching = false);
+    }
+  }
+
+  Future<List<String>> _suggestionsFor(String pattern) async {
+    if (pattern.trim().isEmpty) return [];
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('search_quests');
+      final resp = await callable.call({'query': pattern, 'page': 1, 'pageSize': 5});
+      final data = Map<String, dynamic>.from(resp.data);
+      final hits = (data['hits'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          [];
+      return hits.map((h) => h['title']?.toString() ?? '').toList();
+    } catch (e) {
+      debugPrint('Suggestion fetch error: $e');
+      return [];
+    }
+  }
+
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        _currentQuery = value.trim();
+        _currentPage = 1;
+        _fetchPage(1);
+      });
+    });
+  }
+
+  Widget _buildResultTile(Map<String, dynamic> hit) {
+    final title = hit['title'] ?? 'Untitled';
+    final snippet = hit['snippet'] ?? '';
+    final score = hit['score'] ?? 0;
+
+    return ListTile(
+      title: Text(title),
+      subtitle: snippet.isNotEmpty ? Text(snippet) : null,
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search, size: 18, color: Colors.grey[600]),
+          const SizedBox(height: 2),
+          Text(score.toStringAsFixed(2), style: TextStyle(fontSize: 12)),
+        ],
+      ),
+      onTap: () {
+        // Navigate to quest details
+        final id = hit['id'];
+        if (id != null) {
+            try {
+              context.go('/quests/$id');
+            } catch (_) {
+              // ignore if go is not available
+            }
+        }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    Utils.setBrowserTabTitle("Search Quests");
     return Scaffold(
-      key: _mainScaffoldKey,
       appBar: AppBar(
         title: const Text('Search QuestCards'),
-        actions: [
-          StreamBuilder<List<SelectableItem<Facet>>>(
-            stream: _facetList.facets,
-            builder: (context, snapshot) {
-              // Check if any filters are selected
-              final hasActiveFilters = snapshot.hasData &&
-                  snapshot.data!.any((facet) => facet.isSelected);
-
-              return Badge(
-                isLabelVisible: hasActiveFilters,
-                child: IconButton(
-                  onPressed: () =>
-                      _mainScaffoldKey.currentState?.openEndDrawer(),
-                  icon: const Icon(Icons.filter_list_sharp),
-                  tooltip: 'Filter search results',
-                ),
-              );
-            },
-          )
-        ],
-      ),
-      endDrawer: Drawer(
-        child: _filters(context),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          children: <Widget>[
+          children: [
+            // Use a simple TextField and suggestions below for compatibility
             TextField(
-              controller: _searchTextController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Enter a search term',
-                labelText: 'Search quests',
-                prefixIcon: Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                // Combine label and hint for screen readers if needed, or just use the label.
+              controller: _controller,
+              decoration: InputDecoration(
+                  labelText: 'Search quests',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _controller.clear();
+                            _onQueryChanged('');
+                          },
+                        ),
+                ),
+                onChanged: (v) {
+                  _onQueryChanged(v);
+                  // also fetch inline suggestions
+                  _suggestionsFor(v).then((s) => setState(() => _suggestions = s));
+                },
+                onSubmitted: (v) {
+                  _currentQuery = v.trim();
+                  _currentPage = 1;
+                  _fetchPage(1);
+                },
               ),
-              // The labelText and hintText provide semantic information.
-              // semanticsLabel is not a direct property of TextField.
-            ),
-            StreamBuilder<SearchMetadata>(
-              stream: searchMetadata,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const SizedBox.shrink();
-                }
-                return Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text('${snapshot.data!.nbHits} hits'),
-                );
-              },
-            ),
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.red),
+            // suggestions list
+            if (_suggestions.isNotEmpty)
+              Container(
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _suggestions.length,
+                  itemBuilder: (context, idx) {
+                    final s = _suggestions[idx];
+                    return ListTile(
+                      title: Text(s),
+                      onTap: () {
+                        _controller.text = s;
+                        _onQueryChanged(s);
+                        _suggestions = [];
+                      },
+                    );
+                  },
                 ),
               ),
+            const SizedBox(height: 12),
             Expanded(
-              child: _hits(context),
+              child: _isSearching && _hits.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : _hits.isEmpty
+                      ? const Center(child: Text('No results'))
+                      : ListView.builder(
+                          itemCount: _hits.length + 1,
+                          itemBuilder: (context, idx) {
+                            if (idx < _hits.length) {
+                              final item = _hits[idx];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
+                                child: _buildResultTile(item),
+                              );
+                            }
+
+                            // Load more row
+                            final hasMore = _hits.length < _total;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Center(
+                                child: hasMore
+                                    ? ElevatedButton(
+                                        onPressed: _isSearching
+                                            ? null
+                                            : () {
+                                                _fetchPage(_currentPage + 1);
+                                              },
+                                        child: const Text('Load more'))
+                                    : const Text('End of results'),
+                              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
       ),
     );
   }
-
-  Widget _hits(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _errorMessage!,
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _search(_lastQuery ?? '', _currentPage),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry Search'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_currentPageItems.isEmpty) {
-      return const Center(child: Text('No quests found matching your search'));
-    }
-
-    return Column(
-      children: [
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              _search(_lastQuery ?? '', _currentPage);
-            },
-            child: ListView.builder(
-              itemCount: _currentPageItems.length,
-              itemBuilder: (context, index) {
-                final item = _currentPageItems[index];
-                final questId = item.objectId ?? item.id; // Get the quest ID
-                return Card(
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                  elevation: 4,
-                  child: InkWell(
-                    onTap: () {
-                      if (questId != null) {
-                        // Use go_router to navigate
-                        context.push('/quests/$questId');
-                      } else {
-                        // Handle cases where questId might be null, perhaps show a snackbar
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Error: Quest ID is missing.')),
-                        );
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            Utils.capitalizeTitle(item.title ?? 'No Title'),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.indigo,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Game System: ${item.gameSystem ?? 'N/A'}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ),
-                              if (item.level != null)
-                                Text(
-                                  'Level: ${item.level}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        // Pagination Controls
-        if (_totalPages > 1)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: _currentPage == 0 ? null : _previousPage,
-                  child: const Text('Back'),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text('Page ${_currentPage + 1} of $_totalPages'),
-                ),
-                ElevatedButton(
-                  onPressed: _currentPage >= _totalPages - 1 ? null : _nextPage,
-                  child: const Text('Next'),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _filters(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Filters'),
-        ),
-        body: StreamBuilder<List<SelectableItem<Facet>>>(
-          stream: _facetList.facets,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const SizedBox.shrink();
-            }
-            final selectableFacets = snapshot.data!;
-            return ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: selectableFacets.length,
-              itemBuilder: (_, index) {
-                final selectableFacet = selectableFacets[index];
-                return CheckboxListTile(
-                  value: selectableFacet.isSelected,
-                  title: Text(
-                    "${selectableFacet.item.value} (${selectableFacet.item.count})",
-                    style: TextStyle(color: Colors.black87),
-                  ),
-                  onChanged: (_) {
-                    _facetList.toggle(selectableFacet.item.value);
-                  },
-                );
-              },
-            );
-          },
-        ),
-      );
-}
-
-class SearchMetadata {
-  final int nbHits;
-
-  const SearchMetadata(this.nbHits);
-
-  factory SearchMetadata.fromResponse(SearchResponse response) =>
-      SearchMetadata(response.nbHits);
 }

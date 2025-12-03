@@ -1,6 +1,5 @@
 import 'dart:developer';
 import 'package:http/http.dart' as http;
-import '../config/config.dart';
 import 'package:cloud_functions/cloud_functions.dart'; // Added for Firebase Functions
 
 /// Priority levels for domains

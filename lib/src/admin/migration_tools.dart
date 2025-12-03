@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Added missing import
 import 'package:quest_cards/src/auth/user_context.dart';
-import 'package:quest_cards/src/services/firestore_service.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:provider/provider.dart';
+import 'package:quest_cards/src/admin/search_backfill_dashboard.dart';
 
 /// A utility page for running database migrations
 /// This should only be accessible to admin users
@@ -39,6 +40,12 @@ class _MigrationToolsState extends State<MigrationTools> {
   bool _backfillProductTitleSuccess = false;
   int _backfilledProductTitleCount = 0;
   int _processedProductTitleCount = 0;
+
+  // New state variables for backfilling search index
+  bool _isBackfillingSearchIndex = false;
+  String _backfillSearchStatus = '';
+  bool _backfillSearchSuccess = false;
+  int _backfillSearchProcessed = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -322,6 +329,82 @@ class _MigrationToolsState extends State<MigrationTools> {
               ),
             ),
             const SizedBox(height: 20), // Add some padding at the bottom
+
+            // Sixth card: Backfill Search Index
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Backfill Search Index',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Populate/refresh the `questSearchIndex` documents for all existing QuestCards by calling the backfill function.',
+                    ),
+                    const SizedBox(height: 16),
+                    if (_backfillSearchStatus.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        color: _backfillSearchSuccess
+                            ? Colors.green.shade100
+                            : _isBackfillingSearchIndex
+                                ? Colors.blue.shade100
+                                : Colors.red.shade100,
+                        width: double.infinity,
+                        child: Text(_backfillSearchStatus),
+                      ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        ElevatedButton(
+                          onPressed: _isBackfillingSearchIndex
+                              ? null
+                              : () async {
+                                    await _runBackfillSearchIndex();
+                                },
+                            child: _isBackfillingSearchIndex
+                              ? const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Running Backfill...'),
+                                  ],
+                                )
+                              : const Text('Run Search Backfill'),
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton(
+                            onPressed:
+                              _isBackfillingSearchIndex ? null : _checkSearchIndexStatus,
+                          child: const Text('Check Status'),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => const SearchBackfillDashboard()),
+                            );
+                          },
+                          child: const Text('View Dashboard'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -860,6 +943,63 @@ class _MigrationToolsState extends State<MigrationTools> {
           _backfillProductTitleSuccess = false;
         });
       }
+    }
+  }
+
+  /// Calls the deployed callable backfill_search_index to populate questSearchIndex
+  Future<void> _runBackfillSearchIndex() async {
+    setState(() {
+      _isBackfillingSearchIndex = true;
+      _backfillSearchStatus = 'Starting search index backfill...';
+      _backfillSearchProcessed = 0;
+      _backfillSearchSuccess = false;
+    });
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('backfill_search_index');
+      final resp = await callable.call(<String, dynamic>{});
+      final data = Map<String, dynamic>.from(resp.data ?? {});
+      final processed = data['processed'] as int? ?? 0;
+
+      setState(() {
+        _backfillSearchProcessed = processed;
+        _backfillSearchStatus = 'Backfill complete: processed $processed documents.';
+        _backfillSearchSuccess = true;
+        _isBackfillingSearchIndex = false;
+      });
+    } catch (e, s) {
+      log('Error calling backfill_search_index: $e', stackTrace: s);
+      setState(() {
+        _isBackfillingSearchIndex = false;
+        _backfillSearchStatus = 'Error during search backfill: $e';
+        _backfillSearchSuccess = false;
+      });
+    }
+  }
+
+  /// Simple status check which queries the questSearchIndex count for sanity
+  Future<void> _checkSearchIndexStatus() async {
+    setState(() {
+      _backfillSearchStatus = 'Checking search index status...';
+    });
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final snapshot = await firestore.collection('questSearchIndex').limit(1).get();
+      final exists = snapshot.docs.isNotEmpty;
+      final totalSnapshot = await firestore.collection('questSearchIndex').count().get();
+      final total = totalSnapshot.count;
+
+      setState(() {
+        _backfillSearchStatus = 'Index present: $exists — documents in index: $total';
+        _backfillSearchSuccess = exists;
+      });
+    } catch (e, s) {
+      log('Error checking search index status: $e', stackTrace: s);
+      setState(() {
+        _backfillSearchStatus = 'Error checking search index: $e';
+        _backfillSearchSuccess = false;
+      });
     }
   }
 }

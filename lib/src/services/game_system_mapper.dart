@@ -116,6 +116,7 @@ class GameSystemMapper {
           bestMatch = system;
           matchType = 'name_similarity';
         }
+        
 
         // Check for containing/contained relationship
         if (_isSubstringOf(normalizedName,
@@ -123,6 +124,7 @@ class GameSystemMapper {
             _isSubstringOf(_normalizeGameSystemName(system.standardName),
                 normalizedName)) {
           double substringScore = 0.85; // High confidence but not exact
+          
           if (substringScore > bestScore) {
             bestScore = substringScore;
             bestMatch = system;
@@ -136,6 +138,7 @@ class GameSystemMapper {
             _isAcronymOf(_normalizeGameSystemName(system.standardName),
                 normalizedName)) {
           double acronymScore = 0.9; // Very high confidence
+          
           if (acronymScore > bestScore) {
             bestScore = acronymScore;
             bestMatch = system;
@@ -149,6 +152,7 @@ class GameSystemMapper {
 
           // Simple similarity
           score = _calculateSimilarity(normalizedName, normalizedAlias);
+          
           if (score > bestScore) {
             bestScore = score;
             bestMatch = system;
@@ -159,6 +163,7 @@ class GameSystemMapper {
           if (_isSubstringOf(normalizedName, normalizedAlias) ||
               _isSubstringOf(normalizedAlias, normalizedName)) {
             double substringScore = 0.85;
+            
             if (substringScore > bestScore) {
               bestScore = substringScore;
               bestMatch = system;
@@ -170,6 +175,7 @@ class GameSystemMapper {
           if (_isAcronymOf(normalizedName, normalizedAlias) ||
               _isAcronymOf(normalizedAlias, normalizedName)) {
             double acronymScore = 0.9;
+            
             if (acronymScore > bestScore) {
               bestScore = acronymScore;
               bestMatch = system;
@@ -178,6 +184,7 @@ class GameSystemMapper {
           }
         }
       }
+      
 
       // Apply confidence threshold
       if (bestScore < 0.6) {
@@ -246,15 +253,27 @@ class GameSystemMapper {
     }
 
     // Check for word overlap to boost score
-    final words1 = str1.split(RegExp(r'\s+'));
-    final words2 = str2.split(RegExp(r'\s+'));
-    final commonWords = words1.where((word) => words2.contains(word)).length;
+    final stopWords = {'and', '&', 'the', 'of', 'for', 'a', 'an'};
+    final words1 = str1
+      .split(RegExp(r'\s+'))
+      .map((w) => w.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+      .map((w) => w.length > 1 && w.endsWith('s') ? w.substring(0, w.length - 1) : w)
+      .where((w) => w.isNotEmpty && !stopWords.contains(w))
+      .toList();
+    final words2 = str2
+      .split(RegExp(r'\s+'))
+      .map((w) => w.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+      .map((w) => w.length > 1 && w.endsWith('s') ? w.substring(0, w.length - 1) : w)
+      .where((w) => w.isNotEmpty && !stopWords.contains(w))
+      .toList();
+    final commonWords =
+      words1.where((word) => words2.contains(word)).length;
 
     if (commonWords > 0) {
       final wordSimilarity = 2 * commonWords / (words1.length + words2.length);
 
-      // Use a weighted average of both similarity measures
-      similarity = (similarity * 0.7) + (wordSimilarity * 0.3);
+      // Increase weight of word overlap to improve fuzzy matching for similar names
+      similarity = (similarity * 0.5) + (wordSimilarity * 0.5);
     }
 
     return similarity;
@@ -295,9 +314,12 @@ class GameSystemMapper {
     // Generate acronym from full string
     final words = full.split(RegExp(r'[\s\-&]+'));
     final acronym =
-        words.where((word) => word.isNotEmpty).map((word) => word[0]).join('');
+      words.where((word) => word.isNotEmpty).map((word) => word[0]).join('');
 
-    return acronym.toLowerCase() == potential.toLowerCase();
+    // Normalize both strings by removing non-alphanumeric characters
+    final normalize = (String s) => s.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+
+    return normalize(acronym) == normalize(potential);
   }
 
   /// Check if one string is a substring of another (case-insensitive)

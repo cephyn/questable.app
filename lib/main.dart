@@ -1,6 +1,8 @@
 import 'dart:developer';
 
 import 'package:firebase_core/firebase_core.dart';
+// firebase_auth import not required in main.dart
+import 'package:firebase_ui_auth/firebase_ui_auth.dart' hide AuthProvider, ProfileScreen;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -96,9 +98,15 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    // Configure Firebase UI Auth providers globally (Email only).
+    // Google sign-in is handled directly via google_sign_in to avoid
+    // the firebase_ui_oauth_google package which blocked upgrades.
+    FirebaseUIAuth.configureProviders([
+      EmailAuthProvider(),
+    ]);
+
     // Initialize Firebase Remote Config for secure access to API keys
-    // await Config.initializeRemoteConfig(); // Previous commented out line
-    await Config.initializeAppConfig(); // Corrected and uncommented
+    await Config.initializeAppConfig();
   } catch (e) {
     log('Firebase initialization error: $e');
     // Continue with app initialization even if Firebase fails

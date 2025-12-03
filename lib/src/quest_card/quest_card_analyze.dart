@@ -10,10 +10,10 @@ import 'package:quest_cards/src/services/email_service.dart';
 import 'package:quest_cards/src/services/firebase_functions_service.dart';
 import 'package:quest_cards/src/services/firebase_storage_service.dart';
 import 'package:quest_cards/src/services/purchase_link_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Added import for Timestamp
+// cloud_firestore import not required here
 
 import '../services/firebase_auth_service.dart';
-import '../services/firebase_vertexai_service.dart';
+import '../services/firebase_ai_service.dart';
 import '../services/firestore_service.dart';
 import '../util/utils.dart';
 import 'quest_card.dart';
@@ -33,7 +33,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
 
   final FirebaseStorageService firebaseStorageService =
       FirebaseStorageService();
-  final FirebaseVertexaiService aiService = FirebaseVertexaiService();
+  final FirebaseAiService aiService = FirebaseAiService();
   final FirestoreService firestoreService = FirestoreService();
   final FirebaseAuthService auth = FirebaseAuthService();
   final EmailService emailService = EmailService();

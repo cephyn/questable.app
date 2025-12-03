@@ -2,7 +2,6 @@ import 'dart:developer';
 import '../config/config.dart';
 import 'google_pse_client.dart';
 import 'purchase_link_validator.dart';
-import 'purchase_link_cache.dart';
 
 /// Class for search result with metadata
 class PurchaseLinkResult {
@@ -16,13 +15,12 @@ class PurchaseLinkResult {
 class PurchaseLinkService {
   final GooglePSEClient _searchClient;
   final PurchaseLinkValidator _validator;
-  final PurchaseLinkCache _cache;
+  // cache removed - not used at the moment
 
   /// Create a new PurchaseLinkService
   PurchaseLinkService({
     GooglePSEClient? searchClient,
     PurchaseLinkValidator? validator,
-    PurchaseLinkCache? cache,
   })  : _searchClient = searchClient ??
             GooglePSEClient(
               apiKey: Config.googleApiKey,
@@ -32,8 +30,8 @@ class PurchaseLinkService {
             PurchaseLinkValidator(
               publisherDomains: Config.publisherDomains,
               marketplaceDomains: Config.marketplaceDomains,
-            ),
-        _cache = cache ?? PurchaseLinkCache() {
+            )
+        {
     // log('PurchaseLinkService constructor: Config.googleApiKey at time of GooglePSEClient init is "${Config.googleApiKey}"');
     // log('PurchaseLinkService constructor: Config.googleSearchEngineId at time of GooglePSEClient init is "${Config.googleSearchEngineId}"');
     // Validate configuration on initialization
@@ -215,13 +213,7 @@ class PurchaseLinkService {
   }
 
   /// Generates a cache key from metadata
-  String _generateCacheKey(Map<String, String> metadata) {
-    final title = metadata['title'] ?? '';
-    final publisher = metadata['publisher'] ?? '';
-    final gameSystem = metadata['gameSystem'] ?? '';
-
-    return '$title|$publisher|$gameSystem';
-  }
+  // _generateCacheKey removed - cache support may be reintroduced later
 
   /// Disposes resources
   void dispose() {

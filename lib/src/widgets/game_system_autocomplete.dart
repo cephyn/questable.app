@@ -82,12 +82,18 @@ class _GameSystemAutocompleteFieldState
 
   /// Find the standardized game system for a given input
   Future<void> _findStandardizedGameSystem(String value) async {
+    // Immediately notify parent of the raw typed value so forms can save it
+    // even if async lookup hasn't completed yet.
     if (value.isEmpty) {
       setState(() {
         _standardizedValue = null;
       });
+      widget.onChanged(value, _standardizedValue);
       return;
     }
+
+    // Notify parent immediately about the typed value (standardized may update later)
+    widget.onChanged(value, _standardizedValue);
 
     // Check if the value matches any option
     for (var option in _options) {
@@ -112,7 +118,7 @@ class _GameSystemAutocompleteFieldState
       _standardizedValue = standardSystem;
     });
 
-    // Notify parent of changes
+    // Notify parent of finalized standardized value
     widget.onChanged(value, standardSystem);
   }
 
