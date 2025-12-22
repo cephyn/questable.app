@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:web/web.dart' as web;
+import 'package:quest_cards/src/util/browser.dart' as browser;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
@@ -11,7 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 class Utils {
   static void setBrowserTabTitle(String title) {
     if (kIsWeb) {
-      web.document.title = title;
+      browser.setDocumentTitle(title);
     }
   }
 
