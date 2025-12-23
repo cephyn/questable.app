@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mime/mime.dart';
@@ -27,7 +28,10 @@ class FirebaseStorageService {
     var mimeType = lookupMimeType(file.name);
 
     FirebaseStorage storage = FirebaseStorage.instance;
-    String storagePath = 'uploads/$fileName';
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final safePrefix = DateTime.now().millisecondsSinceEpoch;
+    final ownerFolder = uid ?? 'anonymous';
+    String storagePath = 'uploads/$ownerFolder/${safePrefix}_$fileName';
     Reference ref = storage.ref().child(storagePath);
     UploadTask uploadTask =
         ref.putData(fileBytes, SettableMetadata(contentType: mimeType));
@@ -37,6 +41,35 @@ class FirebaseStorageService {
     // Store mapping of download URL to storage path
     _urlToPathMap[downloadUrl] = storagePath;
 
+    return downloadUrl;
+  }
+
+  /// Uploads a file to a specific Storage path (e.g., a job input path).
+  ///
+  /// Returns the download URL for the uploaded object.
+  Future<String> uploadFileToPath(
+    PlatformFile file,
+    String storagePath, {
+    String? contentType,
+  }) async {
+    Uint8List fileBytes;
+
+    if (kIsWeb) {
+      fileBytes = file.bytes!;
+    } else {
+      fileBytes = File(file.path!).readAsBytesSync();
+    }
+
+    final inferred = contentType ?? lookupMimeType(file.name);
+    final Reference ref = storage.ref().child(storagePath);
+    final UploadTask uploadTask = ref.putData(
+      fileBytes,
+      SettableMetadata(contentType: inferred),
+    );
+    await uploadTask.whenComplete(() => null);
+    final downloadUrl = await ref.getDownloadURL();
+
+    _urlToPathMap[downloadUrl] = storagePath;
     return downloadUrl;
   }
 
@@ -50,7 +83,9 @@ class FirebaseStorageService {
     var mimeType = "text/plain";
 
     FirebaseStorage storage = FirebaseStorage.instance;
-    String storagePath = 'uploads/$fileName';
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final ownerFolder = uid ?? 'anonymous';
+    String storagePath = 'uploads/$ownerFolder/$fileName';
     Reference ref = storage.ref().child(storagePath);
     UploadTask uploadTask =
         ref.putData(fileBytes, SettableMetadata(contentType: mimeType));
@@ -140,7 +175,15 @@ class FirebaseStorageService {
         }
       }
 
-      await fileReference.delete();
+      try {
+        await fileReference.delete();
+      } on FirebaseException catch (e) {
+        // Treat missing objects as a successful cleanup.
+        // This commonly happens when an async worker already deleted the upload.
+        if (e.code != 'object-not-found') {
+          rethrow;
+        }
+      }
 
       // Remove the mapping if deletion was successful
       _urlToPathMap.remove(url);
