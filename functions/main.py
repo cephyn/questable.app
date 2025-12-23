@@ -16,6 +16,9 @@ from firebase_admin import (
 )
 import logging  # Added
 import requests  # Added for the proxy function
+import os
+import tempfile
+import json
 
 # from markitdown import MarkItDown # Importing MarkItDown for PDF to Markdown conversion # MOVED TO pdf_to_md
 
@@ -50,6 +53,58 @@ logging.basicConfig(level=logging.DEBUG)
 initialize_app()
 
 
+PDF_TO_MD_JOBS_COLLECTION = "pdfToMdJobs"
+PDF_TO_MD_INPUT_FILENAME = "input.pdf"
+PDF_TO_MD_OUTPUT_FILENAME = "output.md"
+
+
+def _get_change_before_after(change) -> tuple[object | None, object | None]:
+    """Return (before, after) snapshots from a Firestore Change.
+
+    The firebase_functions Python SDK has used different attribute names across
+    versions. This helper supports both the modern `before`/`after` and the
+    older `old_value`/`value` naming.
+    """
+    if change is None:
+        return (None, None)
+
+    before = None
+    after = None
+
+    for attr in ("before", "old_value", "oldValue"):
+        if hasattr(change, attr):
+            before = getattr(change, attr)
+            break
+
+    for attr in ("after", "value", "new_value", "newValue"):
+        if hasattr(change, attr):
+            after = getattr(change, attr)
+            break
+
+    return (before, after)
+
+
+def _get_default_storage_bucket_name() -> str | None:
+    """Returns the Firebase Storage bucket name from FIREBASE_CONFIG if present."""
+    try:
+        # FIREBASE_CONFIG is a JSON string when present.
+        import json
+
+        cfg = os.environ.get("FIREBASE_CONFIG")
+        if not cfg:
+            return None
+        parsed = json.loads(cfg)
+        return parsed.get("storageBucket")
+    except Exception:
+        return None
+
+
+def _job_paths(job_id: str) -> tuple[str, str]:
+    """Returns (input_path, output_path) for a job inside the default bucket."""
+    base = f"pdf_to_md_jobs/{job_id}"
+    return (f"{base}/{PDF_TO_MD_INPUT_FILENAME}", f"{base}/{PDF_TO_MD_OUTPUT_FILENAME}")
+
+
 @firestore_fn.on_document_created(
     document="questCards/{questId}", memory=options.MemoryOption.MB_512
 )
@@ -71,6 +126,281 @@ def on_new_quest_card_created(event: firestore_fn.Event[firestore_fn.Change]) ->
         logging.error(f"Error calculating similarity for quest {quest_id}: {e}")
         # Optionally, re-raise the exception if you want the function to be marked as failed
         # raise e
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_256)
+def create_pdf_to_md_job(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """Creates a PDF→Markdown conversion job.
+
+    Returns { jobId, uploadPath } where the client should upload a PDF to
+    gs://<bucket>/<uploadPath> (via Firebase Storage SDK).
+    """
+    try:
+        # Require auth so we can lock down Firestore reads to the job owner.
+        if not hasattr(req, "auth") or req.auth is None:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+                message="Authentication required.",
+            )
+
+        bucket = _get_default_storage_bucket_name()
+        if not bucket:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION,
+                message="Firebase Storage bucket is not configured.",
+            )
+
+        data = req.data or {}
+        original_filename = str(data.get("originalFilename") or "").strip()
+        run_id = str(data.get("runId") or "").strip()
+
+        db = firestore.client()
+        doc_ref = db.collection(PDF_TO_MD_JOBS_COLLECTION).document()
+        job_id = doc_ref.id
+        input_path, output_path = _job_paths(job_id)
+
+        initiated_by = req.auth.uid
+
+        doc_ref.set(
+            {
+                "status": "created",
+                "bucket": bucket,
+                "inputPath": input_path,
+                "outputPath": output_path,
+                "originalFilename": original_filename,
+                "runId": run_id,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "createdBy": initiated_by,
+            }
+        )
+
+        logging.info(
+            "PDF_TO_MD job created jobId=%s runId=%s uid=%s inputPath=%s",
+            job_id,
+            run_id,
+            initiated_by,
+            input_path,
+        )
+
+        return {"jobId": job_id, "uploadPath": input_path, "bucket": bucket}
+    except https_fn.HttpsError:
+        raise
+    except Exception as e:
+        logging.error(f"create_pdf_to_md_job error: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="Failed to create PDF to Markdown job.",
+            details=str(e),
+        )
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_256)
+def start_pdf_to_md_job(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """Marks a previously created job as queued, triggering processing."""
+    try:
+        if not hasattr(req, "auth") or req.auth is None:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+                message="Authentication required.",
+            )
+
+        data = req.data or {}
+        job_id = str(data.get("jobId") or "").strip()
+        if not job_id:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+                message="Missing required field: jobId",
+            )
+
+        db = firestore.client()
+        doc_ref = db.collection(PDF_TO_MD_JOBS_COLLECTION).document(job_id)
+        snap = doc_ref.get()
+        if not snap.exists:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.NOT_FOUND,
+                message="Job not found.",
+            )
+
+        # Only the creator may start their job.
+        job_data = snap.to_dict() or {}
+        created_by = str(job_data.get("createdBy") or "")
+        run_id = str(job_data.get("runId") or "")
+        if not created_by or created_by != req.auth.uid:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+                message="Not allowed to start this job.",
+            )
+
+        doc_ref.update(
+            {
+                "status": "queued",
+                "queuedAt": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+        logging.info(
+            "PDF_TO_MD job queued jobId=%s runId=%s uid=%s",
+            job_id,
+            run_id,
+            req.auth.uid,
+        )
+
+        return {"jobId": job_id, "status": "queued"}
+    except https_fn.HttpsError:
+        raise
+    except Exception as e:
+        logging.error(f"start_pdf_to_md_job error: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="Failed to start PDF to Markdown job.",
+            details=str(e),
+        )
+
+
+@firestore_fn.on_document_written(
+    document=f"{PDF_TO_MD_JOBS_COLLECTION}/{{jobId}}",
+    memory=options.MemoryOption.GB_4,
+)
+def process_pdf_to_md_job(event: firestore_fn.Event[firestore_fn.Change]) -> None:
+    """Processes queued PDF→Markdown jobs.
+
+    Triggered by updates to pdfToMdJobs/{jobId}. When status transitions to
+    'queued', downloads the uploaded PDF from Cloud Storage, converts to Markdown,
+    uploads output markdown, and updates job doc.
+    """
+    job_id = event.params["jobId"]
+
+    try:
+        # Extract before/after snapshots (SDK version compatible)
+        old_value, new_value = _get_change_before_after(event.data)
+
+        if new_value is None:
+            return
+
+        def _to_dict(v):
+            try:
+                return v.to_dict() if hasattr(v, "to_dict") else dict(v)
+            except Exception:
+                try:
+                    return dict(v)
+                except Exception:
+                    return {}
+
+        old_data = _to_dict(old_value) if old_value is not None else {}
+        new_data = _to_dict(new_value)
+
+        old_status = str(old_data.get("status") or "")
+        new_status = str(new_data.get("status") or "")
+
+        run_id = str(new_data.get("runId") or "")
+
+        # Only run on transition to queued
+        if new_status != "queued" or old_status == "queued":
+            return
+
+        bucket_name = str(new_data.get("bucket") or "")
+        input_path = str(new_data.get("inputPath") or "")
+        output_path = str(new_data.get("outputPath") or "")
+
+        if not bucket_name or not input_path or not output_path:
+            logging.error(
+                "process_pdf_to_md_job missing bucket/path fields jobId=%s runId=%s",
+                job_id,
+                run_id,
+            )
+            return
+
+        db = firestore.client()
+        doc_ref = db.collection(PDF_TO_MD_JOBS_COLLECTION).document(job_id)
+        doc_ref.update(
+            {
+                "status": "processing",
+                "startedAt": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+        logging.info(
+            "PDF_TO_MD processing started jobId=%s runId=%s inputPath=%s outputPath=%s",
+            job_id,
+            run_id,
+            input_path,
+            output_path,
+        )
+
+        # Lazy imports to keep cold starts smaller
+        from google.cloud import storage  # type: ignore
+        from markitdown import MarkItDown  # type: ignore
+
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(input_path)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local_pdf = os.path.join(tmpdir, "input.pdf")
+            local_md = os.path.join(tmpdir, "output.md")
+
+            blob.download_to_filename(local_pdf)
+
+            doc_ref.update({"downloadedAt": firestore.SERVER_TIMESTAMP})
+
+            # Delete the uploaded PDF as soon as we've successfully pulled it into
+            # local temp storage to minimize retention of user uploads.
+            try:
+                blob.delete()
+                doc_ref.update({"inputDeletedAt": firestore.SERVER_TIMESTAMP})
+            except Exception as e:
+                logging.warning(f"Could not delete input PDF for job {job_id}: {e}")
+
+            md = MarkItDown(enable_plugins=False)
+            result = md.convert(local_pdf)
+            text = getattr(result, "text_content", None)
+            if text is None:
+                text = str(result)
+
+            doc_ref.update(
+                {
+                    "convertedAt": firestore.SERVER_TIMESTAMP,
+                    "markdownCharCount": len(text),
+                }
+            )
+
+            # Write output locally then upload
+            with open(local_md, "w", encoding="utf-8") as f:
+                f.write(text)
+
+            out_blob = bucket.blob(output_path)
+            out_blob.content_type = "text/markdown"
+            out_blob.upload_from_filename(local_md)
+
+            doc_ref.update({"outputUploadedAt": firestore.SERVER_TIMESTAMP})
+
+        doc_ref.update(
+            {
+                "status": "done",
+                "completedAt": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+        logging.info(
+            "PDF_TO_MD processing done jobId=%s runId=%s markdownChars=%s",
+            job_id,
+            run_id,
+            len(text),
+        )
+
+    except Exception as e:
+        logging.exception("process_pdf_to_md_job failed jobId=%s", job_id)
+        try:
+            firestore.client().collection(PDF_TO_MD_JOBS_COLLECTION).document(job_id).update(
+                {
+                    "status": "failed",
+                    "failedAt": firestore.SERVER_TIMESTAMP,
+                    "error": str(e),
+                    "errorType": type(e).__name__,
+                }
+            )
+        except Exception:
+            logging.warning(f"Could not update failed status for job {job_id}")
 
 
 # @https_fn.on_call(
@@ -155,18 +485,12 @@ def proxy_fetch_url(req: https_fn.CallableRequest) -> https_fn.Response | dict:
         with requests.Session() as session:
             # It's good practice to set a User-Agent that's representative of your app/service
             headers = {"User-Agent": "QuestableAppProxy/1.0 (+https://questable.app)"}
-            # Make a GET request. For HEAD requests, use session.head()
-            # The original error was for a HEAD request, but for validation, GET might be more common.
-            # If only headers are needed, change to session.head() and adjust response handling.
-            response = session.get(
-                target_url, headers=headers, timeout=20
-            )  # 20 seconds timeout
+            # Make a GET request. For HEAD requests, use session.head().
+            response = session.get(target_url, headers=headers, timeout=20)
 
-        # Raise an exception for bad status codes (4xx or 5xx)
-        response.raise_for_status()
-
-        # Return relevant parts of the response
-        # Be mindful of not returning excessively large responses if only a status or specific headers are needed.
+        # IMPORTANT: Do NOT raise for non-2xx status codes.
+        # Many sites block automated requests (403) and we want the caller to
+        # treat that as "not accessible" rather than an internal function error.
         return {
             "statusCode": response.status_code,
             "headers": dict(response.headers),
@@ -185,11 +509,9 @@ def proxy_fetch_url(req: https_fn.CallableRequest) -> https_fn.Response | dict:
         )
     except requests.exceptions.RequestException as e:
         logging.error(f"Error fetching {target_url}: {e}")
-        # Include status code in the error if available (e.g., for 403 Forbidden)
-        status_code = e.response.status_code if e.response is not None else "N/A"
         raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAVAILABLE,  # Or more specific based on e.response.status_code
-            message=f"Failed to fetch content from {target_url}. Status: {status_code}",
+            code=https_fn.FunctionsErrorCode.UNAVAILABLE,
+            message=f"Failed to fetch content from {target_url}.",
             details=str(e),
         )
     except Exception as e:
@@ -198,6 +520,131 @@ def proxy_fetch_url(req: https_fn.CallableRequest) -> https_fn.Response | dict:
             code=https_fn.FunctionsErrorCode.INTERNAL,
             message="An internal error occurred while proxying the request.",
             details=str(e),
+        )
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_256)
+def report_client_error(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """Callable used by the client to report failures into Cloud Logs.
+
+    This is especially helpful when browser extensions block Firestore/AI
+    requests (net::ERR_BLOCKED_BY_CLIENT), which prevents useful server-side
+    logs from being generated.
+    """
+    try:
+        data = req.data or {}
+        uid = None
+        try:
+            uid = req.auth.uid if hasattr(req, "auth") and req.auth is not None else None
+        except Exception:
+            uid = None
+
+        logging.error(
+            "CLIENT_ERROR uid=%s runId=%s stage=%s message=%s details=%s",
+            uid,
+            data.get("runId"),
+            data.get("stage"),
+            data.get("message"),
+            {
+                "error": data.get("error"),
+                "stack": data.get("stack"),
+                "context": data.get("context"),
+            },
+        )
+        return {"ok": True}
+    except Exception as e:
+        logging.error(f"report_client_error failed: {e}")
+        return {"ok": False}
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_256)
+def report_client_event(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """Callable used by the client to report stage/progress events into Cloud Logs.
+
+    This is intentionally lightweight and best-effort; it should never break
+    user flows. Use `report_client_error` for exceptions.
+    """
+    try:
+        data = req.data or {}
+        uid = None
+        try:
+            uid = req.auth.uid if hasattr(req, "auth") and req.auth is not None else None
+        except Exception:
+            uid = None
+
+        logging.info(
+            "CLIENT_EVENT uid=%s runId=%s stage=%s message=%s context=%s",
+            uid,
+            data.get("runId"),
+            data.get("stage"),
+            data.get("message"),
+            data.get("context"),
+        )
+        return {"ok": True}
+    except Exception as e:
+        logging.error(f"report_client_event failed: {e}")
+        return {"ok": False}
+
+
+@https_fn.on_request(memory=options.MemoryOption.MB_256)
+def report_client_error_http(req: https_fn.Request) -> https_fn.Response:
+    """HTTP endpoint to report client errors when callable Functions aren't available.
+
+    This is primarily used for very-early web startup crashes where Firebase may
+    not be initialized yet, so `httpsCallable('report_client_error')` cannot run.
+
+    CORS is enabled for browser requests.
+    """
+    cors_headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "3600",
+    }
+
+    if req.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=cors_headers)
+
+    if req.method != "POST":
+        return https_fn.Response(
+            json.dumps({"ok": False, "error": "Method not allowed"}),
+            status=405,
+            headers={**cors_headers, "Content-Type": "application/json"},
+        )
+
+    try:
+        # `req` is a Flask request under the hood.
+        data = None
+        try:
+            data = req.get_json(silent=True)
+        except Exception:
+            data = None
+        if not isinstance(data, dict):
+            data = {}
+
+        logging.error(
+            "CLIENT_ERROR_HTTP runId=%s stage=%s message=%s details=%s",
+            data.get("runId"),
+            data.get("stage"),
+            data.get("message"),
+            {
+                "error": data.get("error"),
+                "stack": data.get("stack"),
+                "context": data.get("context"),
+            },
+        )
+
+        return https_fn.Response(
+            json.dumps({"ok": True}),
+            status=200,
+            headers={**cors_headers, "Content-Type": "application/json"},
+        )
+    except Exception as e:
+        logging.error(f"report_client_error_http failed: {e}")
+        return https_fn.Response(
+            json.dumps({"ok": False}),
+            status=200,
+            headers={**cors_headers, "Content-Type": "application/json"},
         )
 
 
@@ -356,17 +803,19 @@ def search_quests(req: https_fn.CallableRequest) -> https_fn.Response | dict:
 def maintain_search_index(event: firestore_fn.Event[firestore_fn.Change]) -> None:
     quest_id = event.params["questId"]
     try:
+        before, after = _get_change_before_after(event.data)
+
         # If document deleted
-        if event.data.old_value is not None and event.data.value is None:
+        if before is not None and after is None:
             # deleted
             delete_index(firestore.client(), quest_id)
             logging.info(f"Deleted search index for {quest_id}")
             return
 
         # For create or update, build index
-        if event.data.value is not None:
-            # event.data.value is a firestore.DocumentSnapshot-like mapping
-            new_data = event.data.value
+        if after is not None:
+            # `after` is a firestore.DocumentSnapshot-like object
+            new_data = after
             # Convert to dict safely
             try:
                 # If the event object exposes to_dict(), use it

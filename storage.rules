@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isJobOwner(jobId) {
+      // job doc is created by callable before client uploads the PDF
+      return signedIn() &&
+        firestore.get(/databases/(default)/documents/pdfToMdJobs/$(jobId)).data.createdBy == request.auth.uid;
+    }
+
+    // Per-user uploads (used by Analyze File for text/generic uploads)
+    match /uploads/{userId}/{allPaths=**} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // PDF → Markdown conversion jobs
+    match /pdf_to_md_jobs/{jobId}/{fileName} {
+      // input.pdf is uploaded by the client; output.md is read by the client.
+      // The worker uses Admin credentials and bypasses rules.
+      allow read, write: if isJobOwner(jobId);
+    }
+  }
+}
