@@ -47,6 +47,15 @@ class _MigrationToolsState extends State<MigrationTools> {
   bool _backfillSearchSuccess = false;
   int _backfillSearchProcessed = 0;
 
+  // State variables for batch update game system
+  bool _isBatchUpdatingGameSystem = false;
+  String _batchGameSystemStatus = '';
+  bool _batchGameSystemSuccess = false;
+  int _batchGameSystemProcessed = 0;
+  int _batchGameSystemUpdated = 0;
+  final TextEditingController _batchQuestIdController = TextEditingController();
+  final TextEditingController _batchGameSystemController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     final userContext = Provider.of<UserContext>(context);
@@ -323,6 +332,80 @@ class _MigrationToolsState extends State<MigrationTools> {
                               ],
                             )
                           : const Text('Backfill Product Titles'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20), // Add some padding at the bottom
+
+            // Seventh card: Batch Update Game System
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Batch Update Game System',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Update the game system for multiple quests at once. '
+                      'Provide a comma-separated list of quest IDs and the new game system name. '
+                      'Both `gameSystem` and `standardizedGameSystem` can be updated simultaneously.',
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _batchQuestIdController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Quest IDs (comma-separated)',
+                        hintText: 'e.g., questId1,questId2,questId3',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _batchGameSystemController,
+                      decoration: const InputDecoration(
+                        labelText: 'New Game System',
+                        hintText: 'e.g., Dungeons & Dragons 5e',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_batchGameSystemStatus.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        color: _batchGameSystemSuccess
+                            ? Colors.green.shade100
+                            : _isBatchUpdatingGameSystem
+                                ? Colors.blue.shade100
+                                : Colors.red.shade100,
+                        width: double.infinity,
+                        child: Text(_batchGameSystemStatus),
+                      ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _isBatchUpdatingGameSystem
+                          ? null
+                          : _runBatchUpdateGameSystem,
+                      child: _isBatchUpdatingGameSystem
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                SizedBox(width: 8),
+                                Text('Updating...'),
+                              ],
+                            )
+                          : const Text('Batch Update Game System'),
                     ),
                   ],
                 ),
@@ -1000,6 +1083,129 @@ class _MigrationToolsState extends State<MigrationTools> {
         _backfillSearchStatus = 'Error checking search index: $e';
         _backfillSearchSuccess = false;
       });
+    }
+  }
+
+  /// Batch updates the game system for multiple quests
+  Future<void> _runBatchUpdateGameSystem() async {
+    final questIds = _batchQuestIdController.text
+        .split(',')
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+    final newGameSystem = _batchGameSystemController.text.trim();
+
+    // Validation
+    if (questIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please provide at least one quest ID.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (newGameSystem.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please provide a new game system name.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isBatchUpdatingGameSystem = true;
+      _batchGameSystemStatus = 'Starting batch update (${questIds.length} quests)...';
+      _batchGameSystemSuccess = false;
+      _batchGameSystemProcessed = 0;
+      _batchGameSystemUpdated = 0;
+    });
+
+    final firestore = FirebaseFirestore.instance;
+    const batchSize = 400; // Firestore batch limit
+    int batchCounter = 0;
+    WriteBatch batch = firestore.batch();
+
+    try {
+      for (int i = 0; i < questIds.length; i++) {
+        final questId = questIds[i];
+        _batchGameSystemProcessed = i + 1;
+
+        if (!mounted) return;
+        setState(() {
+          _batchGameSystemStatus =
+              'Processing ${_batchGameSystemProcessed}/${questIds.length} quests...';
+        });
+
+        final docRef = firestore.collection('questCards').doc(questId);
+        final docSnapshot = await docRef.get();
+
+        if (!docSnapshot.exists) {
+          log('Quest $questId does not exist, skipping...');
+          continue;
+        }
+
+        // Update both gameSystem and standardizedGameSystem
+        batch.update(docRef, {
+          'gameSystem': newGameSystem,
+          'standardizedGameSystem': newGameSystem,
+          'gameSystem_lowercase': newGameSystem.toLowerCase(),
+        });
+        batchCounter++;
+        _batchGameSystemUpdated++;
+
+        if (batchCounter >= batchSize) {
+          if (!mounted) return;
+          setState(() {
+            _batchGameSystemStatus =
+                'Committing batch (${_batchGameSystemProcessed}/${questIds.length}, Updated: ${_batchGameSystemUpdated})...';
+          });
+          log('Committing batch update...');
+          await batch.commit();
+          log('Batch committed.');
+          batch = firestore.batch();
+          batchCounter = 0;
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+      }
+
+      // Commit final batch
+      if (batchCounter > 0) {
+        if (!mounted) return;
+        setState(() {
+          _batchGameSystemStatus =
+              'Committing final batch (${_batchGameSystemUpdated} quests)...';
+        });
+        log('Committing final batch ($batchCounter operations)...');
+        await batch.commit();
+        log('Final batch committed.');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isBatchUpdatingGameSystem = false;
+          _batchGameSystemStatus =
+              'Batch update complete! Updated: ${_batchGameSystemUpdated}/${questIds.length} quests to "$newGameSystem"';
+          _batchGameSystemSuccess = true;
+        });
+
+        // Clear the input fields on success
+        _batchQuestIdController.clear();
+        _batchGameSystemController.clear();
+      }
+    } catch (e, s) {
+      log('Error during batch game system update: $e', stackTrace: s);
+      if (mounted) {
+        setState(() {
+          _isBatchUpdatingGameSystem = false;
+          _batchGameSystemStatus =
+              'Error during batch update: $e. Processed: ${_batchGameSystemProcessed}, Updated: ${_batchGameSystemUpdated}';
+          _batchGameSystemSuccess = false;
+        });
+      }
     }
   }
 }
