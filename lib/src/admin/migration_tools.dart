@@ -56,6 +56,10 @@ class _MigrationToolsState extends State<MigrationTools> {
   final TextEditingController _batchQuestIdController = TextEditingController();
   final TextEditingController _batchGameSystemController = TextEditingController();
 
+  // State for uploader email backfill
+  bool _isUploaderBackfillRunning = false;
+  String _uploaderBackfillStatus = '';
+
   @override
   Widget build(BuildContext context) {
     final userContext = Provider.of<UserContext>(context);
@@ -484,6 +488,57 @@ class _MigrationToolsState extends State<MigrationTools> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    // NEW: Backfill uploader emails (one-off)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Backfill Uploader Emails',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Populate missing `uploaderEmail` on existing QuestCards from the `uploadedBy` user id. Safe to run; will only update missing fields.',
+                            ),
+                            const SizedBox(height: 12),
+                            if (_uploaderBackfillStatus.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                color: _isUploaderBackfillRunning ? Colors.blue.shade100 : Colors.green.shade100,
+                                width: double.infinity,
+                                child: Text(_uploaderBackfillStatus),
+                              ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                ElevatedButton(
+                                  onPressed: _isUploaderBackfillRunning ? null : _confirmAndRunUploaderBackfill,
+                                  child: _isUploaderBackfillRunning
+                                      ? const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                            SizedBox(width: 8),
+                                            Text('Running...'),
+                                          ],
+                                        )
+                                      : const Text('Run Backfill'),
+                                ),
+                                const SizedBox(width: 12),
+                                OutlinedButton(
+                                  onPressed: _isUploaderBackfillRunning ? null : _checkUploaderBackfillStatus,
+                                  child: const Text('Check Status'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -632,6 +687,14 @@ class _MigrationToolsState extends State<MigrationTools> {
                     style: TextStyle(fontSize: 12),
                   ),
                 ),
+              if (!hasIndexLink)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    'Additionally, you can run the "Backfill Uploader Emails" migration from this page to normalize uploader data.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
             ],
           ),
           backgroundColor: Colors.red,
@@ -662,6 +725,77 @@ class _MigrationToolsState extends State<MigrationTools> {
         log('Index creation link: $indexLink');
       }
     }
+  }
+
+  // Uploader email backfill helpers
+  Future<void> _confirmAndRunUploaderBackfill() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Run Backfill?'),
+          content: const Text(
+              'This will scan all QuestCards and populate missing uploaderEmail fields from uploadedBy user ids. This may update many documents. Proceed?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Run'),
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _runUploaderBackfill();
+    }
+  }
+
+  Future<void> _runUploaderBackfill() async {
+    setState(() {
+      _isUploaderBackfillRunning = true;
+      _uploaderBackfillStatus = 'Running uploader email backfill...';
+    });
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('backfill_uploader_emails');
+      final resp = await callable.call(<String, dynamic>{});
+      final data = Map<String, dynamic>.from(resp.data ?? {});
+      final processed = data['processed'] as int? ?? 0;
+      final updated = data['updated'] as int? ?? 0;
+
+      setState(() {
+        _uploaderBackfillStatus = 'Backfill complete: processed $processed, updated $updated';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backfill complete: processed $processed, updated $updated')),
+      );
+    } catch (e) {
+      log('Backfill failed: $e');
+      setState(() {
+        _uploaderBackfillStatus = 'Backfill failed: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backfill failed: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploaderBackfillRunning = false;
+      });
+    }
+  }
+
+  Future<void> _checkUploaderBackfillStatus() async {
+    // For now, we don't have a persistent status; just a placeholder that confirms function exists
+    setState(() {
+      _uploaderBackfillStatus = 'Backfill function is available. Run to start.';
+    });
   }
 
   Future<void> _runIsPublicMigration() async {

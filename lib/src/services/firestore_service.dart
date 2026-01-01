@@ -571,7 +571,8 @@ class FirestoreService {
       if (!documentSnapshot.exists) {
         await userDocRef.set({
           'roles': ['user'],
-          'email': email
+          'email': email,
+          'createdAt': Timestamp.now(), // Add creation timestamp for analytics
         });
         await emailService.sendSignupEmailToAdmin(email);
         await emailService.sendActivationEmail(email);

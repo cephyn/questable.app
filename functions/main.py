@@ -901,3 +901,292 @@ def backfill_search_index(req: https_fn.CallableRequest) -> https_fn.Response | 
             message="Failed to backfill search index.",
             details=str(e),
         )
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_512)
+def get_site_stats(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """Aggregates site statistics for admin dashboards.
+
+    Returns a dict:
+      - totalUsers: int
+      - totalQuests: int
+      - topUploaders: [{uploader, count}] (top 10)
+      - mostOwnedQuests: [{questId, title, count}] (top 10)
+      - usersPerDay: { YYYY-MM-DD: count }
+    """
+    try:
+        db = firestore.client()
+
+        # Total users and users per day
+        total_users = 0
+        users_per_day = {}
+        try:
+            users_iter = db.collection('users').stream()
+            for u in users_iter:
+                total_users += 1
+                try:
+                    data = u.to_dict() or {}
+                    created = data.get('createdAt')
+                    if created is not None:
+                        # Firestore Timestamps appear as datetime in Admin SDK
+                        try:
+                            day = created.date().isoformat()
+                        except Exception:
+                            # Fallback: cast to str and take YYYY-MM-DD
+                            day = str(created)[:10]
+                        users_per_day[day] = users_per_day.get(day, 0) + 1
+                except Exception:
+                    continue
+        except Exception as e:
+            logging.warning(f"Failed to enumerate users for stats: {e}")
+
+        # Total quests and uploads by user (normalized)
+        total_quests = 0
+        uploads_by_user = {}
+        uid_keys = set()
+        try:
+            quests_iter = db.collection('questCards').stream()
+            for q in quests_iter:
+                total_quests += 1
+                try:
+                    d = q.to_dict() or {}
+                    uploader_email = d.get('uploaderEmail')
+                    uploader_uid = d.get('uploadedBy')
+
+                    if uploader_email and str(uploader_email).strip():
+                        # Canonicalize explicit uploaderEmail
+                        key = str(uploader_email).strip().lower()
+                    elif uploader_uid and str(uploader_uid).strip():
+                        # uploadedBy may sometimes be an email string rather than a uid.
+                        candidate = str(uploader_uid).strip()
+                        if '@' in candidate:
+                            # Treat as an email address and normalize
+                            key = candidate.lower()
+                        else:
+                            # Mark as uid:... so we can resolve later
+                            key = f"uid:{candidate}"
+                            uid_keys.add(candidate)
+                    else:
+                        key = 'unknown'
+
+                    uploads_by_user[key] = uploads_by_user.get(key, 0) + 1
+                except Exception:
+                    continue
+
+            # Resolve uid keys to emails when possible and merge counts
+            if uid_keys:
+                try:
+                    for uid in list(uid_keys):
+                        user_doc = db.collection('users').document(uid).get()
+                        if user_doc.exists:
+                            user_data = user_doc.to_dict() or {}
+                            email = user_data.get('email')
+                            if email and str(email).strip():
+                                email_key = str(email).strip().lower()
+                                uid_key = f"uid:{uid}"
+                                count = uploads_by_user.pop(uid_key, 0)
+                                uploads_by_user[email_key] = (
+                                    uploads_by_user.get(email_key, 0) + count
+                                )
+                except Exception as e:
+                    logging.warning(f"Failed to resolve uploader UIDs to emails: {e}")
+
+        except Exception as e:
+            logging.warning(f"Failed to enumerate questCards for stats: {e}")
+
+        # Most owned quests (collection group query on ownedQuests subcollections)
+        owned_counts = {}
+        try:
+            for owned_doc in db.collection_group('ownedQuests').stream():
+                quest_id = owned_doc.id
+                owned_counts[quest_id] = owned_counts.get(quest_id, 0) + 1
+        except Exception as e:
+            logging.warning(f"Failed to enumerate ownedQuests for stats: {e}")
+
+        # Top lists
+        top_uploads = sorted(uploads_by_user.items(), key=lambda x: -x[1])[:10]
+        top_owned = sorted(owned_counts.items(), key=lambda x: -x[1])[:10]
+
+        # Enrich top owned with titles
+        enriched_top_owned = []
+        for quest_id, count in top_owned:
+            title = None
+            try:
+                qdoc = db.collection('questCards').document(quest_id).get()
+                if qdoc.exists:
+                    title = (qdoc.to_dict() or {}).get('title')
+            except Exception:
+                title = None
+            enriched_top_owned.append({
+                'questId': quest_id,
+                'title': title,
+                'count': count,
+            })
+
+        return {
+            'totalUsers': total_users,
+            'totalQuests': total_quests,
+            'topUploaders': [{'uploader': k, 'count': v} for k, v in top_uploads],
+            'mostOwnedQuests': enriched_top_owned,
+            'usersPerDay': users_per_day,
+        }
+    except https_fn.HttpsError:
+        raise
+    except Exception as e:
+        logging.error(f"get_site_stats error: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="Failed to compute site statistics.",
+            details=str(e),
+        )
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_512)
+def backfill_uploader_emails(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """One-off callable to populate `uploaderEmail` on questCards from `uploadedBy` (user id).
+
+    Safe for large datasets: processes in batches and returns counts.
+    """
+    try:
+        if not hasattr(req, "auth") or req.auth is None:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+                message="Authentication required.",
+            )
+
+        db = firestore.client()
+        processed = 0
+        updated = 0
+        batch = db.batch()
+        batch_count = 0
+        BATCH_SIZE = 400
+
+        # Iterate all questCards; for large datasets consider a query with pagination
+        for q in db.collection('questCards').stream():
+            processed += 1
+            try:
+                d = q.to_dict() or {}
+                if d.get('uploaderEmail'):
+                    continue  # Already has email
+                uploaded_by = d.get('uploadedBy')
+                if not uploaded_by:
+                    continue
+
+                user_doc = db.collection('users').document(str(uploaded_by)).get()
+                if user_doc.exists:
+                    email = (user_doc.to_dict() or {}).get('email')
+                    if email and str(email).strip():
+                        batch.update(q.reference, {'uploaderEmail': str(email).strip().lower()})
+                        batch_count += 1
+                        updated += 1
+
+                if batch_count >= BATCH_SIZE:
+                    batch.commit()
+                    batch = db.batch()
+                    batch_count = 0
+            except Exception as e:
+                logging.warning(f"Error processing quest {q.id}: {e}")
+                continue
+
+        if batch_count > 0:
+            batch.commit()
+
+        return {"processed": processed, "updated": updated}
+
+    except https_fn.HttpsError:
+        raise
+    except Exception as e:
+        logging.error(f"backfill_uploader_emails error: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="Failed to backfill uploader emails.",
+            details=str(e),
+        )
+
+
+@firestore_fn.on_document_written(
+    document="questCards/{questId}",
+    memory=options.MemoryOption.MB_256,
+)
+def sync_uploader_email(event: firestore_fn.Event[firestore_fn.Change]) -> None:
+    """Ensures `uploaderEmail` is populated from `uploadedBy` when missing.
+
+    Triggered on writes to questCards/{questId}. This is idempotent and best-effort.
+    """
+    quest_id = event.params.get("questId")
+    try:
+        before, after = _get_change_before_after(event.data)
+
+        if after is None:
+            return
+
+        def _to_dict(v):
+            try:
+                return v.to_dict() if hasattr(v, "to_dict") else dict(v)
+            except Exception:
+                try:
+                    return dict(v)
+                except Exception:
+                    return {}
+
+        new_data = _to_dict(after)
+        uploader_email = new_data.get('uploaderEmail')
+        uploaded_by = new_data.get('uploadedBy')
+
+        if uploader_email and str(uploader_email).strip():
+            return  # already present
+        if not uploaded_by:
+            return  # nothing to resolve
+
+        # Resolve user email from users collection
+        try:
+            user_doc = firestore.client().collection('users').document(str(uploaded_by)).get()
+            if user_doc.exists:
+                user_map = user_doc.to_dict() or {}
+                email = user_map.get('email')
+                if email and str(email).strip():
+                    firestore.client().collection('questCards').document(quest_id).update({
+                        'uploaderEmail': str(email).strip().lower(),
+                    })
+                    logging.info(f"Synced uploaderEmail for {quest_id} to {email}")
+        except Exception as e:
+            logging.warning(f"Failed to resolve uploader for {quest_id}: {e}")
+
+    except Exception as e:
+        logging.warning(f"sync_uploader_email failed for {quest_id}: {e}")
+
+
+@https_fn.on_call(memory=options.MemoryOption.MB_256)
+def record_auth_event(req: https_fn.CallableRequest) -> https_fn.Response | dict:
+    """Records a lightweight auth event (e.g., login) into Firestore.
+
+    Clients should call this on explicit sign-in events to allow login tracking.
+    """
+    try:
+        if not hasattr(req, "auth") or req.auth is None:
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+                message="Authentication required.",
+            )
+
+        data = req.data or {}
+        event_type = str(data.get("event") or "login")
+        uid = req.auth.uid
+
+        db = firestore.client()
+        db.collection("authEvents").add({
+            "uid": uid,
+            "event": event_type,
+            "timestamp": firestore.SERVER_TIMESTAMP,
+        })
+
+        return {"ok": True}
+    except https_fn.HttpsError:
+        raise
+    except Exception as e:
+        logging.error(f"record_auth_event failed: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="Failed to record auth event.",
+            details=str(e),
+        )
