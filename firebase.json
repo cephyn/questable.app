@@ -15,6 +15,9 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": "build/web",
     "ignore": [
@@ -47,11 +50,6 @@
       "include": [
         "nltk_data/**"
       ]
-    },
-    {
-      "source": "functions_node",
-      "codebase": "node-functions",
-      "runtime": "nodejs22"
     }
   ],
   "extensions": {},

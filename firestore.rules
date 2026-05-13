@@ -104,6 +104,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // PDF->Markdown conversion jobs
+    match /pdfToMdJobs/{jobId} {
+      // Users can read their own job documents to poll status.
+      allow read: if request.auth != null && resource.data.createdBy == request.auth.uid;
+      // Jobs are created/updated by trusted backend code (admin SDK).
+      allow write: if false;
+    }
+
     // Emails collection - allow authenticated users to create emails
     match /emails/{emailId} {
       allow create: if request.auth != null;

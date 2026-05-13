@@ -5,6 +5,8 @@ import 'package:quest_cards/src/quest_card/quest_card.dart';
 import 'package:quest_cards/src/services/game_system_service.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
 import 'package:collection/collection.dart'; // Import for groupBy
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:developer';
 
 /// Unstandardized Quests View
 ///
@@ -28,6 +30,8 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
   String _errorMessage = '';
   bool _isLoadingStandardSystems =
       false; // Added loading state for standard systems
+  bool _isBatchUpdating = false;
+  String _batchUpdateStatus = '';
 
   @override
   void initState() {
@@ -301,7 +305,204 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
 
   // --- End New Methods ---
 
-  @override
+  /// Batch update all quests in a group to a standardized system
+  Future<void> _batchUpdateQuestsToSystem(
+      List<QuestCard> questsToUpdate, String targetSystemName) async {
+    if (questsToUpdate.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No quests to update.')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isBatchUpdating = true;
+      _batchUpdateStatus = 'Starting batch update (${questsToUpdate.length} quests)...';
+    });
+
+    final firestore = FirebaseFirestore.instance;
+    const batchSize = 400;
+    int batchCounter = 0;
+    WriteBatch batch = firestore.batch();
+    int updatedCount = 0;
+
+    try {
+      for (int i = 0; i < questsToUpdate.length; i++) {
+        final quest = questsToUpdate[i];
+        if (quest.id == null) {
+          log('Quest has no ID, skipping...');
+          continue;
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _batchUpdateStatus =
+              'Processing ${i + 1}/${questsToUpdate.length} quests...';
+        });
+
+        final docRef = firestore.collection('questCards').doc(quest.id);
+        batch.update(docRef, {
+          'gameSystem': targetSystemName,
+          'standardizedGameSystem': targetSystemName,
+          'gameSystem_lowercase': targetSystemName.toLowerCase(),
+        });
+        batchCounter++;
+        updatedCount++;
+
+        if (batchCounter >= batchSize) {
+          if (!mounted) return;
+          setState(() {
+            _batchUpdateStatus =
+                'Committing batch (${i + 1}/${questsToUpdate.length}, Updated: $updatedCount)...';
+          });
+          log('Committing batch update...');
+          await batch.commit();
+          log('Batch committed.');
+          batch = firestore.batch();
+          batchCounter = 0;
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+      }
+
+      // Commit final batch
+      if (batchCounter > 0) {
+        if (!mounted) return;
+        setState(() {
+          _batchUpdateStatus = 'Committing final batch...';
+        });
+        log('Committing final batch ($batchCounter operations)...');
+        await batch.commit();
+        log('Final batch committed.');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isBatchUpdating = false;
+          _batchUpdateStatus = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Successfully updated $updatedCount quests to "$targetSystemName"')),
+        );
+        _loadQuests(); // Refresh the list
+      }
+    } catch (e, s) {
+      log('Error during batch update: $e', stackTrace: s);
+      if (mounted) {
+        setState(() {
+          _isBatchUpdating = false;
+          _batchUpdateStatus = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error during batch update: $e')),
+        );
+      }
+    }
+  }
+
+  /// Show dialog to select target standardized system for batch update
+  Future<void> _showBatchUpdateDialog(List<QuestCard> questsInGroup) async {
+    final String gameSystemName = questsInGroup.first.gameSystem?.trim() ?? 'Unknown';
+
+    if (_isLoadingStandardSystems) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Standard systems still loading...')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Batch Update $gameSystemName'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Quests to update: ${questsInGroup.length}'),
+                const SizedBox(height: 16),
+                const Text('Select target standardized system:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _standardGameSystems.length,
+                    itemBuilder: (context, index) {
+                      final system = _standardGameSystems[index];
+                      return ListTile(
+                        title: Text(system.standardName),
+                        onTap: () => Navigator.of(context).pop(
+                          {'system': system.standardName, 'action': 'select'},
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const Text('Or create new:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ListTile(
+                  title: Text('Create "$gameSystemName" as New Standard'),
+                  onTap: () => Navigator.of(context).pop(
+                    {'system': gameSystemName, 'action': 'create'},
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      final targetSystem = result['system'] as String;
+      final action = result['action'] as String;
+
+      if (action == 'create') {
+        // Create new standard system first
+        try {
+          final newSystem = StandardGameSystem(
+            standardName: targetSystem,
+            aliases: [],
+            editions: [],
+          );
+          await _gameSystemService.createGameSystem(newSystem);
+          await _loadStandardGameSystems();
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error creating system: $e')),
+            );
+          }
+          return;
+        }
+      }
+
+      // Now do the batch update
+      if (mounted) {
+        await _batchUpdateQuestsToSystem(questsInGroup, targetSystem);
+      }
+    }
+  }
+
+  // --- End Batch Update Methods ---
   Widget build(BuildContext context) {
     final userContext = Provider.of<UserContext>(context);
 
@@ -389,10 +590,16 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
                                 _addAsNewStandardSystem(representativeQuest);
                               } else if (result == 'add_alias') {
                                 _addAsAlias(representativeQuest);
+                              } else if (result == 'batch_update') {
+                                _showBatchUpdateDialog(questsInGroup);
                               }
                             },
                             itemBuilder: (BuildContext context) =>
                                 <PopupMenuEntry<String>>[
+                              const PopupMenuItem<String>(
+                                value: 'batch_update',
+                                child: Text('Batch Update to System'),
+                              ),
                               const PopupMenuItem<String>(
                                 value: 'add_new',
                                 child: Text('Create New Standard System'),

@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 import 'package:flutter/material.dart';
+import 'package:cloud_functions/cloud_functions.dart'; // For callable functions
 import '../controllers/purchase_link_backfill_controller.dart';
 import '../models/backfill_stats.dart';
 import '../config/config.dart'; // Added to access API keys
@@ -286,6 +287,16 @@ class _PurchaseLinkBackfillScreenState
                   onPressed: _checkStats,
                   child: const Text('Check Status'),
                 ),
+                const SizedBox(width: 16),
+                // Button to trigger uploader-email backfill (one-off)
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.storage_outlined),
+                  label: const Text('Backfill Uploader Emails'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                  ),
+                  onPressed: _isProcessing ? null : _confirmAndRunUploaderBackfill,
+                ),
               ],
             ),
           ],
@@ -392,6 +403,78 @@ class _PurchaseLinkBackfillScreenState
         setState(() {
           _statusMessage = 'Error checking status.';
           _errorDetails = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmAndRunUploaderBackfill() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Run Backfill?'),
+          content: const Text(
+              'This will scan all QuestCards and populate missing uploaderEmail fields from uploadedBy user ids. This may update many documents. Proceed?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Run'),
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _runUploaderBackfill();
+    }
+  }
+
+  Future<void> _runUploaderBackfill() async {
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = 'Running uploader email backfill...';
+      _errorDetails = '';
+    });
+
+    try {
+      final callable = FirebaseFunctions.instance
+          .httpsCallable('backfill_uploader_emails');
+      final resp = await callable.call({});
+      final data = Map<String, dynamic>.from(resp.data ?? {});
+      final processed = data['processed'] ?? 0;
+      final updated = data['updated'] ?? 0;
+
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Backfill complete: processed $processed, updated $updated';
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Backfill complete: processed $processed, updated $updated'),
+      ));
+    } catch (e) {
+      log('Backfill uploader emails failed: $e');
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Backfill failed';
+          _errorDetails = e.toString();
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Backfill failed: $e'),
+      ));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
         });
       }
     }

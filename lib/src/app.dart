@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:quest_cards/src/admin/game_system_admin_view.dart';
 import 'package:quest_cards/src/admin/migration_tools.dart';
 import 'package:quest_cards/src/admin/purchase_link_backfill.dart';
+import 'package:quest_cards/src/admin/site_stats.dart';
 
 // Auth & User
 import 'package:quest_cards/src/auth/user_context.dart';
@@ -228,28 +229,32 @@ class _HomePageState extends State<HomePage> {
         selectedIcon: Icon(Icons.search),
         label: 'Search', // Index 3
       ),
-      if (isAdmin)
-        const NavigationDestination(
-          icon: Icon(Icons.people_alt_outlined),
-          selectedIcon: Icon(Icons.people_alt),
-          label: 'Users', // Shown only to admins
-        ),
+      if (isAdmin) const NavigationDestination(
+        icon: Icon(Icons.bar_chart_outlined),
+        selectedIcon: Icon(Icons.bar_chart),
+        label: 'Stats', // Admin-only Site Stats
+      ),
+      if (isAdmin) const NavigationDestination(
+        icon: Icon(Icons.people_alt_outlined),
+        selectedIcon: Icon(Icons.people_alt),
+        label: 'Users', // Shown only to admins
+      ),
       // Admin Destinations
       if (isAdmin) ...[
         const NavigationDestination(
           icon: Icon(Icons.admin_panel_settings_outlined),
           selectedIcon: Icon(Icons.admin_panel_settings),
-          label: 'Migrate', // Index 5
+          label: 'Migrate', // Index 6
         ),
         const NavigationDestination(
           icon: Icon(Icons.link_outlined),
           selectedIcon: Icon(Icons.link),
-          label: 'Backfill', // Index 6
+          label: 'Backfill', // Index 7
         ),
         const NavigationDestination(
           icon: Icon(Icons.gamepad_outlined),
           selectedIcon: Icon(Icons.gamepad),
-          label: 'Systems', // Index 7
+          label: 'Systems', // Index 8
         ),
       ]
     ];
@@ -316,6 +321,7 @@ class _HomePageState extends State<HomePage> {
           ];
 
           if (isAdmin) {
+            pages.add(SiteStatsAdminView()); // Site Stats (admin only)
             pages.add(LocalUserList()); // Users (admin only)
             // Admin-only pages
             pages.addAll([
