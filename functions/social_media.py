@@ -8,6 +8,7 @@ import datetime
 import random
 from firebase_functions import scheduler_fn, options
 from firebase_admin import firestore
+
 """Heavy third‑party SDKs (atproto, google.genai, mastodon) are lazily imported
 inside the functions that actually use them to reduce cold start import time."""
 
@@ -39,6 +40,7 @@ def generate_ai_text(genre: str, summary: str, quest_title: str) -> str:
 
         # Lazy import & singleton client creation (new google-genai library)
         from google import genai  # type: ignore
+
         global _gemini_client
         if _gemini_client is None:
             _gemini_client = genai.Client(api_key=api_key)
@@ -58,7 +60,7 @@ Example tone for a horror quest: "A chilling presence lurks in the old manor. Wh
         logging.info(f"Generating AI text for quest: {quest_title} (Genre: {genre})")
         # New API call pattern
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.1-flash-lite",
             contents=prompt,
         )
 
@@ -92,7 +94,7 @@ Example tone for a horror quest: "A chilling presence lurks in the old manor. Wh
         ai_text = ai_text.strip()
         if len(ai_text) > 160:
             logging.warning(
-                f"Generated AI text for '{quest_title}' is too long ({len(ai_text)} chars), truncating." 
+                f"Generated AI text for '{quest_title}' is too long ({len(ai_text)} chars), truncating."
             )
             ai_text = ai_text[:157] + "..."
         logging.info(f"Successfully generated AI text: {ai_text}")
@@ -106,15 +108,17 @@ Example tone for a horror quest: "A chilling presence lurks in the old manor. Wh
 def generate_post_content(quest_data):
     """Generates content for social media posts based on quest data."""
     logging.debug(f"Generating content for quest: {quest_data.get('title')}")
-    
+
     title = quest_data.get("title", "Untitled Quest")
     product_name = quest_data.get("productTitle", "")
-    game_system = quest_data.get("standardizedGameSystem", quest_data.get("gameSystem", "Unknown System"))
+    game_system = quest_data.get(
+        "standardizedGameSystem", quest_data.get("gameSystem", "Unknown System")
+    )
     genre = quest_data.get("genre", "Adventure")
     summary = quest_data.get("summary", "No summary available.")
     quest_id = quest_data.get("id")
 
-    deep_link = f"https://questable.app/#/quests/{quest_id}" 
+    deep_link = f"https://questable.app/#/quests/{quest_id}"
 
     hashtag_terms = []
     if game_system:
@@ -158,7 +162,7 @@ def generate_post_content(quest_data):
         logging.warning(
             f"Skipping AI text generation for quest ID {quest_id} due to missing genre, summary, or title."
         )
-    
+
     # Assemble text segments
     text_segments = [post_text_template]
     if ai_enhanced_text:
@@ -179,6 +183,7 @@ def generate_post_content(quest_data):
         "link": deep_link,
         "quest_id": quest_id,  # Add quest_id here
     }
+
 
 def get_bluesky_credentials() -> dict:
     """Fetches Bluesky credentials using the utility function."""
@@ -202,6 +207,7 @@ def post_to_bluesky(content: dict):
     """Posts the given content to Bluesky using TextBuilder for rich text (lazy import)."""
     # Lazy import heavy atproto libs only if we actually attempt a Bluesky post
     from atproto import Client, models, client_utils  # type: ignore
+
     credentials = get_bluesky_credentials()
     client = Client()
 
@@ -315,11 +321,11 @@ def post_to_bluesky(content: dict):
 def post_to_mastodon(content):
     """
     Post content to Mastodon platform.
-    
+
     Required secrets in Google Cloud Secret Manager:
     - mastodon_instance_url: The base URL of your Mastodon instance (e.g., "https://mastodon.social")
     - mastodon_access_token: Your Mastodon application access token
-    
+
     To get these credentials:
     1. Go to your Mastodon instance (e.g., mastodon.social)
     2. Navigate to Preferences > Development > New Application
@@ -330,20 +336,24 @@ def post_to_mastodon(content):
     try:
         # Lazy import Mastodon SDK only when needed
         from mastodon import Mastodon  # type: ignore
+
         # Get Mastodon credentials from Secret Manager
-        instance_url = get_secret("mastodon_instance_url")  # e.g., "https://mastodon.social"
+        instance_url = get_secret(
+            "mastodon_instance_url"
+        )  # e.g., "https://mastodon.social"
         access_token = get_secret("mastodon_access_token")
 
         if not instance_url or not access_token:
-            logging.error("Mastodon instance URL or access token not found in Secret Manager.")
-            log_social_post_attempt(content["quest_id"], "Mastodon", "error", "Missing credentials")
+            logging.error(
+                "Mastodon instance URL or access token not found in Secret Manager."
+            )
+            log_social_post_attempt(
+                content["quest_id"], "Mastodon", "error", "Missing credentials"
+            )
             return
 
         # Create Mastodon client
-        mastodon = Mastodon(
-            access_token=access_token,
-            api_base_url=instance_url
-        )
+        mastodon = Mastodon(access_token=access_token, api_base_url=instance_url)
 
         text_segments = content.get("text_segments", [])
         hashtag_terms = content.get("hashtag_terms", [])
@@ -373,15 +383,17 @@ def post_to_mastodon(content):
 
         if embed_link:
             # Mastodon doesn't use link shortening like Twitter, so we use the full URL length
-            available_char_for_text = limit - len(embed_link) - 1  # 1 for space before link
+            available_char_for_text = (
+                limit - len(embed_link) - 1
+            )  # 1 for space before link
             if len(post_text_to_truncate) > available_char_for_text:
-                text_part = post_text_to_truncate[:available_char_for_text - 3] + "..."
+                text_part = post_text_to_truncate[: available_char_for_text - 3] + "..."
             else:
                 text_part = post_text_to_truncate
             final_post_text = f"{text_part} {embed_link}"
         else:
             if len(post_text_to_truncate) > limit:
-                text_part = post_text_to_truncate[:limit - 3] + "..."
+                text_part = post_text_to_truncate[: limit - 3] + "..."
             else:
                 text_part = post_text_to_truncate
             final_post_text = text_part
@@ -391,21 +403,25 @@ def post_to_mastodon(content):
 
         logging.info(f"Successfully posted to Mastodon. Toot ID: {response['id']}")
         log_social_post_attempt(
-            content["quest_id"], 
-            "Mastodon", 
-            "success", 
-            final_post_text, 
-            link=embed_link, 
-            post_id=response['id']
+            content["quest_id"],
+            "Mastodon",
+            "success",
+            final_post_text,
+            link=embed_link,
+            post_id=response["id"],
         )
 
     except Exception as e:
-        logging.error(f"Error posting to Mastodon: {e}. Check if 'mastodon_instance_url' and 'mastodon_access_token' are correctly set in Secret Manager.")
-        log_social_post_attempt(content["quest_id"], "Mastodon", "error", str(e), link=content.get("link"))
+        logging.error(
+            f"Error posting to Mastodon: {e}. Check if 'mastodon_instance_url' and 'mastodon_access_token' are correctly set in Secret Manager."
+        )
+        log_social_post_attempt(
+            content["quest_id"], "Mastodon", "error", str(e), link=content.get("link")
+        )
 
 
 @scheduler_fn.on_schedule(
-    schedule="0 14,23 * * *", 
+    schedule="0 14,23 * * *",
     memory=options.MemoryOption.GB_1,
 )
 def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) -> None:
@@ -413,7 +429,7 @@ def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) ->
     Selects a random public quest card from Firestore and posts to social media.
     """
     db = _get_db()
-    quests_ref = db.collection("questCards") 
+    quests_ref = db.collection("questCards")
     query = quests_ref.where("isPublic", "==", True)
     logging.info("Querying for public quest cards...")
 
@@ -422,7 +438,7 @@ def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) ->
     for doc in query.stream():
         processed_count += 1
         quest_data = doc.to_dict()
-        quest_data["id"] = doc.id 
+        quest_data["id"] = doc.id
         logging.debug(f"Processing quest document ID: {doc.id}")
 
         if (
@@ -436,9 +452,7 @@ def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) ->
             logging.debug(f"Quest ID: {doc.id} is eligible.")
             eligible_quests.append(quest_data)
         else:
-            logging.debug(
-                f"Quest ID: {doc.id} is NOT eligible due to missing fields."
-            )
+            logging.debug(f"Quest ID: {doc.id} is NOT eligible due to missing fields.")
 
     logging.info(f"Total public quests processed: {processed_count}")
     if not eligible_quests:
@@ -449,27 +463,35 @@ def select_quest_and_post_to_social_media(event: scheduler_fn.ScheduledEvent) ->
     logging.info(
         f"Selected quest for posting: {selected_quest.get('title')} (ID: {selected_quest.get('id')})"
     )
-    
-    generated_content = generate_post_content(selected_quest) 
+
+    generated_content = generate_post_content(selected_quest)
 
     if not generated_content or not generated_content.get("quest_id"):
-        logging.error(f"Failed to generate content or quest_id missing for selected_quest: {selected_quest.get('id')}")
+        logging.error(
+            f"Failed to generate content or quest_id missing for selected_quest: {selected_quest.get('id')}"
+        )
         return
 
     logging.info(
         "Generated content for quest ID %s: %s",
-        generated_content.get('quest_id'),
+        generated_content.get("quest_id"),
         " | ".join(generated_content.get("text_segments", [])),
     )
 
     try:
         post_to_bluesky(generated_content)
     except Exception as e:
-        logging.error(f"Bluesky posting failed in main scheduler for quest {generated_content.get('quest_id')}: {e}")
+        logging.error(
+            f"Bluesky posting failed in main scheduler for quest {generated_content.get('quest_id')}: {e}"
+        )
 
     try:
         post_to_mastodon(generated_content)
     except Exception as e:
-        logging.error(f"Mastodon posting failed in main scheduler for quest {generated_content.get('quest_id')}: {e}")
+        logging.error(
+            f"Mastodon posting failed in main scheduler for quest {generated_content.get('quest_id')}: {e}"
+        )
 
-    logging.info(f"select_quest_and_post_to_social_media function completed for quest {generated_content.get('quest_id')}.")
+    logging.info(
+        f"select_quest_and_post_to_social_media function completed for quest {generated_content.get('quest_id')}."
+    )
