@@ -11,7 +11,7 @@ class PurchaseLinkBackfillScreen extends StatefulWidget {
   const PurchaseLinkBackfillScreen({super.key});
 
   @override
-  _PurchaseLinkBackfillScreenState createState() =>
+  State<PurchaseLinkBackfillScreen> createState() =>
       _PurchaseLinkBackfillScreenState();
 }
 
@@ -61,8 +61,9 @@ class _PurchaseLinkBackfillScreenState
     try {
       // Attempt to get a fresh ID token
       log('Attempting to refresh ID token...');
-      final String? token =
-          await currentUser.getIdToken(true); // true forces refresh
+      final String? token = await currentUser.getIdToken(
+        true,
+      ); // true forces refresh
       if (token != null) {
         log('Successfully refreshed ID token.');
       } else {
@@ -74,7 +75,8 @@ class _PurchaseLinkBackfillScreenState
       await Config.initializeAppConfig();
       if (mounted) {
         setState(() {
-          _keysAreConfigured = Config.googleApiKey.isNotEmpty &&
+          _keysAreConfigured =
+              Config.googleApiKey.isNotEmpty &&
               Config.googleSearchEngineId.isNotEmpty;
           if (!_keysAreConfigured) {
             _configErrorMessage =
@@ -83,9 +85,13 @@ class _PurchaseLinkBackfillScreenState
         });
       }
     } catch (e) {
-      log('Error during _loadConfiguration (token refresh or app config init): $e');
+      log(
+        'Error during _loadConfiguration (token refresh or app config init): $e',
+      );
       if (e is FirebaseAuthException) {
-        log('FirebaseAuthException details: code=${e.code}, message=${e.message}');
+        log(
+          'FirebaseAuthException details: code=${e.code}, message=${e.message}',
+        );
       }
       if (mounted) {
         setState(() {
@@ -133,12 +139,16 @@ class _PurchaseLinkBackfillScreenState
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Configuration Status',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text(
+                          'Configuration Status',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         IconButton(
-                          icon: Icon(_showDebugInfo
-                              ? Icons.visibility_off
-                              : Icons.visibility),
+                          icon: Icon(
+                            _showDebugInfo
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
                           onPressed: () {
                             setState(() {
                               _showDebugInfo = !_showDebugInfo;
@@ -167,22 +177,27 @@ class _PurchaseLinkBackfillScreenState
                         child: Text(
                           'Error: $_configErrorMessage',
                           style: TextStyle(
-                              color: Theme.of(context).colorScheme.error),
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                         ),
                       )
                     else if (_showDebugInfo) ...[
                       Text(
-                          'Google API Key: ${Config.googleApiKey.isEmpty ? "❌ Not configured" : "✅ Configured"}'),
+                        'Google API Key: ${Config.googleApiKey.isEmpty ? "❌ Not configured" : "✅ Configured"}',
+                      ),
                       Text(
-                          'Google Search Engine ID: ${Config.googleSearchEngineId.isEmpty ? "❌ Not configured" : "✅ Configured"}'),
+                        'Google Search Engine ID: ${Config.googleSearchEngineId.isEmpty ? "❌ Not configured" : "✅ Configured"}',
+                      ),
                       const SizedBox(height: 8),
                       if (Config.googleApiKey.isEmpty ||
                           Config.googleSearchEngineId.isEmpty)
                         Text(
-                            'One or more keys are not configured. Purchase link search will fail.',
-                            style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: Theme.of(context).colorScheme.tertiary)),
+                          'One or more keys are not configured. Purchase link search will fail.',
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Theme.of(context).colorScheme.tertiary,
+                          ),
+                        ),
                     ],
                     if (!_isConfigLoading &&
                         _configErrorMessage.isEmpty &&
@@ -194,11 +209,12 @@ class _PurchaseLinkBackfillScreenState
                               ? '✅ API Keys Loaded'
                               : '❌ API Keys Not Loaded',
                           style: TextStyle(
-                              color: _keysAreConfigured
-                                  ? Theme.of(context).colorScheme.secondary
-                                  : Theme.of(context).colorScheme.error),
+                            color: _keysAreConfigured
+                                ? Theme.of(context).colorScheme.secondary
+                                : Theme.of(context).colorScheme.error,
+                          ),
                         ),
-                      )
+                      ),
                   ],
                 ),
               ),
@@ -246,17 +262,20 @@ class _PurchaseLinkBackfillScreenState
                 child: Text(
                   'Error details: $_errorDetails',
                   style: TextStyle(
-                      color: Theme.of(context).colorScheme.onErrorContainer),
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
                 ),
               ),
 
             if (_stats != null) ...[
               Text(
-                  'Progress: ${_stats!.processed}/${_stats!.total} (${_stats!.successRate.toStringAsFixed(1)}%)'),
+                'Progress: ${_stats!.processed}/${_stats!.total} (${_stats!.successRate.toStringAsFixed(1)}%)',
+              ),
               const SizedBox(height: 8),
               LinearProgressIndicator(
-                value:
-                    _stats!.total > 0 ? _stats!.processed / _stats!.total : 0,
+                value: _stats!.total > 0
+                    ? _stats!.processed / _stats!.total
+                    : 0,
               ),
               const SizedBox(height: 16),
               Text('Successful links found: ${_stats!.successful}'),
@@ -273,8 +292,8 @@ class _PurchaseLinkBackfillScreenState
                 ElevatedButton(
                   onPressed:
                       _isProcessing || _isConfigLoading || !_keysAreConfigured
-                          ? null
-                          : _startBackfill,
+                      ? null
+                      : _startBackfill,
                   child: const Text('Start Processing'),
                 ),
                 const SizedBox(width: 16),
@@ -293,9 +312,11 @@ class _PurchaseLinkBackfillScreenState
                   icon: const Icon(Icons.storage_outlined),
                   label: const Text('Backfill Uploader Emails'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                   ),
-                  onPressed: _isProcessing ? null : _confirmAndRunUploaderBackfill,
+                  onPressed: _isProcessing
+                      ? null
+                      : _confirmAndRunUploaderBackfill,
                 ),
               ],
             ),
@@ -334,11 +355,13 @@ class _PurchaseLinkBackfillScreenState
       // Validate configuration before starting
       if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
         throw Exception(
-            'Google API Key or Search Engine ID is not configured.');
+          'Google API Key or Search Engine ID is not configured.',
+        );
       }
 
-      await for (var stats
-          in _controller.processBackfill(batchSize: _batchSize)) {
+      await for (var stats in _controller.processBackfill(
+        batchSize: _batchSize,
+      )) {
         if (mounted) {
           setState(() {
             _stats = stats;
@@ -415,14 +438,17 @@ class _PurchaseLinkBackfillScreenState
         return AlertDialog(
           title: const Text('Run Backfill?'),
           content: const Text(
-              'This will scan all QuestCards and populate missing uploaderEmail fields from uploadedBy user ids. This may update many documents. Proceed?'),
+            'This will scan all QuestCards and populate missing uploaderEmail fields from uploadedBy user ids. This may update many documents. Proceed?',
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
               child: const Text('Run'),
               onPressed: () => Navigator.of(context).pop(true),
             ),
@@ -444,8 +470,9 @@ class _PurchaseLinkBackfillScreenState
     });
 
     try {
-      final callable = FirebaseFunctions.instance
-          .httpsCallable('backfill_uploader_emails');
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'backfill_uploader_emails',
+      );
       final resp = await callable.call({});
       final data = Map<String, dynamic>.from(resp.data ?? {});
       final processed = data['processed'] ?? 0;
@@ -453,13 +480,18 @@ class _PurchaseLinkBackfillScreenState
 
       if (mounted) {
         setState(() {
-          _statusMessage = 'Backfill complete: processed $processed, updated $updated';
+          _statusMessage =
+              'Backfill complete: processed $processed, updated $updated';
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Backfill complete: processed $processed, updated $updated'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Backfill complete: processed $processed, updated $updated',
+          ),
+        ),
+      );
     } catch (e) {
       log('Backfill uploader emails failed: $e');
       if (mounted) {
@@ -468,9 +500,9 @@ class _PurchaseLinkBackfillScreenState
           _errorDetails = e.toString();
         });
       }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Backfill failed: $e'),
-      ));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Backfill failed: $e')));
     } finally {
       if (mounted) {
         setState(() {

@@ -54,7 +54,8 @@ class _MigrationToolsState extends State<MigrationTools> {
   int _batchGameSystemProcessed = 0;
   int _batchGameSystemUpdated = 0;
   final TextEditingController _batchQuestIdController = TextEditingController();
-  final TextEditingController _batchGameSystemController = TextEditingController();
+  final TextEditingController _batchGameSystemController =
+      TextEditingController();
 
   // State for uploader email backfill
   bool _isUploaderBackfillRunning = false;
@@ -67,9 +68,7 @@ class _MigrationToolsState extends State<MigrationTools> {
     // Only accessible to admins
     if (!userContext.isAdmin) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Access Denied'),
-        ),
+        appBar: AppBar(title: const Text('Access Denied')),
         body: const Center(
           child: Text('You must be an admin to access this page.'),
         ),
@@ -77,9 +76,7 @@ class _MigrationToolsState extends State<MigrationTools> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Database Migration Tools'),
-      ),
+      appBar: AppBar(title: const Text('Database Migration Tools')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
@@ -100,8 +97,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Check for Missing isPublic Fields',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -115,10 +114,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                         color: _missingFieldCount == 0
                             ? Theme.of(context).colorScheme.secondaryContainer
                             : _missingFieldCount > 0
-                                ? Theme.of(context)
-                                    .colorScheme
-                                    .tertiaryContainer
-                                : Theme.of(context).colorScheme.surfaceVariant,
+                            ? Theme.of(context).colorScheme.tertiaryContainer
+                            : Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
                         width: double.infinity,
                         child: Text(_checkStatusMessage),
                       ),
@@ -132,8 +131,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                                 SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
                                 Text('Checking...'),
@@ -157,8 +157,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Add isPublic Field to Quest Cards',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -185,8 +187,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                                 SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
                                 Text('Running Migration...'),
@@ -210,8 +213,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Test Filter Query',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -230,7 +235,6 @@ class _MigrationToolsState extends State<MigrationTools> {
             ),
 
             const SizedBox(height: 20), // Add space before the new card
-
             // Fourth card: Populate gameSystem_lowercase
             Card(
               child: Padding(
@@ -240,8 +244,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Populate gameSystem_lowercase Field',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -256,8 +262,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                         color: _populateLowercaseSuccess
                             ? Theme.of(context).colorScheme.secondaryContainer
                             : _isPopulatingLowercase
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Theme.of(context).colorScheme.errorContainer,
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
                         child: Text(_populateLowercaseStatus),
                       ),
@@ -273,8 +279,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                                 SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
                                 Text('Populating...'),
@@ -287,7 +294,6 @@ class _MigrationToolsState extends State<MigrationTools> {
               ),
             ),
             const SizedBox(height: 20), // Add some padding at the bottom
-
             // Fifth card: Backfill productTitle from title
             Card(
               child: Padding(
@@ -297,8 +303,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Backfill Missing Product Titles',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -313,8 +321,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                         color: _backfillProductTitleSuccess
                             ? Theme.of(context).colorScheme.secondaryContainer
                             : _isBackfillingProductTitle
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Theme.of(context).colorScheme.errorContainer,
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
                         child: Text(_backfillProductTitleStatus),
                       ),
@@ -330,8 +338,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                                 SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
                                 Text('Backfilling...'),
@@ -344,7 +353,6 @@ class _MigrationToolsState extends State<MigrationTools> {
               ),
             ),
             const SizedBox(height: 20), // Add some padding at the bottom
-
             // Seventh card: Batch Update Game System
             Card(
               child: Padding(
@@ -354,7 +362,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Batch Update Game System',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -386,10 +397,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         color: _batchGameSystemSuccess
-                            ? Colors.green.shade100
+                            ? Theme.of(context).colorScheme.secondaryContainer
                             : _isBatchUpdatingGameSystem
-                                ? Colors.blue.shade100
-                                : Colors.red.shade100,
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
                         child: Text(_batchGameSystemStatus),
                       ),
@@ -405,7 +416,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                                 SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
                                 Text('Updating...'),
@@ -418,7 +431,6 @@ class _MigrationToolsState extends State<MigrationTools> {
               ),
             ),
             const SizedBox(height: 20), // Add some padding at the bottom
-
             // Sixth card: Backfill Search Index
             Card(
               child: Padding(
@@ -428,8 +440,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Backfill Search Index',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -442,8 +456,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                         color: _backfillSearchSuccess
                             ? Theme.of(context).colorScheme.secondaryContainer
                             : _isBackfillingSearchIndex
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Theme.of(context).colorScheme.errorContainer,
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,7 +467,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                               Padding(
                                 padding: const EdgeInsets.only(top: 6.0),
                                 child: Text(
-                                    'Processed: $_backfillSearchProcessed'),
+                                  'Processed: $_backfillSearchProcessed',
+                                ),
                               ),
                           ],
                         ),
@@ -475,7 +490,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                                       width: 16,
                                       height: 16,
                                       child: CircularProgressIndicator(
-                                          strokeWidth: 2),
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                     SizedBox(width: 8),
                                     Text('Running Backfill...'),
@@ -496,8 +512,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) =>
-                                      const SearchBackfillDashboard()),
+                                builder: (context) =>
+                                    const SearchBackfillDashboard(),
+                              ),
                             );
                           },
                           child: const Text('View Dashboard'),
@@ -514,7 +531,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                           children: [
                             const Text(
                               'Backfill Uploader Emails',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             const Text(
@@ -524,7 +544,13 @@ class _MigrationToolsState extends State<MigrationTools> {
                             if (_uploaderBackfillStatus.isNotEmpty)
                               Container(
                                 padding: const EdgeInsets.all(8),
-                                color: _isUploaderBackfillRunning ? Colors.blue.shade100 : Colors.green.shade100,
+                                color: _isUploaderBackfillRunning
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.primaryContainer
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.secondaryContainer,
                                 width: double.infinity,
                                 child: Text(_uploaderBackfillStatus),
                               ),
@@ -532,12 +558,20 @@ class _MigrationToolsState extends State<MigrationTools> {
                             Row(
                               children: [
                                 ElevatedButton(
-                                  onPressed: _isUploaderBackfillRunning ? null : _confirmAndRunUploaderBackfill,
+                                  onPressed: _isUploaderBackfillRunning
+                                      ? null
+                                      : _confirmAndRunUploaderBackfill,
                                   child: _isUploaderBackfillRunning
                                       ? const Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                            SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
                                             SizedBox(width: 8),
                                             Text('Running...'),
                                           ],
@@ -546,7 +580,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                                 ),
                                 const SizedBox(width: 12),
                                 OutlinedButton(
-                                  onPressed: _isUploaderBackfillRunning ? null : _checkUploaderBackfillStatus,
+                                  onPressed: _isUploaderBackfillRunning
+                                      ? null
+                                      : _checkUploaderBackfillStatus,
                                   child: const Text('Check Status'),
                                 ),
                               ],
@@ -582,8 +618,9 @@ class _MigrationToolsState extends State<MigrationTools> {
 
     try {
       while (true) {
-        Query query =
-            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        Query query = questCardsRef
+            .orderBy(FieldPath.documentId)
+            .limit(batchSize);
         if (lastDoc != null) {
           query = query.startAfterDocument(lastDoc);
         }
@@ -660,8 +697,9 @@ class _MigrationToolsState extends State<MigrationTools> {
 
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content:
-              Text('Query successful! Found ${result.docs.length} documents.'),
+          content: Text(
+            'Query successful! Found ${result.docs.length} documents.',
+          ),
           backgroundColor: Theme.of(context).colorScheme.secondary,
         ),
       );
@@ -674,8 +712,9 @@ class _MigrationToolsState extends State<MigrationTools> {
       // Extract the index creation link if it's present in the error
       if (errorMessage.contains('https://console.firebase.google.com/')) {
         try {
-          final linkRegex =
-              RegExp(r'https://console\.firebase\.google\.com/[^\s]+');
+          final linkRegex = RegExp(
+            r'https://console\.firebase\.google\.com/[^\s]+',
+          );
           final match = linkRegex.firstMatch(errorMessage);
           if (match != null) {
             indexLink = match.group(0)!;
@@ -751,14 +790,17 @@ class _MigrationToolsState extends State<MigrationTools> {
         return AlertDialog(
           title: const Text('Run Backfill?'),
           content: const Text(
-              'This will scan all QuestCards and populate missing uploaderEmail fields from uploadedBy user ids. This may update many documents. Proceed?'),
+            'This will scan all QuestCards and populate missing uploaderEmail fields from uploadedBy user ids. This may update many documents. Proceed?',
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
               child: const Text('Run'),
               onPressed: () => Navigator.of(context).pop(true),
             ),
@@ -779,27 +821,34 @@ class _MigrationToolsState extends State<MigrationTools> {
     });
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable('backfill_uploader_emails');
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'backfill_uploader_emails',
+      );
       final resp = await callable.call(<String, dynamic>{});
       final data = Map<String, dynamic>.from(resp.data ?? {});
       final processed = data['processed'] as int? ?? 0;
       final updated = data['updated'] as int? ?? 0;
 
       setState(() {
-        _uploaderBackfillStatus = 'Backfill complete: processed $processed, updated $updated';
+        _uploaderBackfillStatus =
+            'Backfill complete: processed $processed, updated $updated';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Backfill complete: processed $processed, updated $updated')),
+        SnackBar(
+          content: Text(
+            'Backfill complete: processed $processed, updated $updated',
+          ),
+        ),
       );
     } catch (e) {
       log('Backfill failed: $e');
       setState(() {
         _uploaderBackfillStatus = 'Backfill failed: $e';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Backfill failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Backfill failed: $e')));
     } finally {
       setState(() {
         _isUploaderBackfillRunning = false;
@@ -833,8 +882,9 @@ class _MigrationToolsState extends State<MigrationTools> {
     try {
       while (true) {
         // Query for the next batch
-        Query query =
-            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        Query query = questCardsRef
+            .orderBy(FieldPath.documentId)
+            .limit(batchSize);
         if (lastDoc != null) {
           query = query.startAfterDocument(lastDoc);
         }
@@ -876,7 +926,8 @@ class _MigrationToolsState extends State<MigrationTools> {
               batch = firestore.batch(); // Start new batch
               batchCounter = 0;
               await Future.delayed(
-                  const Duration(milliseconds: 50)); // Small delay
+                const Duration(milliseconds: 50),
+              ); // Small delay
             }
           }
         }
@@ -894,7 +945,9 @@ class _MigrationToolsState extends State<MigrationTools> {
         setState(() {
           _statusMessage = 'Committing final batch...';
         });
-        log('Committing final isPublic migration batch ($batchCounter operations)...');
+        log(
+          'Committing final isPublic migration batch ($batchCounter operations)...',
+        );
         await batch.commit();
         log('Final batch committed.');
       }
@@ -941,8 +994,9 @@ class _MigrationToolsState extends State<MigrationTools> {
     try {
       while (true) {
         // Query for the next batch
-        Query query =
-            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        Query query = questCardsRef
+            .orderBy(FieldPath.documentId)
+            .limit(batchSize);
         if (lastDoc != null) {
           // No need for '!' as lastDoc is checked for null
           query = query.startAfterDocument(lastDoc);
@@ -963,7 +1017,9 @@ class _MigrationToolsState extends State<MigrationTools> {
 
         lastDoc = snapshot.docs.last;
         final currentBatchSize = snapshot.docs.length;
-        log('Processing ${currentBatchSize} documents (up to ${lastDoc.id})...');
+        log(
+          'Processing ${currentBatchSize} documents (up to ${lastDoc.id})...',
+        );
 
         for (final doc in snapshot.docs) {
           _processedLowercaseCount++;
@@ -986,8 +1042,9 @@ class _MigrationToolsState extends State<MigrationTools> {
 
             if (existingLowercase == null ||
                 existingLowercase != lowercaseGameSystem) {
-              batch.update(
-                  doc.reference, {'gameSystem_lowercase': lowercaseGameSystem});
+              batch.update(doc.reference, {
+                'gameSystem_lowercase': lowercaseGameSystem,
+              });
               batchCounter++;
               _populatedLowercaseCount++;
 
@@ -1003,7 +1060,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                 batch = firestore.batch(); // Start new batch
                 batchCounter = 0;
                 await Future.delayed(
-                    const Duration(milliseconds: 50)); // Small delay
+                  const Duration(milliseconds: 50),
+                ); // Small delay
               }
             }
           }
@@ -1075,8 +1133,9 @@ class _MigrationToolsState extends State<MigrationTools> {
 
     try {
       while (true) {
-        Query query =
-            questCardsRef.orderBy(FieldPath.documentId).limit(batchSize);
+        Query query = questCardsRef
+            .orderBy(FieldPath.documentId)
+            .limit(batchSize);
         if (lastDoc != null) {
           query = query.startAfterDocument(lastDoc);
         }
@@ -1156,7 +1215,9 @@ class _MigrationToolsState extends State<MigrationTools> {
           _backfillProductTitleStatus =
               'Committing final product title backfill batch...';
         });
-        log('Committing final product title backfill batch ($batchCounter operations)...');
+        log(
+          'Committing final product title backfill batch ($batchCounter operations)...',
+        );
         await batch.commit();
         log('Final product title backfill batch committed.');
       }
@@ -1192,8 +1253,9 @@ class _MigrationToolsState extends State<MigrationTools> {
     });
 
     try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('backfill_search_index');
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'backfill_search_index',
+      );
       final resp = await callable.call(<String, dynamic>{});
       final data = Map<String, dynamic>.from(resp.data ?? {});
       final processed = data['processed'] as int? ?? 0;
@@ -1223,11 +1285,15 @@ class _MigrationToolsState extends State<MigrationTools> {
 
     try {
       final firestore = FirebaseFirestore.instance;
-      final snapshot =
-          await firestore.collection('questSearchIndex').limit(1).get();
+      final snapshot = await firestore
+          .collection('questSearchIndex')
+          .limit(1)
+          .get();
       final exists = snapshot.docs.isNotEmpty;
-      final totalSnapshot =
-          await firestore.collection('questSearchIndex').count().get();
+      final totalSnapshot = await firestore
+          .collection('questSearchIndex')
+          .count()
+          .get();
       final total = totalSnapshot.count;
 
       setState(() {
@@ -1258,7 +1324,7 @@ class _MigrationToolsState extends State<MigrationTools> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please provide at least one quest ID.'),
-          backgroundColor: Colors.red,
+          backgroundColor: null,
         ),
       );
       return;
@@ -1268,7 +1334,7 @@ class _MigrationToolsState extends State<MigrationTools> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please provide a new game system name.'),
-          backgroundColor: Colors.red,
+          backgroundColor: null,
         ),
       );
       return;
@@ -1276,7 +1342,8 @@ class _MigrationToolsState extends State<MigrationTools> {
 
     setState(() {
       _isBatchUpdatingGameSystem = true;
-      _batchGameSystemStatus = 'Starting batch update (${questIds.length} quests)...';
+      _batchGameSystemStatus =
+          'Starting batch update (${questIds.length} quests)...';
       _batchGameSystemSuccess = false;
       _batchGameSystemProcessed = 0;
       _batchGameSystemUpdated = 0;

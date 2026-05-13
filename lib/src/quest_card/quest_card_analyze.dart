@@ -162,13 +162,19 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
               if (_runId != null)
                 Text(
                   'Run: ${_runId!}',
-                  style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               if (_pdfToMdStatus != null) Text('Status: ${_pdfToMdStatus!}'),
               if (_pdfToMdJobId != null)
                 Text(
                   'Job: ${_pdfToMdJobId!}',
-                  style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               if (_pdfToMdError != null) ...[
                 const SizedBox(height: 8),
@@ -398,7 +404,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           },
         ),
       );
-        Map<String, dynamic> adventureTypeResult = await aiService
+      Map<String, dynamic> adventureTypeResult = await aiService
           .determineAdventureType(url, runId: _runId);
       String adventureType = (adventureTypeResult['adventureType'] ?? '')
           .toString()
@@ -710,7 +716,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           },
         ),
       );
-        List<Map<String, dynamic>> questCardSchemas = await aiService
+      List<Map<String, dynamic>> questCardSchemas = await aiService
           .analyzeMultiFileQueries(fileUrl, runId: _runId); // Use passed URL
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
