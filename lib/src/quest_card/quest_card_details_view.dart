@@ -190,9 +190,10 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
         }
         // Handle errors if necessary
         if (snapshot.hasError) {
-          return const ListTile(
-            title: Text('Error checking ownership'),
-            leading: Icon(Icons.error, color: Colors.red),
+          return ListTile(
+            title: const Text('Error checking ownership'),
+            leading:
+                Icon(Icons.error, color: Theme.of(context).colorScheme.error),
           );
         }
 
@@ -286,7 +287,8 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            Icon(Icons.error_outline,
+                size: 48, color: Theme.of(context).colorScheme.error),
             const SizedBox(height: 16),
             Text(_errorMessage),
             const SizedBox(height: 24),
@@ -300,11 +302,13 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
     }
 
     if (_questCardData == null) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey),
+            Icon(Icons.search_off,
+                size: 48,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
             SizedBox(height: 16),
             Text('Quest not found'),
           ],

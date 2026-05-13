@@ -33,7 +33,9 @@ import 'services/firestore_service.dart';
 
 // Settings
 import 'settings/settings_controller.dart';
+import 'package:quest_cards/src/themes/app_theme.dart';
 import 'settings/settings_view.dart';
+import 'package:quest_cards/src/widgets/branding.dart';
 
 // App Localization (Commented out)
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -75,8 +77,10 @@ class MyApp extends StatelessWidget {
             // onGenerateTitle: (BuildContext context) =>
             //     AppLocalizations.of(context)!.appTitle,
             title: 'Questable', // Added simple title fallback
-            theme: ThemeData(),
-            darkTheme: ThemeData.dark(),
+            theme: AppTheme.lightTheme(
+                presetName: settingsController.themePreset.name),
+            darkTheme: AppTheme.darkTheme(
+                presetName: settingsController.themePreset.name),
             themeMode: settingsController.themeMode,
             // Pass the router configuration
             routerConfig: router,
@@ -112,7 +116,7 @@ class _HomePageState extends State<HomePage> {
           // Loading State
           if (authSnapshot.connectionState == ConnectionState.waiting) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Questable')),
+              appBar: AppBar(title: const BrandingTitle()),
               body: const Center(
                   child:
                       CircularProgressIndicator(key: ValueKey('auth_loading'))),
@@ -122,7 +126,7 @@ class _HomePageState extends State<HomePage> {
           // Error State
           if (authSnapshot.hasError) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Questable')),
+              appBar: AppBar(title: const BrandingTitle()),
               body: Center(
                   child: SelectableText(
                       'Authentication Error: ${authSnapshot.error}')),
@@ -134,7 +138,7 @@ class _HomePageState extends State<HomePage> {
 
           // Build the AppBar
           AppBar appBar = AppBar(
-            title: const Text('Questable', style: TextStyle(fontSize: 20)),
+            title: const BrandingTitle(),
             actions: appBarActions,
             automaticallyImplyLeading: false,
           );
@@ -146,8 +150,19 @@ class _HomePageState extends State<HomePage> {
             return Scaffold(
               key: const ValueKey('logged_out_scaffold'),
               appBar: appBar,
-              body:
-                  const PublicQuestCardListView(), // Directly show public view
+              body: Column(children: [
+                // Concept art / marketing banner for logged-out users
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12.0),
+                  child: Image(
+                    image: AssetImage('samples/questable_concept.png'),
+                    height: 160,
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Questable concept art',
+                  ),
+                ),
+                const Expanded(child: PublicQuestCardListView()),
+              ]), // Directly show public view
             );
           }
           // If user IS logged in, build the Scaffold with AdaptiveScaffold
@@ -213,14 +228,15 @@ class _HomePageState extends State<HomePage> {
         selectedIcon: Icon(Icons.search),
         label: 'Search', // Index 3
       ),
-      if (isAdmin) const NavigationDestination(
-        icon: Icon(Icons.people_alt_outlined),
-        selectedIcon: Icon(Icons.people_alt),
-        label: 'Users', // Shown only to admins
-      ),
+      if (isAdmin)
+        const NavigationDestination(
+          icon: Icon(Icons.people_alt_outlined),
+          selectedIcon: Icon(Icons.people_alt),
+          label: 'Users', // Shown only to admins
+        ),
       // Admin Destinations
       if (isAdmin) ...[
-          const NavigationDestination(
+        const NavigationDestination(
           icon: Icon(Icons.admin_panel_settings_outlined),
           selectedIcon: Icon(Icons.admin_panel_settings),
           label: 'Migrate', // Index 5

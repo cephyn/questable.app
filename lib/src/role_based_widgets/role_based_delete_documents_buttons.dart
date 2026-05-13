@@ -68,7 +68,7 @@ class RoleBasedDeleteDocumentsButtons {
                     Navigator.of(context).pop(true); // User confirmed deletion
                   },
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.red, // Make the delete button red
+                    foregroundColor: Theme.of(context).colorScheme.error,
                   ),
                   child: const Text('DELETE'),
                 ),

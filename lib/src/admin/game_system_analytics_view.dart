@@ -91,7 +91,9 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
-                  child: Text(_error!, style: TextStyle(color: Colors.red)))
+                  child: Text(_error!,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)))
               : _buildDashboard(),
     );
   }
@@ -141,28 +143,30 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
                   'Standardized',
                   '$standardized',
                   '$standardizedPercent%',
-                  Colors.green,
+                  Theme.of(context).colorScheme.secondary,
                   Icons.check_circle,
                 ),
                 _buildStatCard(
                   'Pending',
                   '$pending',
                   pending > 0 ? 'Needs Review' : 'All Clear',
-                  Colors.orange,
+                  Theme.of(context).colorScheme.tertiary,
                   Icons.pending,
                 ),
                 _buildStatCard(
                   'Failed',
                   '$failed',
                   failed > 0 ? 'Needs Attention' : 'All Clear',
-                  failed > 0 ? Colors.red : Colors.green,
+                  failed > 0
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.secondary,
                   failed > 0 ? Icons.error : Icons.check_circle,
                 ),
                 _buildStatCard(
                   'Total',
                   '$total',
                   '100%',
-                  Colors.blue,
+                  Theme.of(context).colorScheme.primary,
                   Icons.analytics,
                 ),
               ],
@@ -188,11 +192,14 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
           const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            style: TextStyle(
+                fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
           ),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -235,12 +242,12 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
                       value: standardized.toDouble(),
                       title:
                           '${(standardized / total * 100).toStringAsFixed(1)}%',
-                      color: Colors.green,
+                      color: Theme.of(context).colorScheme.secondary,
                       radius: 60,
-                      titleStyle: const TextStyle(
+                      titleStyle: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
                     PieChartSectionData(
@@ -248,12 +255,12 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
                       title: pending > 0
                           ? '${(pending / total * 100).toStringAsFixed(1)}%'
                           : '',
-                      color: Colors.orange,
+                      color: Theme.of(context).colorScheme.tertiary,
                       radius: 60,
-                      titleStyle: const TextStyle(
+                      titleStyle: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
                     PieChartSectionData(
@@ -261,12 +268,12 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
                       title: failed > 0
                           ? '${(failed / total * 100).toStringAsFixed(1)}%'
                           : '',
-                      color: Colors.red,
+                      color: Theme.of(context).colorScheme.error,
                       radius: 60,
-                      titleStyle: const TextStyle(
+                      titleStyle: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
                     PieChartSectionData(
@@ -274,12 +281,12 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
                       title: unprocessed > 0
                           ? '${(unprocessed / total * 100).toStringAsFixed(1)}%'
                           : '',
-                      color: Colors.grey,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       radius: 60,
-                      titleStyle: const TextStyle(
+                      titleStyle: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
                   ],
@@ -294,10 +301,13 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
               spacing: 16,
               runSpacing: 8,
               children: [
-                _buildLegendItem('Standardized', Colors.green),
-                _buildLegendItem('Pending', Colors.orange),
-                _buildLegendItem('Failed', Colors.red),
-                _buildLegendItem('Unprocessed', Colors.grey),
+                _buildLegendItem(
+                    'Standardized', Theme.of(context).colorScheme.secondary),
+                _buildLegendItem(
+                    'Pending', Theme.of(context).colorScheme.tertiary),
+                _buildLegendItem('Failed', Theme.of(context).colorScheme.error),
+                _buildLegendItem('Unprocessed',
+                    Theme.of(context).colorScheme.onSurfaceVariant),
               ],
             ),
           ],
@@ -359,16 +369,17 @@ class _GameSystemAnalyticsViewState extends State<GameSystemAnalyticsView> {
                   Color statusColor;
                   switch (migration['status']) {
                     case 'completed':
-                      statusColor = Colors.green;
+                      statusColor = Theme.of(context).colorScheme.secondary;
                       break;
                     case 'in_progress':
-                      statusColor = Colors.blue;
+                      statusColor = Theme.of(context).colorScheme.primary;
                       break;
                     case 'undone':
-                      statusColor = Colors.orange;
+                      statusColor = Theme.of(context).colorScheme.tertiary;
                       break;
                     default:
-                      statusColor = Colors.grey;
+                      statusColor =
+                          Theme.of(context).colorScheme.onSurfaceVariant;
                   }
 
                   return DataRow(

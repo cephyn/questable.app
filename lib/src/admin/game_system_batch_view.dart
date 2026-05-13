@@ -190,14 +190,16 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline,
+                color: Theme.of(context).colorScheme.error, size: 48),
             const SizedBox(height: 16),
             Text(
               'Error:',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(_errorMessage, style: const TextStyle(color: Colors.red)),
+            Text(_errorMessage,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadAffectedQuests,
@@ -214,7 +216,8 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.info_outline, size: 48),
+            Icon(Icons.info_outline,
+                size: 48, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 16),
             Text(
               'No quest cards found for "${widget.gameSystem.standardName}" or its aliases',
@@ -327,7 +330,8 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.green),
+            Icon(Icons.check_circle,
+                color: Theme.of(context).colorScheme.secondary),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

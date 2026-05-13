@@ -21,8 +21,9 @@ class AuthWidgets {
             msg: e.toString(),
             toastLength: Toast.LENGTH_LONG,
             gravity: ToastGravity.SNACKBAR,
-            backgroundColor: Colors.black54,
-            textColor: Colors.white,
+            backgroundColor:
+                Theme.of(context).colorScheme.surface.withAlpha(220),
+            textColor: Theme.of(context).colorScheme.onSurface,
             fontSize: 14.0,
           );
         }

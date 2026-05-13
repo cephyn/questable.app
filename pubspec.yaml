@@ -68,3 +68,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/appainter_theme_green.json
+    # Branding samples used for a visual refresh
+    - samples/questable_logo.png
+    - samples/questable_ico.png
+    - samples/questable_concept.png

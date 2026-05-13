@@ -70,7 +70,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error),
               child: const Text('Delete'),
               onPressed: () => Navigator.of(context).pop(true),
             ),
@@ -204,12 +205,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     },
                                   ),
                                   const Divider(),
-                                  ListTile(
+                                    ListTile(
                                       leading: Icon(Icons.delete_forever,
-                                          color: Colors.red[700]),
+                                        color: Theme.of(context)
+                                          .colorScheme
+                                          .error),
                                       title: Text('Delete Account',
-                                          style: TextStyle(
-                                              color: Colors.red[700])),
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                            .colorScheme
+                                            .error)),
                                       subtitle: const Text(
                                           'Permanently delete your account and data'),
                                       onTap: () => _deleteAccount(

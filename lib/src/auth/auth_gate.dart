@@ -82,15 +82,18 @@ class AuthGate extends StatelessWidget {
                             TextSpan(
                                 text:
                                     'By signing in, you agree to our terms and conditions. All information listed in this website is user-generated or AI-generated and may not be accurate. Please use at your own risk.'),
-                            Utils.createHyperlink(
+                            Utils.createHyperlink(context,
                                 'mailto: admin@questable.app', ' Contact us '),
                             TextSpan(text: 'for any questions or concerns.'),
                           ],
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant),
                         ),
                       ),
                       const SizedBox(height: 12),
-                          ElevatedButton.icon(
+                      ElevatedButton.icon(
                         icon: const Icon(Icons.login),
                         label: const Text('Continue with Google'),
                         onPressed: () async {
@@ -115,7 +118,8 @@ class AuthGate extends StatelessWidget {
                             }
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Google sign-in failed: $e')),
+                              SnackBar(
+                                  content: Text('Google sign-in failed: $e')),
                             );
                           }
                         },
@@ -125,11 +129,19 @@ class AuthGate extends StatelessWidget {
                 );
               },
               sideBuilder: (context, shrinkOffset) {
+                // Use the concept artwork on the sign-in side panel and left-align it.
+                // samples/questable_concept.png matches the provided design attachment.
                 return Padding(
                   padding: const EdgeInsets.all(20),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: Image.asset('assets/images/QuestableTx4x4.png'),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: 0.72,
+                      child: Image.asset(
+                        'samples/questable_logo.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ),
                 );
               },
@@ -150,8 +162,7 @@ class AuthGate extends StatelessWidget {
                     body: Center(child: Text('Error: ${snapshot.error}')));
               } else {
                 return FutureBuilder<List<String>?>(
-                    future:
-                      firestoreService.getUserRoles(user.uid),
+                  future: firestoreService.getUserRoles(user.uid),
                   builder: (BuildContext context,
                       AsyncSnapshot<List<String>?> rolesSnapshot) {
                     if (rolesSnapshot.connectionState ==
@@ -169,7 +180,7 @@ class AuthGate extends StatelessWidget {
                           (roles.contains('admin') || roles.contains('user'))) {
                         return HomePage(settingsController: settingsController);
                       } else {
-                        return const Scaffold(
+                        return Scaffold(
                           body: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Center(
@@ -189,11 +200,13 @@ class AuthGate extends StatelessWidget {
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 10),
-                                  const Text(
+                                  Text(
                                     "An admin will process your account soon.",
                                     style: TextStyle(
                                       fontSize: 18,
-                                      color: Colors.grey,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),

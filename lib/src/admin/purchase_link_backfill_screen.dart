@@ -177,11 +177,11 @@ class _PurchaseLinkBackfillScreenState
                       const SizedBox(height: 8),
                       if (Config.googleApiKey.isEmpty ||
                           Config.googleSearchEngineId.isEmpty)
-                        const Text(
+                        Text(
                             'One or more keys are not configured. Purchase link search will fail.',
                             style: TextStyle(
                                 fontStyle: FontStyle.italic,
-                                color: Colors.orange)),
+                                color: Theme.of(context).colorScheme.tertiary)),
                     ],
                     if (!_isConfigLoading &&
                         _configErrorMessage.isEmpty &&
@@ -194,7 +194,7 @@ class _PurchaseLinkBackfillScreenState
                               : '❌ API Keys Not Loaded',
                           style: TextStyle(
                               color: _keysAreConfigured
-                                  ? Colors.green
+                                  ? Theme.of(context).colorScheme.secondary
                                   : Theme.of(context).colorScheme.error),
                         ),
                       )
@@ -241,10 +241,11 @@ class _PurchaseLinkBackfillScreenState
             if (_errorDetails.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(8.0),
-                color: Colors.red.shade50,
+                color: Theme.of(context).colorScheme.errorContainer,
                 child: Text(
                   'Error details: $_errorDetails',
-                  style: TextStyle(color: Colors.red.shade800),
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer),
                 ),
               ),
 

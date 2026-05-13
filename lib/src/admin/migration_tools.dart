@@ -100,10 +100,12 @@ class _MigrationToolsState extends State<MigrationTools> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         color: _missingFieldCount == 0
-                            ? Colors.green.shade100
+                            ? Theme.of(context).colorScheme.secondaryContainer
                             : _missingFieldCount > 0
-                                ? Colors.orange.shade100
-                                : Colors.grey.shade100,
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .tertiaryContainer
+                                : Theme.of(context).colorScheme.surfaceVariant,
                         width: double.infinity,
                         child: Text(_checkStatusMessage),
                       ),
@@ -155,8 +157,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         color: _success
-                            ? Colors.green.shade100
-                            : Colors.red.shade100,
+                            ? Theme.of(context).colorScheme.secondaryContainer
+                            : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
                         child: Text(_statusMessage),
                       ),
@@ -239,10 +241,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         color: _populateLowercaseSuccess
-                            ? Colors.green.shade100
+                            ? Theme.of(context).colorScheme.secondaryContainer
                             : _isPopulatingLowercase
-                                ? Colors.blue.shade100
-                                : Colors.red.shade100,
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
                         child: Text(_populateLowercaseStatus),
                       ),
@@ -296,10 +298,10 @@ class _MigrationToolsState extends State<MigrationTools> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         color: _backfillProductTitleSuccess
-                            ? Colors.green.shade100
+                            ? Theme.of(context).colorScheme.secondaryContainer
                             : _isBackfillingProductTitle
-                                ? Colors.blue.shade100
-                                : Colors.red.shade100,
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
                         child: Text(_backfillProductTitleStatus),
                       ),
@@ -339,7 +341,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                   children: [
                     const Text(
                       'Backfill Search Index',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -350,12 +353,23 @@ class _MigrationToolsState extends State<MigrationTools> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         color: _backfillSearchSuccess
-                            ? Colors.green.shade100
+                            ? Theme.of(context).colorScheme.secondaryContainer
                             : _isBackfillingSearchIndex
-                                ? Colors.blue.shade100
-                                : Colors.red.shade100,
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(context).colorScheme.errorContainer,
                         width: double.infinity,
-                        child: Text(_backfillSearchStatus),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_backfillSearchStatus),
+                            if (_backfillSearchProcessed > 0)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6.0),
+                                child: Text(
+                                    'Processed: $_backfillSearchProcessed'),
+                              ),
+                          ],
+                        ),
                       ),
                     const SizedBox(height: 16),
                     Row(
@@ -364,9 +378,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                           onPressed: _isBackfillingSearchIndex
                               ? null
                               : () async {
-                                    await _runBackfillSearchIndex();
+                                  await _runBackfillSearchIndex();
                                 },
-                            child: _isBackfillingSearchIndex
+                          child: _isBackfillingSearchIndex
                               ? const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -384,8 +398,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                         ),
                         const SizedBox(width: 12),
                         OutlinedButton(
-                            onPressed:
-                              _isBackfillingSearchIndex ? null : _checkSearchIndexStatus,
+                          onPressed: _isBackfillingSearchIndex
+                              ? null
+                              : _checkSearchIndexStatus,
                           child: const Text('Check Status'),
                         ),
                         const SizedBox(width: 8),
@@ -394,7 +409,8 @@ class _MigrationToolsState extends State<MigrationTools> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => const SearchBackfillDashboard()),
+                                  builder: (context) =>
+                                      const SearchBackfillDashboard()),
                             );
                           },
                           child: const Text('View Dashboard'),
@@ -508,7 +524,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         SnackBar(
           content:
               Text('Query successful! Found ${result.docs.length} documents.'),
-          backgroundColor: Colors.green,
+          backgroundColor: Theme.of(context).colorScheme.secondary,
         ),
       );
     } catch (e) {
@@ -551,21 +567,21 @@ class _MigrationToolsState extends State<MigrationTools> {
                 ),
             ],
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 15),
           action: SnackBarAction(
             label: hasIndexLink ? 'Copy Link' : 'Dismiss',
-            textColor: Colors.white,
+            textColor: Theme.of(context).colorScheme.onError,
             onPressed: () {
               if (hasIndexLink) {
                 // Copy the link to clipboard
                 final data = ClipboardData(text: indexLink);
                 Clipboard.setData(data);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Link copied to clipboard'),
-                    backgroundColor: Colors.blue,
-                    duration: Duration(seconds: 2),
+                  SnackBar(
+                    content: const Text('Link copied to clipboard'),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               }
@@ -826,7 +842,8 @@ class _MigrationToolsState extends State<MigrationTools> {
   Future<void> _runBackfillProductTitleMigration() async {
     setState(() {
       _isBackfillingProductTitle = true;
-      _backfillProductTitleStatus = 'Starting product title backfill... Fetching first batch.';
+      _backfillProductTitleStatus =
+          'Starting product title backfill... Fetching first batch.';
       _backfillProductTitleSuccess = false;
       _backfilledProductTitleCount = 0;
       _processedProductTitleCount = 0;
@@ -857,15 +874,15 @@ class _MigrationToolsState extends State<MigrationTools> {
 
         if (snapshot.docs.isEmpty) {
           log('No more documents found for product title backfill.');
-          break; 
+          break;
         }
 
         lastDoc = snapshot.docs.last;
-        
+
         for (final doc in snapshot.docs) {
           _processedProductTitleCount++;
           final data = doc.data() as Map<String, dynamic>?;
-          
+
           String? title;
           String? productTitle;
 
@@ -879,7 +896,8 @@ class _MigrationToolsState extends State<MigrationTools> {
           }
 
           // Check if productTitle is null, empty, or just whitespace
-          bool productTitleIsBlank = productTitle == null || productTitle.trim().isEmpty;
+          bool productTitleIsBlank =
+              productTitle == null || productTitle.trim().isEmpty;
 
           if (productTitleIsBlank && title != null && title.trim().isNotEmpty) {
             batch.update(doc.reference, {'productTitle': title.trim()});
@@ -895,12 +913,12 @@ class _MigrationToolsState extends State<MigrationTools> {
               log('Committing product title backfill batch...');
               await batch.commit();
               log('Product title backfill batch committed.');
-              batch = firestore.batch(); 
+              batch = firestore.batch();
               batchCounter = 0;
               await Future.delayed(const Duration(milliseconds: 50));
             }
           }
-          
+
           if (_processedProductTitleCount % 100 == 0 && mounted) {
             setState(() {
               _backfillProductTitleStatus =
@@ -918,7 +936,8 @@ class _MigrationToolsState extends State<MigrationTools> {
       if (batchCounter > 0) {
         if (!mounted) return;
         setState(() {
-          _backfillProductTitleStatus = 'Committing final product title backfill batch...';
+          _backfillProductTitleStatus =
+              'Committing final product title backfill batch...';
         });
         log('Committing final product title backfill batch ($batchCounter operations)...');
         await batch.commit();
@@ -956,14 +975,16 @@ class _MigrationToolsState extends State<MigrationTools> {
     });
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable('backfill_search_index');
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('backfill_search_index');
       final resp = await callable.call(<String, dynamic>{});
       final data = Map<String, dynamic>.from(resp.data ?? {});
       final processed = data['processed'] as int? ?? 0;
 
       setState(() {
         _backfillSearchProcessed = processed;
-        _backfillSearchStatus = 'Backfill complete: processed $processed documents.';
+        _backfillSearchStatus =
+            'Backfill complete: processed $processed documents.';
         _backfillSearchSuccess = true;
         _isBackfillingSearchIndex = false;
       });
@@ -985,13 +1006,16 @@ class _MigrationToolsState extends State<MigrationTools> {
 
     try {
       final firestore = FirebaseFirestore.instance;
-      final snapshot = await firestore.collection('questSearchIndex').limit(1).get();
+      final snapshot =
+          await firestore.collection('questSearchIndex').limit(1).get();
       final exists = snapshot.docs.isNotEmpty;
-      final totalSnapshot = await firestore.collection('questSearchIndex').count().get();
+      final totalSnapshot =
+          await firestore.collection('questSearchIndex').count().get();
       final total = totalSnapshot.count;
 
       setState(() {
-        _backfillSearchStatus = 'Index present: $exists — documents in index: $total';
+        _backfillSearchStatus =
+            'Index present: $exists — documents in index: $total';
         _backfillSearchSuccess = exists;
       });
     } catch (e, s) {

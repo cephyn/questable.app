@@ -333,8 +333,8 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
             label: const Text('Sign In'),
             onPressed: () => AuthDialogHelper.navigateToAuthScreen(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -429,9 +429,9 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: Theme.of(context).colorScheme.primaryContainer.withAlpha(30),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: Theme.of(context).colorScheme.primary),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

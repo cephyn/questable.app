@@ -228,8 +228,9 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
                 return ListTile(
                   title: Text(system.standardName),
                   subtitle: aliasExists
-                      ? const Text('Alias already exists here',
-                          style: TextStyle(color: Colors.orange))
+                      ? Text('Alias already exists here',
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.tertiary))
                       : null,
                   onTap: aliasExists
                       ? null
@@ -331,7 +332,8 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
           : _errorMessage.isNotEmpty
               ? Center(
                   child: Text(_errorMessage,
-                      style: const TextStyle(color: Colors.red)))
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)))
               : FutureBuilder<List<QuestCard>>(
                   future: _unstandardizedQuests,
                   builder: (context, snapshot) {

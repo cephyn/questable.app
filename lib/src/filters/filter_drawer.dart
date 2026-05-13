@@ -689,7 +689,7 @@ class _FilterDrawerState extends State<FilterDrawer> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade400),
+              border: Border.all(color: Theme.of(context).colorScheme.outline),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -701,7 +701,9 @@ class _FilterDrawerState extends State<FilterDrawer> {
                     if (currentValues.isEmpty)
                       Text(
                         placeholder,
-                        style: TextStyle(color: Colors.grey.shade600),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                       )
                     else
                       Expanded(
@@ -728,7 +730,7 @@ class _FilterDrawerState extends State<FilterDrawer> {
                       ),
                     Icon(
                       isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ],
                 ),
