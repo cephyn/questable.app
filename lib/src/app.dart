@@ -155,21 +155,7 @@ class _HomePageState extends State<HomePage> {
           return Scaffold(
             key: const ValueKey('logged_out_scaffold'),
             appBar: appBar,
-            body: Column(
-              children: [
-                // Concept art / marketing banner for logged-out users
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12.0),
-                  child: Image(
-                    image: AssetImage('samples/questable_concept.png'),
-                    height: 160,
-                    fit: BoxFit.contain,
-                    semanticLabel: 'Questable concept art',
-                  ),
-                ),
-                const Expanded(child: PublicQuestCardListView()),
-              ],
-            ), // Directly show public view
+            body: const PublicQuestCardListView(), // Directly show public view
           );
         }
         // If user IS logged in, build the Scaffold with AdaptiveScaffold

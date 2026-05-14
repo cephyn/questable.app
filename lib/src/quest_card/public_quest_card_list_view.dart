@@ -8,6 +8,7 @@ import 'package:quest_cards/src/filters/filter_drawer.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
+import 'package:quest_cards/src/widgets/branding.dart';
 import '../util/utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -71,8 +72,10 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
   // Load the total count of quests
   Future<void> _loadTotalCount() async {
     try {
-      final filterProvider =
-          Provider.of<FilterProvider>(context, listen: false);
+      final filterProvider = Provider.of<FilterProvider>(
+        context,
+        listen: false,
+      );
       _totalQuestCount = await _firestoreService.getPublicQuestCardCount(
         filterState: filterProvider.filterState,
       );
@@ -103,8 +106,10 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
     });
 
     try {
-      final filterProvider =
-          Provider.of<FilterProvider>(context, listen: false);
+      final filterProvider = Provider.of<FilterProvider>(
+        context,
+        listen: false,
+      );
 
       // Track filter usage with analytics when loading more cards with filters
       if (filterProvider.filterState.hasFilters) {
@@ -182,10 +187,12 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
       final prefs = await SharedPreferences.getInstance();
 
       // Convert Firestore documents to serializable maps
-      final List<Map<String, dynamic>> serializableData =
-          _questCards.map((doc) {
-        Map<String, dynamic> data =
-            Map<String, dynamic>.from(doc.data() as Map<String, dynamic>);
+      final List<Map<String, dynamic>> serializableData = _questCards.map((
+        doc,
+      ) {
+        Map<String, dynamic> data = Map<String, dynamic>.from(
+          doc.data() as Map<String, dynamic>,
+        );
 
         // Handle Timestamp conversion
         data.forEach((key, value) {
@@ -203,7 +210,9 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
       final jsonData = json.encode(serializableData);
       await prefs.setString(_cacheKey, jsonData);
       await prefs.setInt(
-          _cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
+        _cacheTimestampKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (e) {
       // Cache error is non-fatal, just log it
       debugPrint('Failed to cache quest cards: $e');
@@ -223,8 +232,10 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
         }
       });
 
-      final filterProvider =
-          Provider.of<FilterProvider>(context, listen: false);
+      final filterProvider = Provider.of<FilterProvider>(
+        context,
+        listen: false,
+      );
 
       // Track filter usage when refreshing the quest list with filters
       if (filterProvider.filterState.hasFilters) {
@@ -284,12 +295,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: const Text(
-          'Browse Quests',
-          style: TextStyle(
-            fontSize: 20,
-          ),
-        ),
+        title: const Text('Browse Quests', style: TextStyle(fontSize: 20)),
         actions: [
           // Add filter button to app bar
           IconButton(
@@ -346,8 +352,10 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(40.0),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 10.0,
+              horizontal: 16.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -401,9 +409,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
           ),
 
           // Quest list takes remaining space
-          Expanded(
-            child: _buildQuestList(context),
-          ),
+          Expanded(child: _buildQuestList(context)),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -425,43 +431,10 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
 
   // Welcome banner for new users
   Widget _buildWelcomeBanner(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withAlpha(30),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Theme.of(context).colorScheme.primary),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Welcome to Questable!',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Browse quest cards for tabletop role-playing games. Sign in to create, edit or contribute to the collection.',
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => AuthDialogHelper.navigateToAuthScreen(context),
-                child: const Text('Sign In'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () => AuthDialogHelper.navigateToAuthScreen(context,
-                    isSignUp: true),
-                child: const Text('Create Account'),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return PublicBrowseHero(
+      onSignIn: () => AuthDialogHelper.navigateToAuthScreen(context),
+      onCreateAccount: () =>
+          AuthDialogHelper.navigateToAuthScreen(context, isSignUp: true),
     );
   }
 
@@ -506,7 +479,8 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
               leading: CircleAvatar(
                 // Prioritize standardized system for icon
                 backgroundImage: Utils.getSystemIcon(
-                    data['standardizedGameSystem'] ?? data['gameSystem'] ?? ''),
+                  data['standardizedGameSystem'] ?? data['gameSystem'] ?? '',
+                ),
                 backgroundColor: Colors.transparent,
               ),
               title: AutoSizeText(
@@ -531,11 +505,16 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
                     onPressed: () {
                       final navigator = RootNavigator.of(context);
                       if (navigator != null) {
-                        navigator.showLoginPrompt(context, 'edit',
-                            docId: docId);
+                        navigator.showLoginPrompt(
+                          context,
+                          'edit',
+                          docId: docId,
+                        );
                       } else {
                         AuthDialogHelper.showLoginPrompt(
-                            context, 'edit quests');
+                          context,
+                          'edit quests',
+                        );
                       }
                     },
                     tooltip: 'Edit (requires login)',
@@ -546,6 +525,194 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
           ),
         );
       },
+    );
+  }
+}
+
+class PublicBrowseHero extends StatelessWidget {
+  const PublicBrowseHero({
+    super.key,
+    required this.onSignIn,
+    required this.onCreateAccount,
+  });
+
+  final VoidCallback onSignIn;
+  final VoidCallback onCreateAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primaryContainer.withAlpha(140),
+            colorScheme.surface,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool stacked = constraints.maxWidth < 760;
+          final Widget content = _HeroContent(
+            onSignIn: onSignIn,
+            onCreateAccount: onCreateAccount,
+          );
+          final Widget art = _HeroArtwork(stacked: stacked);
+
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [content, const SizedBox(height: 20), art],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(flex: 11, child: content),
+              const SizedBox(width: 24),
+              Expanded(flex: 9, child: art),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HeroContent extends StatelessWidget {
+  const _HeroContent({required this.onSignIn, required this.onCreateAccount});
+
+  final VoidCallback onSignIn;
+  final VoidCallback onCreateAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: colorScheme.surface.withAlpha(210),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const QuestableMark(size: 28),
+              const SizedBox(width: 8),
+              Text(
+                'Questable',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Discover your next adventure',
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Text(
+            'Browse quest cards for tabletop role-playing games. Sign in to create, edit or contribute to the collection.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            ElevatedButton.icon(
+              onPressed: onSignIn,
+              icon: const Icon(Icons.login),
+              label: const Text('Sign In'),
+            ),
+            OutlinedButton(
+              onPressed: onCreateAccount,
+              child: const Text('Create Account'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroArtwork extends StatelessWidget {
+  const _HeroArtwork({required this.stacked});
+
+  final bool stacked;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: stacked ? 220 : 260),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withAlpha(18),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: AspectRatio(
+          aspectRatio: 1.35,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                'samples/questable_concept.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.surface.withAlpha(18),
+                      colorScheme.surface.withAlpha(110),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
