@@ -52,11 +52,13 @@ class Utils {
     }).join(' ');
   }
 
-  static TextSpan createHyperlink(String url, String linkText) {
+  static TextSpan createHyperlink(BuildContext context, String url, String linkText) {
     return TextSpan(
       text: linkText,
-      style:
-          TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
+        decoration: TextDecoration.underline,
+      ),
       recognizer: TapGestureRecognizer()
         ..onTap = () async {
           await launchUrl(Uri.parse(url));

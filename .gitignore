@@ -56,3 +56,43 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .cache
+
+# Operating system files
+Thumbs.db
+desktop.ini
+
+# VS Code workspace/settings (local dev)
+.vscode/
+
+# Gradle / Android
+.gradle/
+**/local.properties
+**/android/.gradle/
+
+# Xcode / macOS build artifacts
+Pods/
+*.xcuserdata
+*.xcuserstate
+DerivedData/
+*.xcworkspace
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+*.egg-info/
+dist/
+
+# Coverage and reports
+coverage/
+lcov.info
+
+# Misc temp files
+*.tmp
+*.bak
+*.swp
+

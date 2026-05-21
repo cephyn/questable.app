@@ -113,7 +113,8 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
         );
       } else {
         //final id = await _gameSystemService.createGameSystem(gameSystem);
-        await _gameSystemService.createGameSystem(gameSystem); // Fix: Uncommented and removed unused 'id'
+        await _gameSystemService.createGameSystem(
+            gameSystem); // Fix: Uncommented and removed unused 'id'
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Game system created successfully')),
         );
@@ -330,11 +331,11 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Alternative names or common variations used for this game system',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -378,11 +379,11 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Different versions or editions of this game system',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -491,8 +492,12 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
                                               ? Icons.check_circle
                                               : Icons.info_outline,
                                           color: _affectedQuestsCount > 0
-                                              ? Colors.green
-                                              : Colors.blue,
+                                              ? Theme.of(context)
+                                                  .colorScheme
+                                                  .secondary
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
                                         ),
                                         const SizedBox(width: 12),
                                         Expanded(

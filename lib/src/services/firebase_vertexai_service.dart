@@ -51,13 +51,8 @@ class FirebaseAiService {
     return false;
   }
 
-  // AI configuration
-  // Use a stable, widely available model name for Firebase AI Logic.
-  // Preview model names and some newer families can be location-scoped (often `global`).
-  final String aiModel = 'gemini-2.5-flash';
-
-  // Vertex AI Gemini API location.
-  // `global` is safest across newer/preview model families.
+  // AI configuration. Use the global location for broader Gemini model availability.
+  final String aiModel = 'gemini-3.1-flash-preview';
   final String aiLocation = 'global';
   final String systemInstruction =
       'You are an expert at extracting RPG Adventures from text documents and producing structured data. Correct any spelling mistakes. Your task is to extract relevant details from the provided text and output it in JSON format according to the provided response schema. The definition of an RPG Adventure is: An RPG adventure is a narrative-driven scenario within a role-playing game where players guide characters through challenges and exploration to advance a storyline.';

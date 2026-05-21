@@ -173,7 +173,8 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
         title: const Text('Game System Management'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.rule_folder_outlined), // Icon for unstandardized quests
+            icon: const Icon(
+                Icons.rule_folder_outlined), // Icon for unstandardized quests
             onPressed: _navigateToUnstandardizedQuests,
             tooltip: 'View Unstandardized Quests', // Tooltip for the new button
           ),
@@ -222,7 +223,8 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
               padding: const EdgeInsets.all(16.0),
               child: Text(
                 _errorMessage,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.error, fontSize: 16),
               ),
             ),
           Expanded(
@@ -240,18 +242,21 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: Colors.red, size: 48),
+                        Icon(Icons.error_outline,
+                            color: Theme.of(context).colorScheme.error,
+                            size: 48),
                         const SizedBox(height: 16),
                         Text(
                           'Error loading game systems:',
-                          style:
-                              const TextStyle(color: Colors.red, fontSize: 16),
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 16),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '${snapshot.error}',
-                          style: const TextStyle(color: Colors.red),
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.error),
                         ),
                       ],
                     ),

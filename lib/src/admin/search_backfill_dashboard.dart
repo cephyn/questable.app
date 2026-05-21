@@ -6,7 +6,8 @@ class SearchBackfillDashboard extends StatefulWidget {
   const SearchBackfillDashboard({super.key});
 
   @override
-  State<SearchBackfillDashboard> createState() => _SearchBackfillDashboardState();
+  State<SearchBackfillDashboard> createState() =>
+      _SearchBackfillDashboardState();
 }
 
 class _SearchBackfillDashboardState extends State<SearchBackfillDashboard> {
@@ -27,7 +28,11 @@ class _SearchBackfillDashboardState extends State<SearchBackfillDashboard> {
       final total = countSnapshot.count;
 
       // Sum recent processed counts (last 50)
-      final snapshot = await db.collection('backfill_runs').orderBy('startTime', descending: true).limit(50).get();
+      final snapshot = await db
+          .collection('backfill_runs')
+          .orderBy('startTime', descending: true)
+          .limit(50)
+          .get();
       int processedSum = 0;
       for (final d in snapshot.docs) {
         final data = d.data();
@@ -57,7 +62,8 @@ class _SearchBackfillDashboardState extends State<SearchBackfillDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Backfill runs (most recent)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Backfill runs (most recent)',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Card(
               child: Padding(
@@ -65,14 +71,17 @@ class _SearchBackfillDashboardState extends State<SearchBackfillDashboard> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _loading ? const CircularProgressIndicator() : Text('Total runs: $_totalRuns'),
-                    _loading ? const SizedBox() : Text('Processed (last 50): $_totalProcessed'),
+                    _loading
+                        ? const CircularProgressIndicator()
+                        : Text('Total runs: $_totalRuns'),
+                    _loading
+                        ? const SizedBox()
+                        : Text('Processed (last 50): $_totalProcessed'),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 12),
-
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
@@ -114,7 +123,12 @@ class _SearchBackfillDashboardState extends State<SearchBackfillDashboard> {
                               Text('Initiated by: $initiatedBy'),
                               Text('Start: ${startTime ?? 'N/A'}'),
                               Text('End: ${endTime ?? 'N/A'}'),
-                              if (data.containsKey('error')) Text('Error: ${data['error']}', style: const TextStyle(color: Colors.red)),
+                              if (data.containsKey('error'))
+                                Text('Error: ${data['error']}',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error)),
                             ],
                           ),
                           isThreeLine: true,

@@ -34,7 +34,9 @@ import 'services/firestore_service.dart';
 
 // Settings
 import 'settings/settings_controller.dart';
+import 'package:quest_cards/src/themes/app_theme.dart';
 import 'settings/settings_view.dart';
+import 'package:quest_cards/src/widgets/branding.dart';
 
 // App Localization (Commented out)
 // import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -76,8 +78,12 @@ class MyApp extends StatelessWidget {
             // onGenerateTitle: (BuildContext context) =>
             //     AppLocalizations.of(context)!.appTitle,
             title: 'Questable', // Added simple title fallback
-            theme: ThemeData(),
-            darkTheme: ThemeData.dark(),
+            theme: AppTheme.lightTheme(
+              presetName: settingsController.themePreset.name,
+            ),
+            darkTheme: AppTheme.darkTheme(
+              presetName: settingsController.themePreset.name,
+            ),
             themeMode: settingsController.themeMode,
             // Pass the router configuration
             routerConfig: router,
@@ -106,56 +112,58 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
-        stream: auth.getAuthStateChanges(),
-        builder: (context, authSnapshot) {
-          final User? currentUser = authSnapshot.data;
+      stream: auth.getAuthStateChanges(),
+      builder: (context, authSnapshot) {
+        final User? currentUser = authSnapshot.data;
 
-          // Loading State
-          if (authSnapshot.connectionState == ConnectionState.waiting) {
-            return Scaffold(
-              appBar: AppBar(title: const Text('Questable')),
-              body: const Center(
-                  child:
-                      CircularProgressIndicator(key: ValueKey('auth_loading'))),
-            );
-          }
-
-          // Error State
-          if (authSnapshot.hasError) {
-            return Scaffold(
-              appBar: AppBar(title: const Text('Questable')),
-              body: Center(
-                  child: SelectableText(
-                      'Authentication Error: ${authSnapshot.error}')),
-            );
-          }
-
-          // Build AppBar Actions based on auth state
-          List<Widget> appBarActions = _buildAppBarActions(currentUser);
-
-          // Build the AppBar
-          AppBar appBar = AppBar(
-            title: const Text('Questable', style: TextStyle(fontSize: 20)),
-            actions: appBarActions,
-            automaticallyImplyLeading: false,
+        // Loading State
+        if (authSnapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(title: const BrandingTitle()),
+            body: const Center(
+              child: CircularProgressIndicator(key: ValueKey('auth_loading')),
+            ),
           );
+        }
 
-          // If user is NOT logged in, show simple Scaffold with PublicQuestCardListView
-          if (currentUser == null) {
-            // Ensure selected index is 0 for logged-out state
-            _selectedIndex = 0;
-            return Scaffold(
-              key: const ValueKey('logged_out_scaffold'),
-              appBar: appBar,
-              body:
-                  const PublicQuestCardListView(), // Directly show public view
-            );
-          }
-          // If user IS logged in, build the Scaffold with AdaptiveScaffold
-          else {
-            return buildLoggedInScaffold(currentUser, appBar);
-          }
-        });
+        // Error State
+        if (authSnapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: const BrandingTitle()),
+            body: Center(
+              child: SelectableText(
+                'Authentication Error: ${authSnapshot.error}',
+              ),
+            ),
+          );
+        }
+
+        // Build AppBar Actions based on auth state
+        List<Widget> appBarActions = _buildAppBarActions(currentUser);
+
+        // Build the AppBar
+        AppBar appBar = AppBar(
+          title: const BrandingTitle(),
+          actions: appBarActions,
+          automaticallyImplyLeading: false,
+        );
+
+        // If user is NOT logged in, show simple Scaffold with PublicQuestCardListView
+        if (currentUser == null) {
+          // Ensure selected index is 0 for logged-out state
+          _selectedIndex = 0;
+          return Scaffold(
+            key: const ValueKey('logged_out_scaffold'),
+            appBar: appBar,
+            body: const PublicQuestCardListView(), // Directly show public view
+          );
+        }
+        // If user IS logged in, build the Scaffold with AdaptiveScaffold
+        else {
+          return buildLoggedInScaffold(currentUser, appBar);
+        }
+      },
+    );
   }
 
   // Helper to build AppBar actions
@@ -185,7 +193,7 @@ class _HomePageState extends State<HomePage> {
           },
         ),
         AuthWidgets.signOutButton(context, auth),
-      ]
+      ],
     ];
   }
 
@@ -214,19 +222,21 @@ class _HomePageState extends State<HomePage> {
         selectedIcon: Icon(Icons.search),
         label: 'Search', // Index 3
       ),
-      if (isAdmin) const NavigationDestination(
-        icon: Icon(Icons.bar_chart_outlined),
-        selectedIcon: Icon(Icons.bar_chart),
-        label: 'Stats', // Admin-only Site Stats
-      ),
-      if (isAdmin) const NavigationDestination(
-        icon: Icon(Icons.people_alt_outlined),
-        selectedIcon: Icon(Icons.people_alt),
-        label: 'Users', // Shown only to admins
-      ),
+      if (isAdmin)
+        const NavigationDestination(
+          icon: Icon(Icons.bar_chart_outlined),
+          selectedIcon: Icon(Icons.bar_chart),
+          label: 'Stats', // Admin-only Site Stats
+        ),
+      if (isAdmin)
+        const NavigationDestination(
+          icon: Icon(Icons.people_alt_outlined),
+          selectedIcon: Icon(Icons.people_alt),
+          label: 'Users', // Shown only to admins
+        ),
       // Admin Destinations
       if (isAdmin) ...[
-          const NavigationDestination(
+        const NavigationDestination(
           icon: Icon(Icons.admin_panel_settings_outlined),
           selectedIcon: Icon(Icons.admin_panel_settings),
           label: 'Migrate', // Index 6
@@ -241,119 +251,122 @@ class _HomePageState extends State<HomePage> {
           selectedIcon: Icon(Icons.gamepad),
           label: 'Systems', // Index 8
         ),
-      ]
+      ],
     ];
   }
 
   // Builds the Scaffold containing AdaptiveScaffold for LOGGED-IN users
   Widget buildLoggedInScaffold(User currentUser, AppBar appBar) {
     // Fetch roles for the logged-in user
-    final Future<List<String>?> rolesFuture =
-        firestoreService.getUserRoles(currentUser.uid);
+    final Future<List<String>?> rolesFuture = firestoreService.getUserRoles(
+      currentUser.uid,
+    );
 
     return FutureBuilder<List<String>?>(
-        future: rolesFuture,
-        builder: (context, roleSnapshot) {
-          // Role Loading State
-          if (roleSnapshot.connectionState == ConnectionState.waiting) {
-            return Scaffold(
-              key: const ValueKey('role_loading_scaffold'),
-              appBar: appBar, // Use the passed AppBar
-              body: const Center(
-                  child: CircularProgressIndicator(
-                      key: ValueKey('role_loading_indicator'))),
-            );
-          }
-          // Role Error State
-          if (roleSnapshot.hasError) {
-            log('Error loading user roles: ${roleSnapshot.error}');
-            return Scaffold(
-              key: const ValueKey('role_error_scaffold'),
-              appBar: appBar, // Use the passed AppBar
-              body: Center(
-                  child:
-                      Text('Error loading user data: ${roleSnapshot.error}')),
-            );
-          }
-
-          // Roles are loaded
-          List<String>? roles = roleSnapshot.data;
-          bool isAdmin = roles?.contains('admin') ?? false;
-
-          // Build destinations for the logged-in user
-          final List<NavigationDestination> destinations =
-              _buildLoggedInDestinations(isAdmin);
-
-          // Ensure selectedIndex is valid
-          int effectiveSelectedIndex = _selectedIndex;
-          if (effectiveSelectedIndex >= destinations.length) {
-            effectiveSelectedIndex = 0;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _selectedIndex = 0;
-                });
-              }
-            });
-          }
-
-          // Build the list of pages in the same order as the destinations
-          final List<Widget> pages = [
-            QuestCardListView(questCardList: []), // Browse
-            EditQuestCard(docId: ''), // Add Quest
-            QuestCardAnalyze(), // Analyze
-            QuestCardSearch(), // Search
-          ];
-
-          if (isAdmin) {
-            pages.add(SiteStatsAdminView()); // Site Stats (admin only)
-            pages.add(LocalUserList()); // Users (admin only)
-            // Admin-only pages
-            pages.addAll([
-              MigrationTools(), // Migrate
-              PurchaseLinkBackfill(), // Backfill
-              GameSystemAdminView(), // Systems
-            ]);
-          }
-
-          // Ensure selectedIndex is still valid for the pages list
-          if (effectiveSelectedIndex >= pages.length) {
-            effectiveSelectedIndex = 0;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _selectedIndex = 0;
-                });
-              }
-            });
-          }
-
-          final Widget page = pages[effectiveSelectedIndex];
-
-          // Build the final Scaffold with AppBar and AdaptiveScaffold body
+      future: rolesFuture,
+      builder: (context, roleSnapshot) {
+        // Role Loading State
+        if (roleSnapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            key: ValueKey('logged_in_scaffold_${currentUser.uid}'),
+            key: const ValueKey('role_loading_scaffold'),
             appBar: appBar, // Use the passed AppBar
-            body: AdaptiveScaffold(
-              selectedIndex: effectiveSelectedIndex,
-              onSelectedIndexChange: (int index) {
-                if (index < destinations.length) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
-                }
-              },
-              destinations: destinations,
-              body: (_) => page,
-              smallBody: (_) => page,
-              // Standard Breakpoints
-              smallBreakpoint: const Breakpoint(endWidth: 700),
-              mediumBreakpoint:
-                  const Breakpoint(beginWidth: 700, endWidth: 1000),
-              largeBreakpoint: const Breakpoint(beginWidth: 1000),
-              internalAnimations: true,
+            body: const Center(
+              child: CircularProgressIndicator(
+                key: ValueKey('role_loading_indicator'),
+              ),
             ),
           );
-        });
+        }
+        // Role Error State
+        if (roleSnapshot.hasError) {
+          log('Error loading user roles: ${roleSnapshot.error}');
+          return Scaffold(
+            key: const ValueKey('role_error_scaffold'),
+            appBar: appBar, // Use the passed AppBar
+            body: Center(
+              child: Text('Error loading user data: ${roleSnapshot.error}'),
+            ),
+          );
+        }
+
+        // Roles are loaded
+        List<String>? roles = roleSnapshot.data;
+        bool isAdmin = roles?.contains('admin') ?? false;
+
+        // Build destinations for the logged-in user
+        final List<NavigationDestination> destinations =
+            _buildLoggedInDestinations(isAdmin);
+
+        // Ensure selectedIndex is valid
+        int effectiveSelectedIndex = _selectedIndex;
+        if (effectiveSelectedIndex >= destinations.length) {
+          effectiveSelectedIndex = 0;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _selectedIndex = 0;
+              });
+            }
+          });
+        }
+
+        // Build the list of pages in the same order as the destinations
+        final List<Widget> pages = [
+          QuestCardListView(questCardList: []), // Browse
+          EditQuestCard(docId: ''), // Add Quest
+          QuestCardAnalyze(), // Analyze
+          QuestCardSearch(), // Search
+        ];
+
+        if (isAdmin) {
+          pages.add(SiteStatsAdminView()); // Site Stats (admin only)
+          pages.add(LocalUserList()); // Users (admin only)
+          // Admin-only pages
+          pages.addAll([
+            MigrationTools(), // Migrate
+            PurchaseLinkBackfill(), // Backfill
+            GameSystemAdminView(), // Systems
+          ]);
+        }
+
+        // Ensure selectedIndex is still valid for the pages list
+        if (effectiveSelectedIndex >= pages.length) {
+          effectiveSelectedIndex = 0;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _selectedIndex = 0;
+              });
+            }
+          });
+        }
+
+        final Widget page = pages[effectiveSelectedIndex];
+
+        // Build the final Scaffold with AppBar and AdaptiveScaffold body
+        return Scaffold(
+          key: ValueKey('logged_in_scaffold_${currentUser.uid}'),
+          appBar: appBar, // Use the passed AppBar
+          body: AdaptiveScaffold(
+            selectedIndex: effectiveSelectedIndex,
+            onSelectedIndexChange: (int index) {
+              if (index < destinations.length) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              }
+            },
+            destinations: destinations,
+            body: (_) => page,
+            smallBody: (_) => page,
+            // Standard Breakpoints
+            smallBreakpoint: const Breakpoint(endWidth: 700),
+            mediumBreakpoint: const Breakpoint(beginWidth: 700, endWidth: 1000),
+            largeBreakpoint: const Breakpoint(beginWidth: 1000),
+            internalAnimations: true,
+          ),
+        );
+      },
+    );
   }
 }

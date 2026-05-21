@@ -7,23 +7,24 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.8.1 <4.0.0'
+  sdk: ">=3.8.1 <4.0.0"
 
 dependencies:
   auto_size_text: 3.0.0
-  cloud_firestore: 6.1.1
-  cloud_functions: 6.0.5
-  custom_adaptive_scaffold: 2.0.2
+  cloud_firestore: 6.4.1
+  cloud_functions: 6.3.1
+  collection: 1.19.1
+  custom_adaptive_scaffold: 3.0.1
   crypto: 3.0.7
-  file_picker: 10.3.8
-  firebase_analytics: 12.1.0
-  firebase_app_check: 0.4.1+3
-  firebase_auth: 6.1.3
-  firebase_core: 4.3.0
-  firebase_remote_config: 6.1.3
-  firebase_storage: 13.0.5
+  file_picker: 12.0.0-beta.2
+  firebase_analytics: 12.4.1
+  firebase_app_check: 0.4.4+1
+  firebase_auth: 6.5.1
+  firebase_core: 4.9.0
+  firebase_remote_config: 6.5.1
+  firebase_storage: 13.4.1
   firebase_ui_auth: 3.0.1
-  fl_chart: 1.1.1
+  fl_chart: 1.2.0
   flutter:
     sdk: flutter
   flutter_localizations:
@@ -31,30 +32,27 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   fluttertoast: 9.0.0
-  google_fonts: 6.3.3
+  google_fonts: 8.1.0
   google_sign_in: 7.2.0
   infinite_scroll_pagination: 5.1.1
   mime: 2.0.0
   provider: 6.1.5+1
   url_launcher: 6.3.2
-  json_theme: 11.0.0
   rxdart: 0.28.0
-  shared_preferences: 2.5.4
+  shared_preferences: 2.5.5
   http: 1.6.0
-  gpt_markdown: 1.1.5
-  mockito: 5.6.1
-  flutter_typeahead: 5.2.0
+  gpt_markdown: 1.1.7
+  flutter_typeahead: 6.0.0
   intl: 0.20.2
-  go_router: 17.0.1
-  share_plus: 12.0.1
+  go_router: 17.2.3
+  share_plus: 13.1.0
   simple_icons: 14.6.1 # Add simple_icons
-  firebase_ai: 3.6.1
+  firebase_ai: 3.12.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: 6.0.0
-  build_runner: 2.10.4
 
 flutter:
   uses-material-design: true
@@ -66,4 +64,8 @@ flutter:
     # Add assets from the images directory to the application.
     - assets/images/
     - assets/icons/
-    - assets/appainter_theme_green.json
+    # Branding samples used for a visual refresh
+    - samples/questable_logo.png
+    - samples/questable_ico.png
+    - samples/questable_ico_256.png
+    - samples/questable_concept.png

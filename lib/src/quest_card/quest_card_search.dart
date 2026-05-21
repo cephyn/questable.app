@@ -126,7 +126,8 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search, size: 18, color: Colors.grey[600]),
+            Icon(Icons.search,
+              size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(height: 2),
           Text(score.toStringAsFixed(2), style: TextStyle(fontSize: 12)),
         ],

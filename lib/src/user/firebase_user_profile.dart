@@ -87,27 +87,26 @@ class FirebaseUserProfileWidget extends StatelessWidget {
                 ),
                 subtitle: Text(
                   userProfile.email,
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
             ),
             SizedBox(height: 20),
-            _buildInfoTile('Email Verified',
+            _buildInfoTile(context, 'Email Verified',
                 userProfile.isEmailVerified ? 'Yes' : 'No', Icons.verified),
-            _buildInfoTile('Anonymous', userProfile.isAnonymous ? 'Yes' : 'No',
+            _buildInfoTile(context, 'Anonymous', userProfile.isAnonymous ? 'Yes' : 'No',
                 Icons.privacy_tip),
-            _buildInfoTile(
-                'Creation Time',
-                userProfile.metadata.creationTime.toLocal().toString(),
-                Icons.timer),
-            _buildInfoTile(
-                'Last Sign In',
-                userProfile.metadata.lastSignInTime.toLocal().toString(),
-                Icons.access_time),
+            _buildInfoTile(context, 'Creation Time',
+              userProfile.metadata.creationTime.toLocal().toString(),
+              Icons.timer),
+            _buildInfoTile(context, 'Last Sign In',
+              userProfile.metadata.lastSignInTime.toLocal().toString(),
+              Icons.access_time),
             if (userProfile.phoneNumber != null)
-              _buildInfoTile(
-                  'Phone Number', userProfile.phoneNumber!, Icons.phone),
-            _buildProviderData(userProfile.providerData),
+              _buildInfoTile(context, 'Phone Number', userProfile.phoneNumber!, Icons.phone),
+            _buildProviderData(context, userProfile.providerData),
             Spacer(),
             ElevatedButton(
               onPressed: () => _signOut(context),
@@ -116,12 +115,13 @@ class FirebaseUserProfileWidget extends StatelessWidget {
             SizedBox(height: 8),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, // Red color for delete button
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
               ),
               onPressed: () => _deleteAccount(context),
               child: Text(
                 'Delete Account',
-                style: TextStyle(color: Colors.black),
+                style: TextStyle(color: Theme.of(context).colorScheme.onError),
               ),
             ),
           ],
@@ -130,12 +130,12 @@ class FirebaseUserProfileWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoTile(String label, String value, IconData icon) {
+  Widget _buildInfoTile(BuildContext context, String label, String value, IconData icon) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          Icon(icon, color: Colors.blue),
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -148,7 +148,7 @@ class FirebaseUserProfileWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildProviderData(List<UserInfo> providerData) {
+  Widget _buildProviderData(BuildContext context, List<UserInfo> providerData) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
@@ -162,7 +162,7 @@ class FirebaseUserProfileWidget extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Row(
                   children: [
-                    Icon(Icons.account_circle, color: Colors.green),
+                    Icon(Icons.account_circle, color: Theme.of(context).colorScheme.secondary),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(

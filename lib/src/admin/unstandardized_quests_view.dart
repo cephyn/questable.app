@@ -49,25 +49,27 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       _unstandardizedQuests = _gameSystemService
           .getQuestCardsNeedingReview() // Fetch quests needing review
           .then((quests) {
-        debugPrint('Loaded ${quests.length} unstandardized quests');
-        return quests;
-      }).catchError((error) {
-        debugPrint('Error loading unstandardized quests: $error');
-        if (mounted) {
-          // Check if widget is still mounted
-          setState(() {
-            _errorMessage = 'Failed to load quests: $error';
+            debugPrint('Loaded ${quests.length} unstandardized quests');
+            return quests;
+          })
+          .catchError((error) {
+            debugPrint('Error loading unstandardized quests: $error');
+            if (mounted) {
+              // Check if widget is still mounted
+              setState(() {
+                _errorMessage = 'Failed to load quests: $error';
+              });
+            }
+            return <QuestCard>[]; // Return empty list on error
+          })
+          .whenComplete(() {
+            if (mounted) {
+              // Check if widget is still mounted
+              setState(() {
+                _isLoading = false;
+              });
+            }
           });
-        }
-        return <QuestCard>[]; // Return empty list on error
-      }).whenComplete(() {
-        if (mounted) {
-          // Check if widget is still mounted
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      });
     });
   }
 
@@ -100,7 +102,8 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
     // TODO: Implement navigation to QuestCardDetailView or similar editor
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text('Navigate to edit quest: ${quest.title ?? 'N/A'}')),
+        content: Text('Navigate to edit quest: ${quest.title ?? 'N/A'}'),
+      ),
     );
     // Example:
     // Navigator.push(
@@ -124,14 +127,17 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
     }
 
     // Check if a system with this name already exists (case-insensitive)
-    final exists = _standardGameSystems.any((sys) =>
-        sys.standardName.toLowerCase() == gameSystemName.toLowerCase());
+    final exists = _standardGameSystems.any(
+      (sys) => sys.standardName.toLowerCase() == gameSystemName.toLowerCase(),
+    );
     if (exists) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                '"$gameSystemName" already exists as a standard game system.')),
+          content: Text(
+            '"$gameSystemName" already exists as a standard game system.',
+          ),
+        ),
       );
       return;
     }
@@ -149,7 +155,8 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('"$gameSystemName" added as a new standard system.')),
+          content: Text('"$gameSystemName" added as a new standard system.'),
+        ),
       );
       await _loadStandardGameSystems(); // Refresh standard systems list
       // Optionally: Automatically apply this new standard to the current quest
@@ -157,9 +164,9 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       _loadQuests(); // Refresh the list of unstandardized quests
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error adding new system: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error adding new system: $e')));
       }
     } finally {
       if (mounted) {
@@ -174,7 +181,8 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Quest has no game system name to use as alias.')),
+          content: Text('Quest has no game system name to use as alias.'),
+        ),
       );
       return;
     }
@@ -190,14 +198,16 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('No standard systems found to add alias to.')),
+          content: Text('No standard systems found to add alias to.'),
+        ),
       );
       // Attempt to reload standard systems if empty
       await _loadStandardGameSystems();
       if (_standardGameSystems.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Still no standard systems found after reload.')),
+            content: Text('Still no standard systems found after reload.'),
+          ),
         );
         return;
       }
@@ -207,8 +217,11 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
 
     // Sort systems alphabetically for the dialog
     final sortedSystems = List<StandardGameSystem>.from(_standardGameSystems)
-      ..sort((a, b) =>
-          a.standardName.toLowerCase().compareTo(b.standardName.toLowerCase()));
+      ..sort(
+        (a, b) => a.standardName.toLowerCase().compareTo(
+          b.standardName.toLowerCase(),
+        ),
+      );
 
     if (!mounted) return; // Check before showing dialog
     final selectedSystem = await showDialog<StandardGameSystem>(
@@ -225,20 +238,27 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
               itemBuilder: (context, index) {
                 final system = sortedSystems[index];
                 // Check if alias already exists (case-insensitive)
-                final aliasExists = system.aliases.any(
-                        (a) => a.toLowerCase() == aliasName.toLowerCase()) ||
+                final aliasExists =
+                    system.aliases.any(
+                      (a) => a.toLowerCase() == aliasName.toLowerCase(),
+                    ) ||
                     system.standardName.toLowerCase() ==
                         aliasName.toLowerCase();
                 return ListTile(
                   title: Text(system.standardName),
                   subtitle: aliasExists
-                      ? const Text('Alias already exists here',
-                          style: TextStyle(color: Colors.orange))
+                      ? Text(
+                          'Alias already exists here',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.tertiary,
+                          ),
+                        )
                       : null,
                   onTap: aliasExists
                       ? null
-                      : () => Navigator.of(context)
-                          .pop(system), // Disable if alias exists
+                      : () => Navigator.of(
+                          context,
+                        ).pop(system), // Disable if alias exists
                 );
               },
             ),
@@ -258,16 +278,20 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       setState(() => _isLoading = true);
       try {
         // Check again if alias already exists before updating
-        final aliasExists = selectedSystem.aliases
-                .any((a) => a.toLowerCase() == aliasName.toLowerCase()) ||
+        final aliasExists =
+            selectedSystem.aliases.any(
+              (a) => a.toLowerCase() == aliasName.toLowerCase(),
+            ) ||
             selectedSystem.standardName.toLowerCase() ==
                 aliasName.toLowerCase();
         if (aliasExists) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text(
-                    'Alias "$aliasName" already exists for "${selectedSystem.standardName}".')),
+              content: Text(
+                'Alias "$aliasName" already exists for "${selectedSystem.standardName}".',
+              ),
+            ),
           );
           return; // Exit if alias was added while dialog was open
         }
@@ -281,8 +305,10 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Added "$aliasName" as alias to "${selectedSystem.standardName}".')),
+            content: Text(
+              'Added "$aliasName" as alias to "${selectedSystem.standardName}".',
+            ),
+          ),
         );
         await _loadStandardGameSystems(); // Refresh standard systems list
         // Optionally: Update the current quest to use the standardized system
@@ -290,9 +316,9 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
         _loadQuests(); // Refresh the list of unstandardized quests
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error adding alias: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error adding alias: $e')));
         }
       } finally {
         if (mounted) {
@@ -306,19 +332,22 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
 
   /// Batch update all quests in a group to a standardized system
   Future<void> _batchUpdateQuestsToSystem(
-      List<QuestCard> questsToUpdate, String targetSystemName) async {
+    List<QuestCard> questsToUpdate,
+    String targetSystemName,
+  ) async {
     if (questsToUpdate.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No quests to update.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No quests to update.')));
       return;
     }
 
     if (!mounted) return;
     setState(() {
       _isBatchUpdating = true;
-      _batchUpdateStatus = 'Starting batch update (${questsToUpdate.length} quests)...';
+      _batchUpdateStatus =
+          'Starting batch update (${questsToUpdate.length} quests)...';
     });
 
     final firestore = FirebaseFirestore.instance;
@@ -383,8 +412,10 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Successfully updated $updatedCount quests to "$targetSystemName"')),
+            content: Text(
+              'Successfully updated $updatedCount quests to "$targetSystemName"',
+            ),
+          ),
         );
         _loadQuests(); // Refresh the list
       }
@@ -404,7 +435,8 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
 
   /// Show dialog to select target standardized system for batch update
   Future<void> _showBatchUpdateDialog(List<QuestCard> questsInGroup) async {
-    final String gameSystemName = questsInGroup.first.gameSystem?.trim() ?? 'Unknown';
+    final String gameSystemName =
+        questsInGroup.first.gameSystem?.trim() ?? 'Unknown';
 
     if (_isLoadingStandardSystems) {
       if (!mounted) return;
@@ -428,8 +460,10 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
               children: [
                 Text('Quests to update: ${questsInGroup.length}'),
                 const SizedBox(height: 16),
-                const Text('Select target standardized system:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Select target standardized system:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: ListView.builder(
@@ -439,23 +473,26 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
                       final system = _standardGameSystems[index];
                       return ListTile(
                         title: Text(system.standardName),
-                        onTap: () => Navigator.of(context).pop(
-                          {'system': system.standardName, 'action': 'select'},
-                        ),
+                        onTap: () => Navigator.of(context).pop({
+                          'system': system.standardName,
+                          'action': 'select',
+                        }),
                       );
                     },
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Divider(),
-                const Text('Or create new:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Or create new:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 ListTile(
                   title: Text('Create "$gameSystemName" as New Standard'),
-                  onTap: () => Navigator.of(context).pop(
-                    {'system': gameSystemName, 'action': 'create'},
-                  ),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pop({'system': gameSystemName, 'action': 'create'}),
                 ),
               ],
             ),
@@ -502,13 +539,15 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
   }
 
   // --- End Batch Update Methods ---
+  @override
   Widget build(BuildContext context) {
     final userContext = Provider.of<UserContext>(context);
 
     // Ensure user is admin
     if (!userContext.isAdmin) {
       return const Center(
-          child: Text('Access Denied. Admin privileges required.'));
+        child: Text('Access Denied. Admin privileges required.'),
+      );
     }
 
     return Scaffold(
@@ -530,115 +569,147 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Text(_errorMessage,
-                      style: const TextStyle(color: Colors.red)))
-              : FutureBuilder<List<QuestCard>>(
-                  future: _unstandardizedQuests,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting &&
-                        !_isLoading) {
-                      // Show loading indicator only if not already handled by _isLoading
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(
-                          child: SelectableText('Error: ${snapshot.error}'));
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(
-                          child: Text('No unstandardized quests found.'));
-                    }
+          ? Center(
+              child: Text(
+                _errorMessage,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            )
+          : FutureBuilder<List<QuestCard>>(
+              future: _unstandardizedQuests,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !_isLoading) {
+                  // Show loading indicator only if not already handled by _isLoading
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(
+                    child: SelectableText('Error: ${snapshot.error}'),
+                  );
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                    child: Text('No unstandardized quests found.'),
+                  );
+                }
 
-                    final quests = snapshot.data!;
-                    // Group quests by game system name (case-insensitive, handle null/empty)
-                    final groupedQuests = groupBy<QuestCard, String>(
-                      quests,
-                      (quest) => (quest.gameSystem?.trim().toLowerCase() ??
-                                  'unknown system')
-                              .isEmpty
-                          ? 'unknown system'
-                          : quest.gameSystem!.trim().toLowerCase(),
-                    );
+                final quests = snapshot.data!;
+                // Group quests by game system name (case-insensitive, handle null/empty)
+                final groupedQuests = groupBy<QuestCard, String>(
+                  quests,
+                  (quest) =>
+                      (quest.gameSystem?.trim().toLowerCase() ??
+                              'unknown system')
+                          .isEmpty
+                      ? 'unknown system'
+                      : quest.gameSystem!.trim().toLowerCase(),
+                );
 
-                    // Sort group keys alphabetically
-                    final sortedKeys = groupedQuests.keys.toList()
-                      ..sort((a, b) => a.compareTo(b));
+                // Sort group keys alphabetically
+                final sortedKeys = groupedQuests.keys.toList()
+                  ..sort((a, b) => a.compareTo(b));
 
-                    return ListView.builder(
-                      itemCount: sortedKeys.length,
-                      itemBuilder: (context, index) {
-                        final gameSystemKey = sortedKeys[index];
-                        final questsInGroup = groupedQuests[gameSystemKey]!;
-                        // Use the first quest's gameSystem name for display, handling potential null/empty
-                        final displayGameSystem =
-                            questsInGroup.first.gameSystem?.trim();
-                        final displayTitle = (displayGameSystem == null ||
-                                displayGameSystem.isEmpty)
-                            ? 'Unknown System'
-                            : displayGameSystem;
-
-                        return ExpansionTile(
-                          title:
-                              Text('$displayTitle (${questsInGroup.length})'),
-                          // Add actions for the group
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (String result) {
-                              // Use the first quest as representative for the action
-                              final representativeQuest = questsInGroup.first;
-                              if (result == 'add_new') {
-                                _addAsNewStandardSystem(representativeQuest);
-                              } else if (result == 'add_alias') {
-                                _addAsAlias(representativeQuest);
-                              } else if (result == 'batch_update') {
-                                _showBatchUpdateDialog(questsInGroup);
-                              }
-                            },
-                            itemBuilder: (BuildContext context) =>
-                                <PopupMenuEntry<String>>[
-                              const PopupMenuItem<String>(
-                                value: 'batch_update',
-                                child: Text('Batch Update to System'),
-                              ),
-                              const PopupMenuItem<String>(
-                                value: 'add_new',
-                                child: Text('Create New Standard System'),
-                              ),
-                              PopupMenuItem<String>(
-                                value: 'add_alias',
-                                enabled: !_isLoadingStandardSystems &&
-                                    _standardGameSystems
-                                        .isNotEmpty, // Disable if systems loading or empty
-                                child: Text(_isLoadingStandardSystems
-                                    ? 'Loading systems...'
-                                    : 'Add as Alias to Existing'),
-                              ),
-                            ],
-                            icon: const Icon(Icons.more_vert),
-                            tooltip: 'Standardize System',
+                return Column(
+                  children: [
+                    if (_batchUpdateStatus.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _isBatchUpdating
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          children: questsInGroup.map((quest) {
-                            // Use null-safe access for quest properties
-                            final title = quest.title ?? 'No Title';
-                            final productTitle =
-                                quest.productTitle ?? 'Unknown Product';
-                            final status =
-                                quest.systemMigrationStatus ?? 'Unknown Status';
-                            final gameSystemDisplay = quest.gameSystem ??
-                                'No System'; // Display original case here
+                          child: Text(_batchUpdateStatus),
+                        ),
+                      ),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: sortedKeys.length,
+                        itemBuilder: (context, index) {
+                          final gameSystemKey = sortedKeys[index];
+                          final questsInGroup = groupedQuests[gameSystemKey]!;
+                          final displayGameSystem = questsInGroup
+                              .first
+                              .gameSystem
+                              ?.trim();
+                          final displayTitle =
+                              (displayGameSystem == null ||
+                                  displayGameSystem.isEmpty)
+                              ? 'Unknown System'
+                              : displayGameSystem;
 
-                            return ListTile(
-                              title: Text(title),
-                              subtitle: Text(
-                                  'Product: $productTitle\nSystem: $gameSystemDisplay\nStatus: $status'),
-                              isThreeLine: true,
-                              onTap: () => _navigateToEditQuest(
-                                  quest), // Navigate to edit on tap
-                            );
-                          }).toList(),
-                        );
-                      },
-                    );
-                  },
-                ),
+                          return ExpansionTile(
+                            title: Text(
+                              '$displayTitle (${questsInGroup.length})',
+                            ),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (String result) {
+                                final representativeQuest = questsInGroup.first;
+                                if (result == 'add_new') {
+                                  _addAsNewStandardSystem(representativeQuest);
+                                } else if (result == 'add_alias') {
+                                  _addAsAlias(representativeQuest);
+                                } else if (result == 'batch_update') {
+                                  _showBatchUpdateDialog(questsInGroup);
+                                }
+                              },
+                              itemBuilder: (BuildContext context) =>
+                                  <PopupMenuEntry<String>>[
+                                    const PopupMenuItem<String>(
+                                      value: 'batch_update',
+                                      child: Text('Batch Update to System'),
+                                    ),
+                                    const PopupMenuItem<String>(
+                                      value: 'add_new',
+                                      child: Text('Create New Standard System'),
+                                    ),
+                                    PopupMenuItem<String>(
+                                      value: 'add_alias',
+                                      enabled:
+                                          !_isLoadingStandardSystems &&
+                                          _standardGameSystems.isNotEmpty,
+                                      child: Text(
+                                        _isLoadingStandardSystems
+                                            ? 'Loading systems...'
+                                            : 'Add as Alias to Existing',
+                                      ),
+                                    ),
+                                  ],
+                              icon: const Icon(Icons.more_vert),
+                              tooltip: 'Standardize System',
+                            ),
+                            children: questsInGroup.map((quest) {
+                              final title = quest.title ?? 'No Title';
+                              final productTitle =
+                                  quest.productTitle ?? 'Unknown Product';
+                              final status =
+                                  quest.systemMigrationStatus ??
+                                  'Unknown Status';
+                              final gameSystemDisplay =
+                                  quest.gameSystem ?? 'No System';
+
+                              return ListTile(
+                                title: Text(title),
+                                subtitle: Text(
+                                  'Product: $productTitle\nSystem: $gameSystemDisplay\nStatus: $status',
+                                ),
+                                isThreeLine: true,
+                                onTap: () => _navigateToEditQuest(quest),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
     );
   }
 }

@@ -135,8 +135,8 @@ class _GameSystemSearchState extends State<GameSystemSearch> {
         else if (_errorMessage.isNotEmpty)
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child:
-                Text(_errorMessage, style: const TextStyle(color: Colors.red)),
+            child: Text(_errorMessage,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           )
         else if (_filteredGameSystems.isEmpty &&
             _searchController.text.isNotEmpty)
@@ -162,7 +162,10 @@ class _GameSystemSearchState extends State<GameSystemSearch> {
                   title: Text(system.standardName),
                   subtitle: system.aliases.isNotEmpty
                       ? Text('Aliases: ${system.aliases.join(', ')}',
-                          style: TextStyle(color: Colors.grey[600]))
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant))
                       : null,
                   onTap: () {
                     widget.onSelected(system);

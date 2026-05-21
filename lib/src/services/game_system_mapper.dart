@@ -25,11 +25,11 @@ class MappingResult {
 /// - Confidence scoring for suggested matches
 /// - Learning from manual mappings
 class GameSystemMapper {
-  final GameSystemService _gameSystemService;
+  final GameSystemLookupService _gameSystemService;
 
   // Constructor with dependency injection
-  GameSystemMapper({GameSystemService? gameSystemService})
-      : _gameSystemService = gameSystemService ?? GameSystemService();
+  GameSystemMapper({GameSystemLookupService? gameSystemService})
+    : _gameSystemService = gameSystemService ?? GameSystemService();
 
   // Cache of standard game systems to avoid repeated Firestore calls
   List<StandardGameSystem>? _cachedSystems;
@@ -50,10 +50,7 @@ class GameSystemMapper {
   Future<MappingResult> findBestMatch(String gameSystemName) async {
     try {
       if (gameSystemName.isEmpty) {
-        return MappingResult(
-          confidence: 0.0,
-          matchType: 'empty',
-        );
+        return MappingResult(confidence: 0.0, matchType: 'empty');
       }
 
       // Normalize the input
@@ -74,11 +71,11 @@ class GameSystemMapper {
       return await _findFuzzyMatch(normalizedName);
     } catch (e, stackTrace) {
       _logError(
-          'Error finding best match for "$gameSystemName"', e, stackTrace);
-      return MappingResult(
-        confidence: 0.0,
-        matchType: 'error',
+        'Error finding best match for "$gameSystemName"',
+        e,
+        stackTrace,
       );
+      return MappingResult(confidence: 0.0, matchType: 'error');
     }
   }
 
@@ -110,21 +107,26 @@ class GameSystemMapper {
       for (final system in allSystems) {
         // Check standard name
         double score = _calculateSimilarity(
-            normalizedName, _normalizeGameSystemName(system.standardName));
+          normalizedName,
+          _normalizeGameSystemName(system.standardName),
+        );
         if (score > bestScore) {
           bestScore = score;
           bestMatch = system;
           matchType = 'name_similarity';
         }
-        
 
         // Check for containing/contained relationship
-        if (_isSubstringOf(normalizedName,
-                _normalizeGameSystemName(system.standardName)) ||
-            _isSubstringOf(_normalizeGameSystemName(system.standardName),
-                normalizedName)) {
+        if (_isSubstringOf(
+              normalizedName,
+              _normalizeGameSystemName(system.standardName),
+            ) ||
+            _isSubstringOf(
+              _normalizeGameSystemName(system.standardName),
+              normalizedName,
+            )) {
           double substringScore = 0.85; // High confidence but not exact
-          
+
           if (substringScore > bestScore) {
             bestScore = substringScore;
             bestMatch = system;
@@ -133,12 +135,16 @@ class GameSystemMapper {
         }
 
         // Check for acronym match (e.g., "D&D" for "Dungeons & Dragons")
-        if (_isAcronymOf(normalizedName,
-                _normalizeGameSystemName(system.standardName)) ||
-            _isAcronymOf(_normalizeGameSystemName(system.standardName),
-                normalizedName)) {
+        if (_isAcronymOf(
+              normalizedName,
+              _normalizeGameSystemName(system.standardName),
+            ) ||
+            _isAcronymOf(
+              _normalizeGameSystemName(system.standardName),
+              normalizedName,
+            )) {
           double acronymScore = 0.9; // Very high confidence
-          
+
           if (acronymScore > bestScore) {
             bestScore = acronymScore;
             bestMatch = system;
@@ -152,7 +158,7 @@ class GameSystemMapper {
 
           // Simple similarity
           score = _calculateSimilarity(normalizedName, normalizedAlias);
-          
+
           if (score > bestScore) {
             bestScore = score;
             bestMatch = system;
@@ -163,7 +169,7 @@ class GameSystemMapper {
           if (_isSubstringOf(normalizedName, normalizedAlias) ||
               _isSubstringOf(normalizedAlias, normalizedName)) {
             double substringScore = 0.85;
-            
+
             if (substringScore > bestScore) {
               bestScore = substringScore;
               bestMatch = system;
@@ -175,7 +181,7 @@ class GameSystemMapper {
           if (_isAcronymOf(normalizedName, normalizedAlias) ||
               _isAcronymOf(normalizedAlias, normalizedName)) {
             double acronymScore = 0.9;
-            
+
             if (acronymScore > bestScore) {
               bestScore = acronymScore;
               bestMatch = system;
@@ -184,7 +190,6 @@ class GameSystemMapper {
           }
         }
       }
-      
 
       // Apply confidence threshold
       if (bestScore < 0.6) {
@@ -202,10 +207,7 @@ class GameSystemMapper {
       );
     } catch (e, stackTrace) {
       _logError('Error in fuzzy matching', e, stackTrace);
-      return MappingResult(
-        confidence: 0.0,
-        matchType: 'error',
-      );
+      return MappingResult(confidence: 0.0, matchType: 'error');
     }
   }
 
@@ -255,19 +257,26 @@ class GameSystemMapper {
     // Check for word overlap to boost score
     final stopWords = {'and', '&', 'the', 'of', 'for', 'a', 'an'};
     final words1 = str1
-      .split(RegExp(r'\s+'))
-      .map((w) => w.replaceAll(RegExp(r'[^a-z0-9]'), ''))
-      .map((w) => w.length > 1 && w.endsWith('s') ? w.substring(0, w.length - 1) : w)
-      .where((w) => w.isNotEmpty && !stopWords.contains(w))
-      .toList();
+        .split(RegExp(r'\s+'))
+        .map((w) => w.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+        .map(
+          (w) => w.length > 1 && w.endsWith('s')
+              ? w.substring(0, w.length - 1)
+              : w,
+        )
+        .where((w) => w.isNotEmpty && !stopWords.contains(w))
+        .toList();
     final words2 = str2
-      .split(RegExp(r'\s+'))
-      .map((w) => w.replaceAll(RegExp(r'[^a-z0-9]'), ''))
-      .map((w) => w.length > 1 && w.endsWith('s') ? w.substring(0, w.length - 1) : w)
-      .where((w) => w.isNotEmpty && !stopWords.contains(w))
-      .toList();
-    final commonWords =
-      words1.where((word) => words2.contains(word)).length;
+        .split(RegExp(r'\s+'))
+        .map((w) => w.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+        .map(
+          (w) => w.length > 1 && w.endsWith('s')
+              ? w.substring(0, w.length - 1)
+              : w,
+        )
+        .where((w) => w.isNotEmpty && !stopWords.contains(w))
+        .toList();
+    final commonWords = words1.where((word) => words2.contains(word)).length;
 
     if (commonWords > 0) {
       final wordSimilarity = 2 * commonWords / (words1.length + words2.length);
@@ -313,11 +322,14 @@ class GameSystemMapper {
   bool _isAcronymOf(String potential, String full) {
     // Generate acronym from full string
     final words = full.split(RegExp(r'[\s\-&]+'));
-    final acronym =
-      words.where((word) => word.isNotEmpty).map((word) => word[0]).join('');
+    final acronym = words
+        .where((word) => word.isNotEmpty)
+        .map((word) => word[0])
+        .join('');
 
     // Normalize both strings by removing non-alphanumeric characters
-    final normalize = (String s) => s.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    String normalize(String value) =>
+        value.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
 
     return normalize(acronym) == normalize(potential);
   }
@@ -332,12 +344,16 @@ class GameSystemMapper {
   ///
   /// Records successful mappings to improve future matching
   Future<void> learnFromManualMapping(
-      String originalName, StandardGameSystem standardSystem) async {
+    String originalName,
+    StandardGameSystem standardSystem,
+  ) async {
     try {
       // If the system doesn't already have this as an alias, add it
-      if (!standardSystem.aliases.any((alias) =>
-          _normalizeGameSystemName(alias) ==
-          _normalizeGameSystemName(originalName))) {
+      if (!standardSystem.aliases.any(
+        (alias) =>
+            _normalizeGameSystemName(alias) ==
+            _normalizeGameSystemName(originalName),
+      )) {
         final updatedSystem = standardSystem.copyWith(
           aliases: [...standardSystem.aliases, originalName],
         );
@@ -347,8 +363,10 @@ class GameSystemMapper {
         // Update cache
         if (_cachedSystems != null) {
           _cachedSystems = _cachedSystems!
-              .map((system) =>
-                  system.id == standardSystem.id ? updatedSystem : system)
+              .map(
+                (system) =>
+                    system.id == standardSystem.id ? updatedSystem : system,
+              )
               .toList();
         }
       }

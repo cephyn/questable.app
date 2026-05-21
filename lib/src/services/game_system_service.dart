@@ -5,14 +5,20 @@ import 'package:flutter/foundation.dart';
 import '../models/standard_game_system.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart'; // Correct import path for QuestCard model
 
+abstract class GameSystemLookupService {
+  Future<List<StandardGameSystem>> getAllGameSystems();
+  Future<StandardGameSystem?> findGameSystemByName(String name);
+  Future<void> updateGameSystem(StandardGameSystem gameSystem);
+}
+
 /// Service for managing standardized game systems in Firestore
-class GameSystemService {
+class GameSystemService implements GameSystemLookupService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   // Only create file reference on platforms that support it
   final File? _errorLogFile =
       !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-          ? File('error.log')
-          : null;
+      ? File('error.log')
+      : null;
 
   /// Reference to the game_systems collection
   CollectionReference<Map<String, dynamic>> get gameSystems =>
@@ -26,16 +32,19 @@ class GameSystemService {
   void _logError(String message, dynamic error, [StackTrace? stackTrace]) {
     final timestamp = DateTime.now();
     final errorMessage = '$message: $error';
-    final fullMessage =
-        stackTrace != null ? '$errorMessage\n$stackTrace' : errorMessage;
+    final fullMessage = stackTrace != null
+        ? '$errorMessage\n$stackTrace'
+        : errorMessage;
 
     debugPrint(errorMessage); // Use Flutter's logging system
 
     // Only write to file if platform supports it
     if (_errorLogFile != null) {
       try {
-        _errorLogFile.writeAsStringSync('$timestamp: $fullMessage\n',
-            mode: FileMode.append);
+        _errorLogFile.writeAsStringSync(
+          '$timestamp: $fullMessage\n',
+          mode: FileMode.append,
+        );
       } catch (e) {
         debugPrint('Failed to write to error log: $e');
       }
@@ -43,6 +52,7 @@ class GameSystemService {
   }
 
   /// Get all standardized game systems
+  @override
   Future<List<StandardGameSystem>> getAllGameSystems() async {
     try {
       debugPrint('Fetching all game systems from Firestore...');
@@ -73,6 +83,7 @@ class GameSystemService {
   }
 
   /// Find a standardized game system by name or alias
+  @override
   Future<StandardGameSystem?> findGameSystemByName(String name) async {
     if (name.isEmpty) return null;
 
@@ -128,11 +139,13 @@ class GameSystemService {
   }
 
   /// Update an existing standardized game system
+  @override
   Future<void> updateGameSystem(StandardGameSystem gameSystem) async {
     try {
       if (gameSystem.id == null) {
         throw ArgumentError(
-            'Game system ID cannot be null for update operation');
+          'Game system ID cannot be null for update operation',
+        );
       }
       await gameSystems.doc(gameSystem.id).update(gameSystem.toFirestore());
     } catch (e, stackTrace) {
@@ -161,8 +174,9 @@ class GameSystemService {
       final snapshot = await questCards.get();
       if (_errorLogFile != null) {
         _errorLogFile.writeAsStringSync(
-            '${DateTime.now()}: Found ${snapshot.docs.length} quest cards to analyze\n',
-            mode: FileMode.append);
+          '${DateTime.now()}: Found ${snapshot.docs.length} quest cards to analyze\n',
+          mode: FileMode.append,
+        );
       }
 
       // Extract game system values and count occurrences
@@ -184,8 +198,9 @@ class GameSystemService {
 
       if (_errorLogFile != null) {
         _errorLogFile.writeAsStringSync(
-            '${DateTime.now()}: Identified ${gameSystemCounts.length} unique game systems\n',
-            mode: FileMode.append);
+          '${DateTime.now()}: Identified ${gameSystemCounts.length} unique game systems\n',
+          mode: FileMode.append,
+        );
       }
       return gameSystemCounts;
     } catch (e, stackTrace) {
@@ -196,7 +211,7 @@ class GameSystemService {
 
   /// Generate a report of game system variations and suggested groupings
   Future<Map<String, List<Map<String, dynamic>>>>
-      generateGameSystemVariationsReport() async {
+  generateGameSystemVariationsReport() async {
     try {
       final gameSystemCounts = await getUniqueGameSystemValues();
       final Map<String, List<Map<String, dynamic>>> variationGroups = {};
@@ -268,20 +283,27 @@ class GameSystemService {
 
       if (_errorLogFile != null) {
         _errorLogFile.writeAsStringSync(
-            '${DateTime.now()}: Generated ${variationGroups.length} variation groups\n',
-            mode: FileMode.append);
+          '${DateTime.now()}: Generated ${variationGroups.length} variation groups\n',
+          mode: FileMode.append,
+        );
       }
       return variationGroups;
     } catch (e, stackTrace) {
       _logError(
-          'Error generating game system variations report', e, stackTrace);
+        'Error generating game system variations report',
+        e,
+        stackTrace,
+      );
       rethrow;
     }
   }
 
   /// Update a quest card with standardized game system information
-  Future<void> updateQuestCardGameSystem(String questCardId,
-      String originalGameSystem, StandardGameSystem standardSystem) async {
+  Future<void> updateQuestCardGameSystem(
+    String questCardId,
+    String originalGameSystem,
+    StandardGameSystem standardSystem,
+  ) async {
     try {
       await questCards.doc(questCardId).update({
         'gameSystem': originalGameSystem, // Keep original for reference
@@ -301,7 +323,8 @@ class GameSystemService {
   Future<List<QuestCard>> getQuestCardsNeedingReview({int limit = 50}) async {
     try {
       debugPrint(
-          '[getQuestCardsNeedingReview] Fetching quest cards where systemMigrationStatus is NOT \'completed\' (limit: $limit)...');
+        '[getQuestCardsNeedingReview] Fetching quest cards where systemMigrationStatus is NOT \'completed\' (limit: $limit)...',
+      );
 
       // Query for documents where systemMigrationStatus is not equal to 'completed'
       // Firestore's `isNotEqualTo` implicitly excludes documents where the field doesn't exist.
@@ -314,7 +337,8 @@ class GameSystemService {
           .get();
 
       debugPrint(
-          '[getQuestCardsNeedingReview] Query 1 (isNotEqualTo: completed) found ${notCompletedSnapshot.docs.length} documents.');
+        '[getQuestCardsNeedingReview] Query 1 (isNotEqualTo: completed) found ${notCompletedSnapshot.docs.length} documents.',
+      );
 
       // Query 2: Find documents where the status field is null (meaning not processed yet)
       // Adjust limit based on results from the first query to respect the overall limit.
@@ -327,27 +351,34 @@ class GameSystemService {
             .get();
         nullStatusDocs = nullStatusSnapshot.docs;
         debugPrint(
-            '[getQuestCardsNeedingReview] Query 2 (isNull: true) found ${nullStatusDocs.length} documents.');
+          '[getQuestCardsNeedingReview] Query 2 (isNull: true) found ${nullStatusDocs.length} documents.',
+        );
       } else {
         debugPrint(
-            '[getQuestCardsNeedingReview] Query 1 already met limit, skipping Query 2 (isNull: true).');
+          '[getQuestCardsNeedingReview] Query 1 already met limit, skipping Query 2 (isNull: true).',
+        );
       }
-
 
       // Combine results (no need for deduplication as queries are mutually exclusive)
       final finalDocs = [...notCompletedSnapshot.docs, ...nullStatusDocs];
 
-      debugPrint('[getQuestCardsNeedingReview] Total documents found: ${finalDocs.length}');
+      debugPrint(
+        '[getQuestCardsNeedingReview] Total documents found: ${finalDocs.length}',
+      );
 
-      return finalDocs
-          .map((doc) {
-              final questCard = QuestCard.fromJson(doc.data())..id = doc.id;
-              debugPrint('[getQuestCardsNeedingReview] Mapping doc ${doc.id} to QuestCard: ${questCard.title ?? 'No Title'} (Status: ${questCard.systemMigrationStatus ?? 'null'})');
-              return questCard;
-            })
-          .toList();
+      return finalDocs.map((doc) {
+        final questCard = QuestCard.fromJson(doc.data())..id = doc.id;
+        debugPrint(
+          '[getQuestCardsNeedingReview] Mapping doc ${doc.id} to QuestCard: ${questCard.title ?? 'No Title'} (Status: ${questCard.systemMigrationStatus ?? 'null'})',
+        );
+        return questCard;
+      }).toList();
     } catch (e, stackTrace) {
-      _logError('[getQuestCardsNeedingReview] Error getting quest cards needing review', e, stackTrace);
+      _logError(
+        '[getQuestCardsNeedingReview] Error getting quest cards needing review',
+        e,
+        stackTrace,
+      );
       rethrow;
     }
   }

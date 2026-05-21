@@ -1,7 +1,7 @@
-
 import 'package:flutter/material.dart';
 
-import 'settings_service.dart';
+import 'package:quest_cards/src/settings/settings_service.dart';
+import 'package:quest_cards/src/themes/app_theme.dart';
 
 /// A class that many Widgets can interact with to read user settings, update
 /// user settings, or listen to user settings changes.
@@ -17,15 +17,22 @@ class SettingsController with ChangeNotifier {
   // Make ThemeMode a private variable so it is not updated directly without
   // also persisting the changes with the SettingsService.
   late ThemeMode _themeMode;
+  late ThemePreset _themePreset;
 
   // Allow Widgets to read the user's preferred ThemeMode.
   ThemeMode get themeMode => _themeMode;
+  ThemePreset get themePreset => _themePreset;
 
   /// Load the user's settings from the SettingsService. It may load from a
   /// local database or the internet. The controller only knows it can load the
   /// settings from the service.
   Future<void> loadSettings() async {
     _themeMode = await _settingsService.themeMode();
+    final presetName = await _settingsService.themePreset();
+    _themePreset = ThemePreset.values.firstWhere(
+      (p) => p.name == presetName,
+      orElse: () => ThemePreset.classic,
+    );
 
     // Important! Inform listeners a change has occurred.
     notifyListeners();
@@ -47,5 +54,12 @@ class SettingsController with ChangeNotifier {
     // Persist the changes to a local database or the internet using the
     // SettingService.
     await _settingsService.updateThemeMode(newThemeMode);
+  }
+
+  Future<void> updateThemePreset(ThemePreset newPreset) async {
+    if (newPreset == _themePreset) return;
+    _themePreset = newPreset;
+    notifyListeners();
+    await _settingsService.updateThemePreset(newPreset);
   }
 }

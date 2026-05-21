@@ -1,5 +1,11 @@
 {
   "projects": {
     "default": "quest-cards-3c47a"
+  },
+  "targets": {},
+  "etags": {
+    "quest-cards-3c47a": {
+      "extensionInstances": {}
+    }
   }
 }

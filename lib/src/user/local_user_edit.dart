@@ -57,8 +57,9 @@ class _LocalUserEditState extends State<LocalUserEdit> {
                         toastLength: Toast.LENGTH_SHORT,
                         gravity: ToastGravity.CENTER,
                         timeInSecForIosWeb: 1,
-                        backgroundColor: Colors.red,
-                        textColor: Colors.white,
+                        backgroundColor:
+                            Theme.of(context).colorScheme.secondary,
+                        textColor: Theme.of(context).colorScheme.onSecondary,
                         fontSize: 16.0);
                   },
                   style: ElevatedButton.styleFrom(
@@ -177,7 +178,8 @@ class _LocalUserEditState extends State<LocalUserEdit> {
             flex: 3,
             child: Text(
               value ?? 'N/A',
-              style: TextStyle(fontSize: 16, color: Colors.black87),
+              style: TextStyle(
+                  fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
             ),
           ),
         ],

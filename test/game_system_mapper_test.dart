@@ -1,21 +1,36 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:mockito/annotations.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
 import 'package:quest_cards/src/services/game_system_mapper.dart';
 import 'package:quest_cards/src/services/game_system_service.dart';
 
-@GenerateMocks([GameSystemService])
-import 'game_system_mapper_test.mocks.dart';
+class FakeGameSystemLookupService implements GameSystemLookupService {
+  final Map<String, StandardGameSystem?> exactMatches = {};
+  List<StandardGameSystem> allSystems = [];
+  StandardGameSystem? lastUpdatedSystem;
+
+  @override
+  Future<StandardGameSystem?> findGameSystemByName(String name) async {
+    return exactMatches[name];
+  }
+
+  @override
+  Future<List<StandardGameSystem>> getAllGameSystems() async {
+    return allSystems;
+  }
+
+  @override
+  Future<void> updateGameSystem(StandardGameSystem gameSystem) async {
+    lastUpdatedSystem = gameSystem;
+  }
+}
 
 void main() {
   late GameSystemMapper mapper;
-  late MockGameSystemService mockGameSystemService;
+  late FakeGameSystemLookupService fakeGameSystemService;
 
   setUp(() {
-    mockGameSystemService = MockGameSystemService();
-    // Initialize the mapper with the mock service
-    mapper = GameSystemMapper(gameSystemService: mockGameSystemService);
+    fakeGameSystemService = FakeGameSystemLookupService();
+    mapper = GameSystemMapper(gameSystemService: fakeGameSystemService);
   });
 
   group('GameSystemMapper', () {
@@ -26,8 +41,7 @@ void main() {
         standardName: 'Dungeons & Dragons',
         aliases: ['D&D', 'DnD'],
       );
-      when(mockGameSystemService.findGameSystemByName('dungeons & dragons'))
-          .thenAnswer((_) async => testSystem);
+      fakeGameSystemService.exactMatches['dungeons & dragons'] = testSystem;
 
       // Act
       final result = await mapper.findBestMatch('Dungeons & Dragons');
@@ -57,16 +71,10 @@ void main() {
           standardName: 'Dungeons & Dragons',
           aliases: ['D&D'],
         ),
-        StandardGameSystem(
-          id: '2',
-          standardName: 'Pathfinder',
-          aliases: [],
-        ),
+        StandardGameSystem(id: '2', standardName: 'Pathfinder', aliases: []),
       ];
-      when(mockGameSystemService.findGameSystemByName('dungeon and dragons'))
-          .thenAnswer((_) async => null);
-      when(mockGameSystemService.getAllGameSystems())
-          .thenAnswer((_) async => testSystems);
+      fakeGameSystemService.exactMatches['dungeon and dragons'] = null;
+      fakeGameSystemService.allSystems = testSystems;
 
       // Act
       final result = await mapper.findBestMatch('dungeon and dragons');
@@ -86,10 +94,8 @@ void main() {
           aliases: [],
         ),
       ];
-      when(mockGameSystemService.findGameSystemByName('d&d'))
-          .thenAnswer((_) async => null);
-      when(mockGameSystemService.getAllGameSystems())
-          .thenAnswer((_) async => testSystems);
+      fakeGameSystemService.exactMatches['d&d'] = null;
+      fakeGameSystemService.allSystems = testSystems;
 
       // Act
       final result = await mapper.findBestMatch('D&D');

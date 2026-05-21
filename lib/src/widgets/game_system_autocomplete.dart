@@ -132,11 +132,12 @@ class _GameSystemAutocompleteFieldState
               ? 'Will be standardized as: $_standardizedValue'
               : null,
           helperStyle: TextStyle(
-            color: Colors.blue[700],
+            color: Theme.of(context).colorScheme.primary,
             fontStyle: FontStyle.italic,
           ),
-          suffixIcon: _standardizedValue != null
-              ? Icon(Icons.check_circle, color: Colors.green)
+            suffixIcon: _standardizedValue != null
+              ? Icon(Icons.check_circle,
+                color: Theme.of(context).colorScheme.secondary)
               : null,
         );
 
@@ -190,6 +191,7 @@ class _GameSystemAutocompleteFieldState
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 SizedBox(width: 8),
@@ -197,7 +199,7 @@ class _GameSystemAutocompleteFieldState
                   'Loading game systems...',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],

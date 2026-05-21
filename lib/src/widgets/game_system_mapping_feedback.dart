@@ -128,13 +128,13 @@ class _GameSystemFeedbackWidgetState extends State<GameSystemFeedbackWidget> {
             ),
             const SizedBox(height: 16),
             if (_feedbackSubmitted)
-              const Center(
-                child: Text(
-                  'Feedback received. Thank you!',
-                  style: TextStyle(
-                      color: Colors.green, fontWeight: FontWeight.bold),
-                ),
-              )
+              Center(
+                  child: Text(
+                'Feedback received. Thank you!',
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.secondary,
+                    fontWeight: FontWeight.bold),
+              ))
             else if (_isLoading)
               const Center(child: CircularProgressIndicator())
             else
@@ -146,8 +146,10 @@ class _GameSystemFeedbackWidgetState extends State<GameSystemFeedbackWidget> {
                     label: const Text('Yes, Correct'),
                     onPressed: () => _submitFeedback(true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[600],
-                      foregroundColor: Colors.white,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.secondaryContainer,
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onSecondaryContainer,
                     ),
                   ),
                   ElevatedButton.icon(
@@ -155,8 +157,10 @@ class _GameSystemFeedbackWidgetState extends State<GameSystemFeedbackWidget> {
                     label: const Text('No, Incorrect'),
                     onPressed: () => _submitFeedback(false),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[600],
-                      foregroundColor: Colors.white,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.errorContainer,
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onErrorContainer,
                     ),
                   ),
                 ],
