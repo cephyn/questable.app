@@ -429,9 +429,7 @@ def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response
         search_engine_id = get_secret(google_search_engine_id_secret_id, project_id)
 
         if not api_key:
-            logging.error(
-                f"Secret {google_api_key_secret_id} not found in project {project_id}."
-            )
+            logging.error("Google API Key secret not found in Secret Manager.")
             # Return an error or handle as appropriate for your application
             # For callable functions, you can raise an HttpsError
             raise https_fn.HttpsError(
@@ -440,9 +438,7 @@ def get_google_search_config(req: https_fn.CallableRequest) -> https_fn.Response
             )
 
         if not search_engine_id:
-            logging.error(
-                f"Secret {google_search_engine_id_secret_id} not found in project {project_id}."
-            )
+            logging.error("Google Search Engine ID secret not found in Secret Manager.")
             raise https_fn.HttpsError(
                 code=https_fn.FunctionsErrorCode.NOT_FOUND,
                 message=f"Google Search Engine ID secret ({google_search_engine_id_secret_id}) not found.",
