@@ -81,7 +81,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   // Removed docIds list as it's returned by the futures
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.pickFiles(
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: [
         'pdf',
