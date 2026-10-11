@@ -4,6 +4,7 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 // firebase_auth import not required in main.dart
 import 'package:firebase_ui_auth/firebase_ui_auth.dart' hide AuthProvider, ProfileScreen;
@@ -13,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:quest_cards/firebase_options.dart';
+import 'package:quest_cards/src/config/app_constants.dart';
 import 'package:quest_cards/src/config/config.dart';
 import 'package:quest_cards/src/quest_card/quest_card_details_view.dart';
 import 'package:quest_cards/src/screens/profile_screen.dart'; // Import ProfileScreen
@@ -88,6 +90,23 @@ final GoRouter _router = GoRouter(
   ],
 );
 
+/// Activates App Check with the default providers per platform:
+/// Play Integrity (Android), App Attest with DeviceCheck fallback (Apple),
+/// and reCAPTCHA Enterprise (web). The site key is a reCAPTCHA Enterprise key,
+/// so the web provider must be the Enterprise variant. Failures are logged
+/// rather than rethrown so the rest of startup (Remote Config, auth) still runs.
+Future<void> _activateAppCheck() async {
+  try {
+    await FirebaseAppCheck.instance.activate(
+      providerWeb: ReCaptchaEnterpriseProvider(AppConstants.recaptchaEnterpriseSiteKey),
+      providerAndroid: const AndroidPlayIntegrityProvider(),
+      providerApple: const AppleAppAttestWithDeviceCheckFallbackProvider(),
+    );
+  } catch (e) {
+    log('App Check activation failed: $e');
+  }
+}
+
 void main() async {
   // Install a web-only early error hook that reports via plain HTTP,
   // so we get logs even if Firebase isn't initialized yet.
@@ -147,6 +166,10 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+
+      // App Check must be activated before other Firebase services are used
+      // so their requests carry attestation tokens.
+      await _activateAppCheck();
 
       // Firestore on web uses a streaming transport (WebChannel) that can be
       // blocked by ad blockers / privacy extensions, resulting in

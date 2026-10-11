@@ -60,7 +60,7 @@ Example tone for a horror quest: "A chilling presence lurks in the old manor. Wh
         logging.info(f"Generating AI text for quest: {quest_title} (Genre: {genre})")
         # New API call pattern
         response = client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.5-flash-lite",
             contents=prompt,
         )
 

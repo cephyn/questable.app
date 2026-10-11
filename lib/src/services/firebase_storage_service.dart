@@ -20,7 +20,7 @@ class FirebaseStorageService {
     String? fileName;
 
     if (kIsWeb) {
-      fileBytes = file.bytes!;
+      fileBytes = await file.readAsBytes();
     } else {
       fileBytes = File(file.path!).readAsBytesSync();
     }
@@ -55,7 +55,7 @@ class FirebaseStorageService {
     Uint8List fileBytes;
 
     if (kIsWeb) {
-      fileBytes = file.bytes!;
+      fileBytes = await file.readAsBytes();
     } else {
       fileBytes = File(file.path!).readAsBytesSync();
     }

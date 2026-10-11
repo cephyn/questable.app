@@ -81,7 +81,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   // Removed docIds list as it's returned by the futures
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.pickFiles(
+    PlatformFile? picked = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: [
         'pdf',
@@ -94,10 +94,10 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         'json',
       ],
     );
-    if (result != null) {
+    if (picked != null) {
       setState(() {
-        _file = result.files.single;
-        _fileName = _file!.name;
+        _file = picked;
+        _fileName = picked.name;
       });
     }
   }
@@ -195,7 +195,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
                         'pdfToMdStatus': _pdfToMdStatus,
                         'pdfToMdError': _pdfToMdError,
                         'filename': _file?.name,
-                        'size': _file?.size,
+                        'size': _file?.lengthSync(),
                       };
                       await Clipboard.setData(
                         ClipboardData(text: jsonEncode(payload)),
@@ -255,7 +255,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         stage: 'analyze_start',
         runId: _runId,
         message: 'User started analysis',
-        context: {'filename': _file?.name, 'size': _file?.size},
+        context: {'filename': _file?.name, 'size': _file?.lengthSync()},
       ),
     );
 
@@ -313,7 +313,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           context: {
             'mimeType': mimeType,
             'filename': _file?.name,
-            'size': _file?.size,
+            'size': _file?.lengthSync(),
           },
         ),
       );
@@ -398,7 +398,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
             'fileUrl': url,
             'mimeType': mimeType,
             'filename': _file?.name,
-            'size': _file?.size,
+            'size': _file?.lengthSync(),
             'aiModel': aiService.aiModel,
             'aiLocation': aiService.aiLocation,
           },
@@ -458,7 +458,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
               'fileUrl': url,
               'mimeType': mimeType,
               'filename': _file?.name,
-              'size': _file?.size,
+              'size': _file?.lengthSync(),
               'pdfToMdJobId': _pdfToMdJobId,
               'pdfToMdStatus': _pdfToMdStatus,
               'aiModel': aiService.aiModel,

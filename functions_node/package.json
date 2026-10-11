@@ -4,11 +4,11 @@
     "private": true,
     "license": "ISC",
     "dependencies": {
-        "@opendocsg/pdf2md": "^0.2.7",
-        "axios": "^1.18.1",
+        "@opendocsg/pdf2md": "^0.3.4",
+        "axios": "^1.20.0",
         "busboy": "^1.6.0",
-        "firebase-admin": "^14.2.0",
-        "firebase-functions": "^7.3.0"
+        "firebase-admin": "^14.5.0",
+        "firebase-functions": "^7.4.0"
     },
     "overrides": {
         "protobufjs": "8.7.1"

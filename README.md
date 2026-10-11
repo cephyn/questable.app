@@ -57,6 +57,11 @@ flutter run -d chrome
    firebase use your-project-id # Replace with your actual Firebase project ID
    ```
 
+3. **App Check**
+   - The app activates Firebase App Check at startup in [lib/main.dart](lib/main.dart) (Play Integrity on Android, App Attest with DeviceCheck fallback on Apple, reCAPTCHA Enterprise on web).
+   - Register each app (Android, iOS, macOS, web) under Firebase Console > Security > App Check > Apps. The web reCAPTCHA Enterprise site key (the App Check web app must use the same key in its reCAPTCHA Enterprise config) is in [lib/src/config/app_constants.dart](lib/src/config/app_constants.dart).
+   - Enforcement is enabled per product in the console. Only registered apps can reach enforced resources.
+
 ## Features
 
 - **Quest Card Management**: Upload, analyze, and catalog RPG adventures
