@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/services/firebase_auth_service.dart';
 
 /// Provides authentication state and user information throughout the app.
 class AuthProvider extends ChangeNotifier {
+  static final _log = Logger('AuthProvider');
   final FirebaseAuthService _authService = FirebaseAuthService();
   StreamSubscription<User?>? _authStateSubscription;
 
@@ -62,8 +64,8 @@ class AuthProvider extends ChangeNotifier {
       _lastSeenUid = user?.uid;
       notifyListeners();
     }, onError: (error) {
-      // Handle potential errors listening to auth state
-      debugPrint("Error listening to auth state: $error");
+      // Handle potential errors...
+      _log.warning('Error listening to auth state', error);
       _isLoading = false;
       notifyListeners();
     });

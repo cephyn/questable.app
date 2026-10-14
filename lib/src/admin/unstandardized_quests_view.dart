@@ -6,7 +6,7 @@ import 'package:quest_cards/src/services/game_system_service.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
 import 'package:collection/collection.dart'; // Import for groupBy
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:developer';
+import 'package:logging/logging.dart';
 
 /// Unstandardized Quests View
 ///
@@ -22,6 +22,7 @@ class UnstandardizedQuestsView extends StatefulWidget {
 }
 
 class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
+  static final _log = Logger('UnstandardizedQuestsView');
   final GameSystemService _gameSystemService = GameSystemService();
   late Future<List<QuestCard>> _unstandardizedQuests;
   List<StandardGameSystem> _standardGameSystems =
@@ -44,16 +45,16 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
-      debugPrint('Loading unstandardized quests...');
+      _log.info('Loading unstandardized quests...');
 
       _unstandardizedQuests = _gameSystemService
           .getQuestCardsNeedingReview() // Fetch quests needing review
           .then((quests) {
-            debugPrint('Loaded ${quests.length} unstandardized quests');
+            _log.info('Loaded ${quests.length} unstandardized quests');
             return quests;
           })
           .catchError((error) {
-            debugPrint('Error loading unstandardized quests: $error');
+            _log.warning('Error loading unstandardized quests', error);
             if (mounted) {
               // Check if widget is still mounted
               setState(() {
@@ -82,7 +83,7 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
     try {
       _standardGameSystems = await _gameSystemService.getAllGameSystems();
     } catch (e) {
-      debugPrint('Error loading standard game systems: $e');
+      _log.warning('Error loading standard game systems', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading standard systems: $e')),
@@ -360,7 +361,7 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
       for (int i = 0; i < questsToUpdate.length; i++) {
         final quest = questsToUpdate[i];
         if (quest.id == null) {
-          log('Quest has no ID, skipping...');
+          _log.fine('Quest has no ID, skipping...');
           continue;
         }
 
@@ -385,9 +386,9 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
             _batchUpdateStatus =
                 'Committing batch (${i + 1}/${questsToUpdate.length}, Updated: $updatedCount)...';
           });
-          log('Committing batch update...');
+          _log.info('Committing batch update...');
           await batch.commit();
-          log('Batch committed.');
+          _log.info('Batch committed.');
           batch = firestore.batch();
           batchCounter = 0;
           await Future.delayed(const Duration(milliseconds: 50));
@@ -400,9 +401,9 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
         setState(() {
           _batchUpdateStatus = 'Committing final batch...';
         });
-        log('Committing final batch ($batchCounter operations)...');
+        _log.info('Committing final batch ($batchCounter operations)...');
         await batch.commit();
-        log('Final batch committed.');
+        _log.info('Final batch committed.');
       }
 
       if (mounted) {
@@ -420,7 +421,7 @@ class _UnstandardizedQuestsViewState extends State<UnstandardizedQuestsView> {
         _loadQuests(); // Refresh the list
       }
     } catch (e, s) {
-      log('Error during batch update: $e', stackTrace: s);
+      _log.severe('Error during batch update', e, s);
       if (mounted) {
         setState(() {
           _isBatchUpdating = false;

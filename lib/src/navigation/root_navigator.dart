@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/auth/auth_gate.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
@@ -33,6 +34,8 @@ class RootNavigator extends StatefulWidget {
 
 class RootNavigatorState extends State<RootNavigator>
     with SingleTickerProviderStateMixin {
+  static final _log = Logger('RootNavigator');
+
   final FirestoreService _firestoreService = FirestoreService();
   String? _pendingAction;
   String? _pendingDocId;
@@ -106,7 +109,7 @@ class RootNavigatorState extends State<RootNavigator>
                 userContext.isAuthenticated && userContext.hasValidRole;
           } catch (e) {
             // If UserContext is not available, default to unauthenticated
-            debugPrint('Error accessing UserContext: $e');
+            _log.warning('Error accessing UserContext', e);
             // Continue with isAuthenticated = false
           }
 
@@ -295,7 +298,7 @@ class RootNavigatorState extends State<RootNavigator>
           .showSnackBar(SnackBar(content: Text(message)));
     } else {
       // Fallback to print if scaffold messenger is not available
-      debugPrint('Snackbar message (not shown): $message');
+      _log.fine('Snackbar message (not shown): $message');
     }
   }
 

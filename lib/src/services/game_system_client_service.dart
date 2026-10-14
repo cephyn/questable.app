@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
 
 /// Client-side service for working with standardized game systems
 class GameSystemClientService {
+  static final _log = Logger('GameSystemClientService');
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Get all standard game systems
@@ -15,7 +16,7 @@ class GameSystemClientService {
               (doc) => StandardGameSystem.fromFirestore(doc, SnapshotOptions()))
           .toList();
     } catch (e) {
-      debugPrint('Error fetching game systems: $e');
+      _log.warning('Error fetching game systems', e);
       return [];
     }
   }
@@ -50,7 +51,7 @@ class GameSystemClientService {
 
       return options;
     } catch (e) {
-      debugPrint('Error preparing game system options: $e');
+      _log.warning('Error preparing game system options', e);
       return [];
     }
   }
@@ -92,7 +93,7 @@ class GameSystemClientService {
 
       return null;
     } catch (e) {
-      debugPrint('Error finding standardized name: $e');
+      _log.warning('Error finding standardized name', e);
       return null;
     }
   }

@@ -26,7 +26,9 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
     });
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable('get_site_stats');
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'get_site_stats',
+      );
       final resp = await callable.call();
       final data = Map<String, dynamic>.from(resp.data ?? {});
       setState(() {
@@ -70,7 +72,10 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Top Uploaders', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Top Uploaders',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             ...uploads.map((u) {
               final uploader = u['uploader'] ?? 'unknown';
@@ -80,7 +85,7 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
                 title: Text(uploader.toString()),
                 trailing: Text(count.toString()),
               );
-            }).toList()
+            }),
           ],
         ),
       ),
@@ -97,7 +102,10 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Most Owned Quests', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Most Owned Quests',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             ...owned.map((o) {
               final title = o['title'] ?? o['questId'] ?? 'Unknown';
@@ -107,7 +115,7 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
                 title: Text(title.toString()),
                 trailing: Text(count.toString()),
               );
-            }).toList()
+            }),
           ],
         ),
       ),
@@ -115,7 +123,9 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
   }
 
   Widget _buildUsersPerDay() {
-    final Map<String, dynamic> usersPerDay = Map<String, dynamic>.from(_stats['usersPerDay'] ?? {});
+    final Map<String, dynamic> usersPerDay = Map<String, dynamic>.from(
+      _stats['usersPerDay'] ?? {},
+    );
     if (usersPerDay.isEmpty) return const Text('No user creation data');
     final entries = usersPerDay.entries.toList()
       ..sort((a, b) => b.key.compareTo(a.key));
@@ -126,13 +136,18 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('New Users By Day', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'New Users By Day',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            ...entries.map((e) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(e.key),
-              trailing: Text(e.value.toString()),
-            ))
+            ...entries.map(
+              (e) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(e.key),
+                trailing: Text(e.value.toString()),
+              ),
+            ),
           ],
         ),
       ),
@@ -157,27 +172,37 @@ class _SiteStatsAdminViewState extends State<SiteStatsAdminView> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text('Error: $_error'))
-                : SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(child: Text('Error: $_error'))
+            : SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(child: _buildCard('Total Users', (_stats['totalUsers'] ?? 0).toString())),
-                            const SizedBox(width: 12),
-                            Expanded(child: _buildCard('Total Quests', (_stats['totalQuests'] ?? 0).toString())),
-                          ],
+                        Expanded(
+                          child: _buildCard(
+                            'Total Users',
+                            (_stats['totalUsers'] ?? 0).toString(),
+                          ),
                         ),
-                        const SizedBox(height: 16),
-                        _buildTopUploaders(),
-                        const SizedBox(height: 16),
-                        _buildMostOwned(),
-                        const SizedBox(height: 16),
-                        _buildUsersPerDay(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildCard(
+                            'Total Quests',
+                            (_stats['totalQuests'] ?? 0).toString(),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    _buildTopUploaders(),
+                    const SizedBox(height: 16),
+                    _buildMostOwned(),
+                    const SizedBox(height: 16),
+                    _buildUsersPerDay(),
+                  ],
+                ),
+              ),
       ),
     );
   }

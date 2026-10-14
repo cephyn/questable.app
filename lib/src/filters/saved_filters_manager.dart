@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
 
@@ -14,6 +15,7 @@ enum SyncDirection {
 
 /// A class to manage saved filter sets with names
 class SavedFiltersManager extends ChangeNotifier {
+  static final _log = Logger('SavedFiltersManager');
   static const String _localPrefsKey = 'saved_filter_sets';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -45,7 +47,7 @@ class SavedFiltersManager extends ChangeNotifier {
       try {
         await _syncWithFirestore(direction: SyncDirection.fromFirestore);
       } catch (e) {
-        debugPrint('Error syncing filters from Firestore: $e');
+        _log.warning('Error syncing filters from Firestore', e);
       }
     }
 
@@ -66,7 +68,7 @@ class SavedFiltersManager extends ChangeNotifier {
       try {
         await _saveToFirestore(name, filters);
       } catch (e) {
-        debugPrint('Error saving filters to Firestore: $e');
+        _log.warning('Error saving filters to Firestore', e);
         // Continue even if Firestore sync fails
       }
     }
@@ -88,7 +90,7 @@ class SavedFiltersManager extends ChangeNotifier {
       try {
         await _deleteFromFirestore(name);
       } catch (e) {
-        debugPrint('Error deleting filters from Firestore: $e');
+        _log.warning('Error deleting filters from Firestore', e);
         // Continue even if Firestore sync fails
       }
     }
@@ -121,7 +123,7 @@ class SavedFiltersManager extends ChangeNotifier {
         }
         await _saveToFirestore(newName, filters);
       } catch (e) {
-        debugPrint('Error updating filters in Firestore: $e');
+        _log.warning('Error updating filters in Firestore', e);
         // Continue even if Firestore sync fails
       }
     }
@@ -163,7 +165,7 @@ class SavedFiltersManager extends ChangeNotifier {
         });
       }
     } catch (e) {
-      debugPrint('Error loading saved filters from SharedPreferences: $e');
+      _log.warning('Error loading saved filters from SharedPreferences', e);
     }
   }
 
@@ -180,7 +182,7 @@ class SavedFiltersManager extends ChangeNotifier {
 
       await prefs.setString(_localPrefsKey, jsonEncode(savedFilters));
     } catch (e) {
-      debugPrint('Error saving filters to SharedPreferences: $e');
+      _log.warning('Error saving filters to SharedPreferences', e);
     }
   }
 

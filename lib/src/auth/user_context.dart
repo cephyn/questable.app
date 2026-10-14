@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/services/firebase_auth_service.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
 // local_user not required here
 
 /// Provides user authentication state and role information throughout the app
 class UserContext extends ChangeNotifier {
+  static final _log = Logger('UserContext');
   final FirebaseAuthService _authService = FirebaseAuthService();
   final FirestoreService _firestoreService = FirestoreService();
 
@@ -51,7 +53,7 @@ class UserContext extends ChangeNotifier {
     try {
       _roles = await _firestoreService.getUserRoles(userId);
     } catch (e) {
-      debugPrint('Error loading user roles: $e');
+      _log.warning('Error loading user roles', e);
       _roles = [];
     }
 
@@ -65,7 +67,7 @@ class UserContext extends ChangeNotifier {
       await _authService.signOut();
       _roles = null;
     } catch (e) {
-      debugPrint('Error signing out: $e');
+      _log.warning('Error signing out', e);
     }
   }
 

@@ -1,6 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -123,6 +123,7 @@ enum FilterOperator {
 
 /// Manages the state of all active filters for quest cards.
 class FilterState extends ChangeNotifier {
+  static final _log = Logger('FilterState');
   final Set<FilterCriteria> _filters = HashSet<FilterCriteria>();
   OwnershipFilterStatus _ownershipStatus =
       OwnershipFilterStatus.all; // Add ownership status
@@ -179,9 +180,7 @@ class FilterState extends ChangeNotifier {
   void addFilter(FilterCriteria criteria) {
     // Special handling for ownership filter - use setOwnershipStatus instead
     if (criteria.field == ownershipFilterField) {
-      developer.log(
-          'Warning: Use setOwnershipStatus to manage ownership filters.',
-          name: 'FilterState');
+      _log.warning('Use setOwnershipStatus to manage ownership filters.');
       return;
     }
 
@@ -325,9 +324,8 @@ class FilterState extends ChangeNotifier {
           // This requires specific handling, potentially using >= and <=
           // with a special character, or relying on external search services.
           // For now, we'll log a warning and skip this filter.
-          developer.log(
-              'Warning: Firestore does not directly support string \'contains\' filter for field: ${filter.field}. Skipping.',
-              name: 'FilterState');
+          _log.warning(
+              'Firestore does not directly support string \'contains\' filter for field: ${filter.field}. Skipping.');
           break;
       }
     }
@@ -359,22 +357,19 @@ class FilterState extends ChangeNotifier {
               if (filter.operator == FilterOperator.equals) {
                 filteredQuery =
                     filteredQuery.where(filter.field, isEqualTo: systemName);
-                developer.log(
-                    'Applying standardizedGameSystem filter (from String): isEqualTo "$systemName"',
-                    name: 'FilterState');
+                _log.fine(
+                    'Applying standardizedGameSystem filter (from String): isEqualTo "$systemName"');
               } else {
                 // Log if a different operator is used with a single string, though current UI setup implies 'equals'
-                developer.log(
-                    'Warning: Operator ${filter.operator} used with String value for standardizedGameSystem. Value: "$systemName". Applying as isEqualTo.',
-                    name: 'FilterState');
+                _log.warning(
+                    'Operator ${filter.operator} used with String value for standardizedGameSystem. Value: "$systemName". Applying as isEqualTo.');
                 // Default to isEqualTo for a single string if operator is not explicitly handled or is unexpected
                 filteredQuery =
                     filteredQuery.where(filter.field, isEqualTo: systemName);
               }
             } else {
-              developer.log(
-                  'Warning: standardizedGameSystem filter (from String) received an empty string. Skipping filter.',
-                  name: 'FilterState');
+              _log.warning(
+                  'standardizedGameSystem filter (from String) received an empty string. Skipping filter.');
             }
           } else if (filter.value is List &&
               (filter.value as List).isNotEmpty) {
@@ -392,19 +387,16 @@ class FilterState extends ChangeNotifier {
                 if (stringListValue.isNotEmpty) {
                   // Firestore 'whereIn' requires a non-empty list and limits to 30 elements.
                   if (stringListValue.length > 30) {
-                    developer.log(
-                        'Warning: standardizedGameSystem whereIn filter (from List<String>) has ${stringListValue.length} values. Firestore limits this to 30. The query may fail.',
-                        name: 'FilterState');
+                    _log.warning(
+                        'standardizedGameSystem whereIn filter (from List<String>) has ${stringListValue.length} values. Firestore limits this to 30. The query may fail.');
                   }
                   filteredQuery = filteredQuery.where(filter.field,
                       whereIn: stringListValue);
-                  developer.log(
-                      'Applying standardizedGameSystem filter (from List<String>): whereIn $stringListValue',
-                      name: 'FilterState');
+                  _log.fine(
+                      'Applying standardizedGameSystem filter (from List<String>): whereIn $stringListValue');
                 } else {
-                  developer.log(
-                      'Warning: standardizedGameSystem whereIn filter (from List<String>) received an empty list. Value: $stringListValue. Skipping filter.',
-                      name: 'FilterState');
+                  _log.warning(
+                      'standardizedGameSystem whereIn filter (from List<String>) received an empty list. Value: $stringListValue. Skipping filter.');
                 }
               } else {
                 // Operator is not whereIn (e.g., equals).
@@ -415,13 +407,11 @@ class FilterState extends ChangeNotifier {
                       0]; // Use the first element as the system name.
                   filteredQuery =
                       filteredQuery.where(filter.field, isEqualTo: nameToQuery);
-                  developer.log(
-                      'Applying standardizedGameSystem filter (from List<String>, non-whereIn): isEqualTo "$nameToQuery" (using first element). Assumes other parts like edition are separate filters.',
-                      name: 'FilterState');
+                  _log.fine(
+                      'Applying standardizedGameSystem filter (from List<String>, non-whereIn): isEqualTo "$nameToQuery" (using first element). Assumes other parts like edition are separate filters.');
                 } else {
-                  developer.log(
-                      'Warning: standardizedGameSystem filter (from List<String>, non-whereIn) received an empty list. Value: $stringListValue. Skipping filter.',
-                      name: 'FilterState');
+                  _log.warning(
+                      'standardizedGameSystem filter (from List<String>, non-whereIn) received an empty list. Value: $stringListValue. Skipping filter.');
                 }
               }
             } else if (systemValueList.every((item) =>
@@ -438,34 +428,28 @@ class FilterState extends ChangeNotifier {
                   // Firestore 'whereIn' requires a non-empty list.
                   // Firestore also limits 'whereIn' array to 30 elements.
                   if (namesForWhereIn.length > 30) {
-                    developer.log(
-                        'Warning: standardizedGameSystem whereIn filter has ${namesForWhereIn.length} values. Firestore limits this to 30. The query may fail.',
-                        name: 'FilterState');
+                    _log.warning(
+                        'Warning: standardizedGameSystem whereIn filter has ${namesForWhereIn.length} values. Firestore limits this to 30. The query may fail.');
                   }
                   filteredQuery = filteredQuery.where(filter.field,
                       whereIn: namesForWhereIn);
-                  developer.log(
-                      'Applying standardizedGameSystem filter: whereIn $namesForWhereIn',
-                      name: 'FilterState');
+                  _log.fine(
+                      'Applying standardizedGameSystem filter: whereIn $namesForWhereIn');
                 } else {
-                  developer.log(
-                      'Warning: standardizedGameSystem whereIn filter resulted in an empty list of names. Value: $systemValueList. Skipping filter.',
-                      name: 'FilterState');
+                  _log.warning(
+                      'Warning: standardizedGameSystem whereIn filter resulted in an empty list of names. Value: $systemValueList. Skipping filter.');
                 }
               } else {
-                developer.log(
-                    'Warning: Operator ${filter.operator} used with List<List<String>> for standardizedGameSystem. Expected whereIn. Value: $systemValueList. Skipping filter.',
-                    name: 'FilterState');
+                _log.warning(
+                    'Warning: Operator ${filter.operator} used with List<List<String>> for standardizedGameSystem. Expected whereIn. Value: $systemValueList. Skipping filter.');
               }
             } else {
-              developer.log(
-                  'Warning: Unsupported value structure for standardizedGameSystem. Value: $systemValueList. Skipping filter.',
-                  name: 'FilterState');
+              _log.warning(
+                  'Warning: Unsupported value structure for standardizedGameSystem. Value: $systemValueList. Skipping filter.');
             }
           } else {
-            developer.log(
-                'Warning: Empty or invalid value for standardizedGameSystem (not a String or non-empty List). Value: ${filter.value}. Skipping filter.',
-                name: 'FilterState');
+            _log.warning(
+                'Warning: Empty or invalid value for standardizedGameSystem (not a String or non-empty List). Value: ${filter.value}. Skipping filter.');
           }
           continue; // Processed standardizedGameSystem, skip general switch
         }
@@ -501,9 +485,8 @@ class FilterState extends ChangeNotifier {
               filteredQuery = filteredQuery.where(filter.field,
                   arrayContainsAny: filter.value as List);
             } else {
-              developer.log(
-                  'Warning: Value for arrayContainsAny on field ${filter.field} is not a List or is empty. Value: ${filter.value}. Skipping.',
-                  name: 'FilterState');
+              _log.warning(
+                  'Warning: Value for arrayContainsAny on field ${filter.field} is not a List or is empty. Value: ${filter.value}. Skipping.');
             }
             break;
           case FilterOperator.whereIn:
@@ -512,23 +495,19 @@ class FilterState extends ChangeNotifier {
               filteredQuery = filteredQuery.where(filter.field,
                   whereIn: filter.value as List);
             } else {
-              developer.log(
-                  'Warning: Value for whereIn on field ${filter.field} is not a List or is empty. Value: ${filter.value}. Skipping.',
-                  name: 'FilterState');
+              _log.warning(
+                  'Warning: Value for whereIn on field ${filter.field} is not a List or is empty. Value: ${filter.value}. Skipping.');
             }
             break;
           case FilterOperator.contains:
             // Firestore doesn't directly support string contains
-            developer.log(
-                'Warning: Firestore does not directly support string \'contains\' filter for field: ${filter.field}. Skipping.',
-                name: 'FilterState');
+            _log.warning(
+                'Firestore does not directly support string \'contains\' filter for field: ${filter.field}. Skipping.');
             break;
         }
       }
     } catch (e, stackTrace) {
-      // Log the error to developer console with detailed information
-      developer.log('Error applying filter: $e',
-          name: 'Questable', error: e, stackTrace: stackTrace);
+      _log.warning('Error applying filter', e, stackTrace);
 
       // Log to file with stacktrace for debugging
       try {
@@ -538,8 +517,7 @@ class FilterState extends ChangeNotifier {
             '[$timestamp] Filter Error: $e\\n$stackTrace\\n\\n',
             mode: FileMode.append);
       } catch (logError) {
-        developer.log('Failed to write error to log file: $logError',
-            name: 'Questable', error: logError);
+        _log.warning('Failed to write error to log file', logError);
       }
 
       // Create a proper error dialog with clickable URL if one is present in the error message
@@ -557,13 +535,11 @@ class FilterState extends ChangeNotifier {
           try {
             showErrorDialog(errorString, url);
           } catch (showDialogError) {
-            developer.log('Error calling showErrorDialog: $showDialogError',
-                name: 'Questable', error: showDialogError);
+            _log.warning('Error calling showErrorDialog', showDialogError);
           }
         });
       } catch (uiError) {
-        developer.log('Error in showErrorDialog callback scheduling: $uiError',
-            name: 'Questable', error: uiError);
+        _log.warning('Error in showErrorDialog callback scheduling', uiError);
       }
 
       // Return the original query with just the isPublic filter
@@ -611,20 +587,7 @@ class FilterState extends ChangeNotifier {
       logMessage += '\nClickable Error URL: $url';
     }
 
-    developer.log(logMessage, name: 'Questable', level: 2000 // Error level
-        );
-
-    // Print to console for immediate visibility during debugging
-    debugPrint('');
-    debugPrint('====== FILTER ERROR ======');
-    debugPrint(errorMessage);
-    if (url != null) {
-      debugPrint('');
-      debugPrint('ERROR URL: $url');
-      debugPrint('(URL has been logged to error.log)');
-    }
-    debugPrint('==========================');
-    debugPrint('');
+    _log.warning(logMessage);
 
     // We'll leave it to the UI components to display this error
     // as they have access to proper BuildContext
@@ -642,10 +605,9 @@ class FilterState extends ChangeNotifier {
       await prefs.setString(_prefsKey, jsonEncode(filterMaps));
       // Save ownership status separately
       await prefs.setInt(_ownershipPrefsKey, _ownershipStatus.index);
-      developer.log('Filters saved successfully. Ownership: $_ownershipStatus',
-          name: 'FilterState');
+      _log.info('Filters saved successfully. Ownership: $_ownershipStatus');
     } catch (e) {
-      developer.log('Error saving filters: $e', name: 'FilterState', error: e);
+      _log.warning('Error saving filters', e);
     }
   }
 
@@ -694,10 +656,9 @@ class FilterState extends ChangeNotifier {
       }
 
       notifyListeners();
-      developer.log('Filters loaded successfully. Ownership: $_ownershipStatus',
-          name: 'FilterState');
+      _log.info('Filters loaded successfully. Ownership: $_ownershipStatus');
     } catch (e) {
-      developer.log('Error loading filters: $e', name: 'FilterState', error: e);
+      _log.warning('Error loading filters', e);
       // Optionally clear filters on load error
       // _filters.clear();
       // _ownershipStatus = OwnershipFilterStatus.all;
@@ -753,6 +714,7 @@ class FilterState extends ChangeNotifier {
 
 /// Provides filter state and manages filter options and saved filters.
 class FilterProvider extends ChangeNotifier {
+  static final _log = Logger('FilterProvider');
   final FilterState _filterState = FilterState();
   final Map<String, List<dynamic>> _filterOptions = {};
   final SavedFiltersManager _savedFiltersManager = SavedFiltersManager();
@@ -813,7 +775,7 @@ class FilterProvider extends ChangeNotifier {
       if (!const ListEquality().equals(_standardGameSystems, fetchedSystems)) {
         _standardGameSystems = fetchedSystems;
         systemsChanged = true;
-        developer.log('Standard game systems updated.', name: 'FilterProvider');
+        _log.info('Standard game systems updated.');
 
         // Update filter options for standardGameSystem based on the fetched list
         final standardSystemNames =
@@ -826,8 +788,7 @@ class FilterProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      developer.log('Error fetching standard game systems: $e',
-          name: 'FilterProvider', error: e);
+      _log.warning('Error fetching standard game systems', e);
       // Optionally clear cache on error?
       // _standardGameSystems = [];
       // systemsChanged = true;
@@ -855,14 +816,13 @@ class FilterProvider extends ChangeNotifier {
     // --- Notify if anything changed ---
     if (optionsChanged || systemsChanged) {
       notifyListeners(); // Notify if any options or systems were updated
-      developer.log('Filter options/systems loaded/updated.',
-          name: 'FilterProvider');
+      _log.info('Filter options/systems loaded/updated.');
     }
   }
 
   /// Helper to fetch distinct values for a field
   Future<List<dynamic>> _fetchOptionsForField(String field) async {
-    developer.log('Fetching options for field: $field', name: 'FilterProvider');
+    _log.fine('Fetching options for field: $field');
     try {
       // Correct the collection name to questCards
       final snapshot = await FirebaseFirestore.instance
@@ -872,9 +832,8 @@ class FilterProvider extends ChangeNotifier {
           .get(const GetOptions(
               source: Source.serverAndCache)); // Keep serverAndCache for now
 
-      developer.log(
-          'Fetched ${snapshot.docs.length} documents for field: $field',
-          name: 'FilterProvider');
+      _log.fine(
+          'Fetched ${snapshot.docs.length} documents for field: $field');
 
       Set<dynamic> uniqueOptions = {};
       for (var doc in snapshot.docs) {
@@ -894,16 +853,12 @@ class FilterProvider extends ChangeNotifier {
       }
       // Sort options alphabetically
       List<dynamic> sortedOptions = uniqueOptions.toList()..sort();
-      developer.log(
-          'Found ${sortedOptions.length} unique options for field: $field',
-          name: 'FilterProvider');
+      _log.fine(
+          'Found ${sortedOptions.length} unique options for field: $field');
       return sortedOptions;
     } catch (e, stackTrace) {
       // Add stackTrace
-      developer.log('Error fetching options for field $field: $e',
-          name: 'FilterProvider',
-          error: e,
-          stackTrace: stackTrace); // Log stackTrace
+      _log.warning('Error fetching options for field $field', e, stackTrace);
       return []; // Return empty list on error
     }
   }
@@ -1017,9 +972,7 @@ class FilterProvider extends ChangeNotifier {
           .firstWhereOrNull((system) => system.standardName == name);
     } catch (e) {
       // Should not happen with firstWhereOrNull, but good practice
-      // Corrected logging statement syntax
-      developer.log('Error finding system by name \'$name\': $e',
-          name: 'FilterProvider');
+      _log.warning('Error finding system by name \'$name\'', e);
       return null;
     }
   }

@@ -1,20 +1,21 @@
 import 'dart:convert';
-import 'dart:developer';
 
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart';
 import 'package:quest_cards/src/services/purchase_link_service.dart';
 import 'package:quest_cards/src/services/client_telemetry_service.dart';
 
 import 'firebase_storage_service.dart';
-import 'dart:math' hide log;
 
 /// Service to interact with Firebase Vertex AI for RPG adventure extraction
 class FirebaseAiService {
+  static final _log = Logger('FirebaseAiService');
+
   final FirebaseStorageService firebaseStorageService =
       FirebaseStorageService();
 
@@ -139,7 +140,7 @@ class FirebaseAiService {
       final tokenCount = await model.countTokens([
         Content.multi([prompt, filePart]),
       ]);
-      log('Token count: ${tokenCount.totalTokens}');
+      _log.fine('Token count: ${tokenCount.totalTokens}');
 
       // Generate content
       final response = await model.generateContent([
@@ -169,11 +170,15 @@ class FirebaseAiService {
 
       // Return response text
       return response.text ?? '{}';
-    } catch (e) {
+    } catch (e, st) {
       // Do not return a fake JSON payload on error, because callers may
       // interpret it as a valid schema and write empty/null questCards.
       // Bubble the error up so UI can show it and avoid persisting junk docs.
-      log('Error in analyzeFile (model=$aiModel location=$aiLocation): $e');
+      _log.severe(
+        'Error in analyzeFile (model=$aiModel location=$aiLocation)',
+        e,
+        st,
+      );
       rethrow;
     }
   }
@@ -206,7 +211,7 @@ class FirebaseAiService {
             textOverride = utf8.decode(bytes, allowMalformed: true);
           }
         } catch (e) {
-          log('determineAdventureType text download failed: $e');
+          _log.warning('determineAdventureType text download failed', e);
         }
       }
 
@@ -220,11 +225,13 @@ class FirebaseAiService {
         telemetryStage: 'ai_determine_type_request',
       );
 
-      log('Adventure type determined: ${adventureType.toString()}');
+      _log.info('Adventure type determined: ${adventureType.toString()}');
       return adventureType;
-    } catch (e) {
-      log(
-        'Error in determineAdventureType (model=$aiModel location=$aiLocation): $e',
+    } catch (e, st) {
+      _log.severe(
+        'Error in determineAdventureType (model=$aiModel location=$aiLocation)',
+        e,
+        st,
       );
       rethrow;
     }
@@ -241,7 +248,7 @@ class FirebaseAiService {
     List<Map<String, dynamic>> allAdventures = [];
     Reference? fileReference;
 
-    Future<List<Map<String, dynamic>>> _extractAllFromFullText(
+    Future<List<Map<String, dynamic>>> extractAllFromFullText(
       String mimeType,
       Reference ref,
       String fullText,
@@ -282,7 +289,7 @@ Rules:
           .toList();
     }
 
-    Future<List<Map<String, dynamic>>> _fullExtractThenEnrichAndReturn(
+    Future<List<Map<String, dynamic>>> fullExtractThenEnrichAndReturn(
       String mimeType,
       Reference ref,
       String fullText,
@@ -299,7 +306,7 @@ Rules:
         globalInfo['link'] = purchaseLink;
       }
 
-      final extracted = await _extractAllFromFullText(mimeType, ref, fullText);
+      final extracted = await extractAllFromFullText(mimeType, ref, fullText);
 
       final List<Map<String, dynamic>> enriched = [];
       for (int i = 0; i < extracted.length; i++) {
@@ -367,10 +374,10 @@ Rules:
           await fileReference.delete();
         } on FirebaseException catch (e) {
           if (e.code != 'object-not-found') {
-            log('Error deleting source file: $e');
+            _log.warning('Error deleting source file', e);
           }
         } catch (e) {
-          log('Error deleting source file: $e');
+          _log.warning('Error deleting source file', e);
         }
       }
 
@@ -399,7 +406,7 @@ Rules:
       List<String> adventureTitles = aiTitles;
       if (tocTitles.length >= 5) {
         adventureTitles = _mergeUniqueTitlesPreserveOrder(tocTitles, aiTitles);
-        log(
+        _log.info(
           'TOC titles parsed: ${tocTitles.length}; merged titles: ${adventureTitles.length}',
         );
       } else if (tocRange != null && lines != null && aiTitles.length < 5) {
@@ -424,12 +431,12 @@ Rules:
               tocAiTitles,
               aiTitles,
             );
-            log(
+            _log.info(
               'AI-on-TOC titles: ${tocAiTitles.length}; merged titles: ${adventureTitles.length}',
             );
           }
-        } catch (e) {
-          log('AI-on-TOC title extraction failed: $e');
+        } catch (e, st) {
+          _log.warning('AI-on-TOC title extraction failed', e, st);
         }
       }
 
@@ -441,30 +448,30 @@ Rules:
             final fallback = _titlesFromMarkdownHeadings(localLines);
             if (fallback.isNotEmpty) {
               adventureTitles = fallback;
-              log(
+              _log.info(
                 'Fallback titles from markdown headings: ${adventureTitles.length}',
               );
             }
           }
-        } catch (e) {
-          log('Fallback title extraction failed: $e');
+        } catch (e, st) {
+          _log.warning('Fallback title extraction failed', e, st);
         }
       }
 
       // If we still have no titles, try full-document extraction.
       if (adventureTitles.isEmpty) {
-        log(
+        _log.info(
           'No adventure titles found; attempting full-document multi-extract fallback.',
         );
         if (fullText == null || fullText.trim().isEmpty) {
           return [];
         }
-        final enriched = await _fullExtractThenEnrichAndReturn(
+        final enriched = await fullExtractThenEnrichAndReturn(
           mimeType,
           fileReference,
           fullText,
         );
-        log(
+        _log.info(
           'Full-document multi-extract produced ${enriched.length} adventures',
         );
         return enriched;
@@ -477,13 +484,13 @@ Rules:
         textOverride: fullText,
         runId: runId,
       );
-      log("Global info extracted: ${globalInfo.keys.join(', ')}");
+      _log.info("Global info extracted: ${globalInfo.keys.join(', ')}");
 
       var purchaseLinkFuture = _searchForPurchaseLink(globalInfo);
       String? purchaseLink = await purchaseLinkFuture;
       if (purchaseLink!.isNotEmpty) {
         globalInfo['link'] = purchaseLink;
-        log('Purchase link found: ${globalInfo['link']}');
+        _log.info('Purchase link found: ${globalInfo['link']}');
       }
 
       // 3. Process each individual adventure
@@ -529,15 +536,15 @@ Rules:
 
       final lowCoverage = coverage < 0.4;
       if (isLongDoc && lowCoverage) {
-        log(
+        _log.info(
           'Low title-to-body match coverage (${(coverage * 100).toStringAsFixed(0)}%); using full-document extraction instead.',
         );
-        final enriched = await _fullExtractThenEnrichAndReturn(
+        final enriched = await fullExtractThenEnrichAndReturn(
           mimeType,
           fileReference,
           fullText,
         );
-        log('Full-document extraction returned ${enriched.length} adventures');
+        _log.info('Full-document extraction returned ${enriched.length} adventures');
         return enriched;
       }
 
@@ -557,7 +564,7 @@ Rules:
           endLineNum = lines.length;
         }
         if (startLineNum >= endLineNum) {
-          log(
+          _log.warning(
             "  Warning: No content found for '$title' (start line ${startLineNum + 1} >= end line $endLineNum). Skipping.",
           );
           continue;
@@ -596,15 +603,17 @@ Rules:
           // Merge global and individual data
           adventureObject.addAll(individualData);
           allAdventures.add(adventureObject);
-        } catch (e) {
-          log("Error processing adventure '$title': $e");
+        } catch (e, st) {
+          _log.warning("Error processing adventure '$title'", e, st);
         }
       }
-      log("Successfully processed ${allAdventures.length} adventures");
+      _log.info("Successfully processed ${allAdventures.length} adventures");
       return allAdventures;
-    } catch (e) {
-      log(
-        'Error in analyzeMultiFileQueries (model=$aiModel location=$aiLocation): $e',
+    } catch (e, st) {
+      _log.severe(
+        'Error in analyzeMultiFileQueries (model=$aiModel location=$aiLocation)',
+        e,
+        st,
       );
       rethrow;
     } finally {
@@ -612,7 +621,7 @@ Rules:
       // Safe even if already deleted.
       if (fileReference != null) {
         await fileReference.delete().catchError(
-          (e) => log("Error deleting source file in finally: $e"),
+          (e) => _log.warning("Error deleting source file in finally", e),
         );
       }
     }
@@ -773,7 +782,7 @@ Instructions:
       // Check if user is authenticated
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
-        log('Error: User is not authenticated');
+        _log.warning('Error: User is not authenticated');
         return {
           'error':
               'User is not authenticated. Please sign in to access this feature.',
@@ -788,7 +797,7 @@ Instructions:
           ? _clipTextForModel(textOverride)
           : null;
 
-      Map<String, dynamic> _textStats(String text) {
+      Map<String, dynamic> textStats(String text) {
         final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
         final first = normalized.isEmpty
             ? ''
@@ -823,7 +832,7 @@ Instructions:
               'storagePath': fileReference.fullPath,
               'aiModel': aiModel,
               'aiLocation': aiLocation,
-              'text': _textStats(clippedText),
+              'text': textStats(clippedText),
             },
           ),
         );
@@ -833,7 +842,7 @@ Instructions:
           fileReference,
         );
         // Avoid logging the full signed URL; use Storage path instead.
-        log(
+        _log.info(
           'Using FileData for AI request (mimeType=$mimeType path=${fileReference.fullPath})',
         );
 
@@ -861,10 +870,10 @@ Instructions:
         // Get token counts for monitoring/logging
         var tokenCount = await requestModel.countTokens([Content.multi(parts)]);
 
-        log('Token count: ${tokenCount.totalTokens}');
+        _log.fine('Token count: ${tokenCount.totalTokens}');
       } catch (tokenCountError) {
         // Continue even if token counting fails
-        log('Warning: Failed to count tokens: $tokenCountError');
+        _log.warning('Failed to count tokens', tokenCountError);
       }
 
       // Make the actual API request
@@ -878,7 +887,7 @@ Instructions:
 
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
-          stage: (telemetryStage ?? 'ai_request') + '_done',
+          stage: '${telemetryStage ?? 'ai_request'}_done',
           runId: runId,
           context: {
             'responseChars': response.text!.length,
@@ -888,15 +897,17 @@ Instructions:
       );
 
       return decoded;
-    } catch (e) {
-      log(
-        'Error in AI request processing (model=$aiModel location=$aiLocation): $e',
+    } catch (e, st) {
+      _log.severe(
+        'Error in AI request processing (model=$aiModel location=$aiLocation)',
+        e,
+        st,
       );
 
       // Best-effort: emit request-failure telemetry with just sizes (no content).
       ClientTelemetryService.emit(
         ClientTelemetryService.error(
-          stage: (telemetryStage ?? 'ai_request') + '_error',
+          stage: '${telemetryStage ?? 'ai_request'}_error',
           runId: runId,
           message: 'AI request failed',
           error: e,
@@ -911,12 +922,12 @@ Instructions:
       );
 
       if (e.toString().contains('permission')) {
-        log(
+        _log.warning(
           'Permission error details: This may be due to insufficient Firebase permissions.',
         );
         final email =
             FirebaseAuth.instance.currentUser?.email ?? 'Not signed in';
-        log('Current user email: $email');
+        _log.fine('Current user email: $email');
       }
       rethrow;
     }
@@ -1154,7 +1165,7 @@ Instructions:
     final potentialStarts = <MapEntry<int, String>>[];
     final notFound = <String>[];
 
-    log('Scanning file for titles (skip TOC=${skipRange != null})...');
+    _log.info('Scanning file for titles (skip TOC=${skipRange != null})...');
 
     for (final originalTitle in adventureTitles) {
       final normalizedTitle = _normalizeTitleForMatch(originalTitle);
@@ -1233,11 +1244,11 @@ Instructions:
 
     if (notFound.isNotEmpty) {
       // Keep the log small; the telemetry already contains the full title list.
-      log('WARNING: ${notFound.length} titles not found in body text.');
+      _log.warning('${notFound.length} titles not found in body text.');
     }
 
     if (potentialStarts.isEmpty) {
-      log('ERROR: No adventure titles could be matched to body text.');
+      _log.warning('No adventure titles could be matched to body text.');
       return [];
     }
 
@@ -1251,9 +1262,9 @@ Instructions:
       }
     }
 
-    log('Identified adventure start points (sorted): ${deduped.length}');
+    _log.info('Identified adventure start points (sorted): ${deduped.length}');
     for (final entry in deduped.take(12)) {
-      log('  Line ${entry.key + 1}: ${entry.value}');
+      _log.fine('  Line ${entry.key + 1}: ${entry.value}');
     }
 
     return deduped;
@@ -1266,15 +1277,15 @@ Instructions:
     }
 
     try {
-      log('Searching for purchase link for ${metadata['productTitle']}');
+      _log.fine('Searching for purchase link for ${metadata['productTitle']}');
 
       // Use the PurchaseLinkService to find a purchase link
       //final purchaseLinkService = PurchaseLinkService();
 
       // Run in a separate isolate to avoid blocking the main thread
-      return compute(_isolatedPurchaseLinkSearch, metadata);
+      return await compute(_isolatedPurchaseLinkSearch, metadata);
     } catch (e) {
-      log('Error in purchase link search: $e');
+      _log.warning('Error in purchase link search', e);
       return null;
     }
   }

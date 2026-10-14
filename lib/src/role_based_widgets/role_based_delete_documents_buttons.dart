@@ -24,6 +24,7 @@ class RoleBasedDeleteDocumentsButtons {
                     await _showDeleteConfirmationDialog(context);
                 if (confirmDelete) {
                   await firestoreService.deleteQuestCard(docId);
+                  if (!context.mounted) return;
                   // Show a snackbar confirming deletion
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

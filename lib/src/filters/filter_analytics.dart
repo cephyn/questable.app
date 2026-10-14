@@ -1,12 +1,12 @@
 import 'dart:convert';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'filter_state.dart';
 
 /// A service to track filter usage and analytics
 class FilterAnalytics {
+  static final _log = Logger('FilterAnalytics');
   static final FilterAnalytics _instance = FilterAnalytics._internal();
   static FilterAnalytics get instance => _instance;
 
@@ -35,10 +35,10 @@ class FilterAnalytics {
         },
       );
 
-      debugPrint(
+      _log.fine(
           'Analytics: Filter applied - ${filter.field}: ${filter.value}');
     } catch (e) {
-      debugPrint('Error tracking filter applied: $e');
+      _log.warning('Error tracking filter applied', e);
     }
   }
 
@@ -52,9 +52,9 @@ class FilterAnalytics {
         },
       );
 
-      debugPrint('Analytics: Filter removed - $field');
+      _log.fine('Analytics: Filter removed - $field');
     } catch (e) {
-      debugPrint('Error tracking filter removed: $e');
+      _log.warning('Error tracking filter removed', e);
     }
   }
 
@@ -63,9 +63,9 @@ class FilterAnalytics {
     try {
       await _analytics.logEvent(name: 'filters_cleared');
 
-      debugPrint('Analytics: All filters cleared');
+      _log.fine('Analytics: All filters cleared');
     } catch (e) {
-      debugPrint('Error tracking filters cleared: $e');
+      _log.warning('Error tracking filters cleared', e);
     }
   }
 
@@ -117,10 +117,10 @@ class FilterAnalytics {
         parameters: parameters.cast<String, Object>(),
       );
 
-      debugPrint(
+      _log.fine(
           'Analytics: Filter combination tracked - ${parameters.toString()}');
     } catch (e) {
-      debugPrint('Error tracking filter combination: $e');
+      _log.warning('Error tracking filter combination', e);
     }
   }
 
@@ -135,10 +135,10 @@ class FilterAnalytics {
         },
       );
 
-      debugPrint(
+      _log.fine(
           'Analytics: Saved filter applied - $name ($filterCount filters)');
     } catch (e) {
-      debugPrint('Error tracking saved filter applied: $e');
+      _log.warning('Error tracking saved filter applied', e);
     }
   }
 
@@ -153,9 +153,9 @@ class FilterAnalytics {
         },
       );
 
-      debugPrint('Analytics: Filter set saved - $name ($filterCount filters)');
+      _log.fine('Analytics: Filter set saved - $name ($filterCount filters)');
     } catch (e) {
-      debugPrint('Error tracking filter set saved: $e');
+      _log.warning('Error tracking filter set saved', e);
     }
   }
 
@@ -173,7 +173,7 @@ class FilterAnalytics {
           'count': entries[i].value,
         });
       } catch (e) {
-        debugPrint('Error parsing filter combination: $e');
+        _log.warning('Error parsing filter combination', e);
       }
     }
 
@@ -185,9 +185,9 @@ class FilterAnalytics {
     if (userId != null && userId.isNotEmpty) {
       try {
         await _analytics.setUserId(id: userId);
-        debugPrint('Analytics: User ID set - $userId');
+        _log.fine('Analytics: User ID set - $userId');
       } catch (e) {
-        debugPrint('Error setting analytics user ID: $e');
+        _log.warning('Error setting analytics user ID', e);
       }
     }
   }

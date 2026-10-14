@@ -1,8 +1,8 @@
-import 'dart:developer';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logging/logging.dart';
 
 class EmailService {
+  static final _log = Logger('EmailService');
   final CollectionReference emails =
       FirebaseFirestore.instance.collection('emails');
 
@@ -22,7 +22,7 @@ class EmailService {
       docId = ref.id;
     });
     //print(docId);
-    log(docId);
+    _log.fine(docId);
   }
 
   Future<void> sendNonAdventureEmailToAdmin(String adventureJson) async {
@@ -75,9 +75,9 @@ class EmailService {
         <p>Please review these changes and apply them manually if appropriate.</p>
       '''
     }).then((DocumentReference ref) {
-      log('Edit suggestion email sent: ${ref.id}');
+      _log.info('Edit suggestion email sent: ${ref.id}');
     }).catchError((error) {
-      log('Error sending edit suggestion email: $error');
+      _log.warning('Error sending edit suggestion email', error);
     });
   }
 }

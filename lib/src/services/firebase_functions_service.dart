@@ -1,14 +1,16 @@
 import 'dart:async';
-import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:logging/logging.dart';
 
 import 'firebase_storage_service.dart';
 
 class FirebaseFunctionsService {
+  static final _log = Logger('FirebaseFunctionsService');
+
   final FirebaseStorageService firebaseStorageService =
       FirebaseStorageService();
 
@@ -131,7 +133,7 @@ class FirebaseFunctionsService {
     } on TimeoutException catch (e) {
       throw Exception('Timed out waiting for PDF→MD conversion: $e');
     } catch (e) {
-      log('Error in pdfToMarkdownUrl: $e');
+      _log.warning('Error in pdfToMarkdownUrl', e);
       rethrow;
     }
   }

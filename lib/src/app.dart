@@ -1,11 +1,10 @@
-import 'dart:developer';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart' hide NavigationDestination;
 import 'package:custom_adaptive_scaffold/custom_adaptive_scaffold.dart';
 // import 'package:flutter_localizations/flutter_localizations.dart'; // Commented out localization
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart';
 
 // Admin Views
 import 'package:quest_cards/src/admin/game_system_admin_view.dart';
@@ -105,6 +104,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static final _log = Logger('HomePage');
   var _selectedIndex = 0;
   final FirestoreService firestoreService = FirestoreService();
   final FirebaseAuthService auth = FirebaseAuthService();
@@ -279,7 +279,7 @@ class _HomePageState extends State<HomePage> {
         }
         // Role Error State
         if (roleSnapshot.hasError) {
-          log('Error loading user roles: ${roleSnapshot.error}');
+          _log.warning('Error loading user roles', roleSnapshot.error, roleSnapshot.stackTrace);
           return Scaffold(
             key: const ValueKey('role_error_scaffold'),
             appBar: appBar, // Use the passed AppBar

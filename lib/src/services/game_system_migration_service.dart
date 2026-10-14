@@ -1,5 +1,5 @@
-import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logging/logging.dart';
 
 import '../models/standard_game_system.dart';
 import 'game_system_service.dart';
@@ -7,6 +7,8 @@ import 'game_system_mapper.dart';
 
 /// Service for managing large-scale game system migrations
 class GameSystemMigrationService {
+  static final _log = Logger('GameSystemMigrationService');
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GameSystemService _gameSystemService = GameSystemService();
   final GameSystemMapper _gameSystemMapper = GameSystemMapper();
@@ -86,10 +88,7 @@ class GameSystemMigrationService {
     WriteBatch batch = _firestore.batch();
     final timestamp = FieldValue.serverTimestamp();
     final migrationId = DateTime.now().millisecondsSinceEpoch.toString();
-    final logName = 'GameSystemMigrationService.applyStandardToQuests';
-
-    developer.log('Starting batch process for migration ID: $migrationId',
-        name: logName);
+    _log.info('Starting batch process for migration ID: $migrationId');
 
     // Create a migration log entry in the batch
     final logRef = migrationLogs.doc(migrationId);
@@ -100,7 +99,7 @@ class GameSystemMigrationService {
       'affectedCount': questCards.length,
       'status': 'in_progress',
     });
-    developer.log('Added migration log set to batch.', name: logName);
+    _log.fine('Added migration log set to batch.');
 
     // Process quest cards in batches (max 500 per batch)
     for (var i = 0; i < questCards.length; i++) {
@@ -119,77 +118,66 @@ class GameSystemMigrationService {
         // Firestore batches limited to 500 operations (set + updates)
         // Check if batch is full (499 updates + 1 set = 500)
         if (successCount % 499 == 0 && i < questCards.length - 1) {
-          developer.log(
-              'Committing intermediate batch (count: $successCount)...',
-              name: logName);
+          _log.info('Committing intermediate batch (count: $successCount)...');
           try {
             await batch.commit();
-            developer.log('Intermediate batch committed successfully.',
-                name: logName);
+            _log.info('Intermediate batch committed successfully.');
           } catch (e, s) {
-            developer.log('Error committing intermediate batch.',
-                name: logName, error: e, stackTrace: s);
+            _log.severe('Error committing intermediate batch.', e, s);
             rethrow; // Rethrow to be caught by the outer catch block
           }
           // Start a new batch
           batch = _firestore.batch();
-          developer.log('Started new batch.', name: logName);
+          _log.fine('Started new batch.');
         }
       }
     }
-    developer.log(
-        'Finished adding quest card updates to batch (total: $successCount).',
-        name: logName);
+    _log.fine(
+        'Finished adding quest card updates to batch (total: $successCount).');
 
     // Commit any remaining operations in the final batch
     if (successCount > 0) {
-      developer.log('Committing final batch...', name: logName);
+      _log.info('Committing final batch...');
       try {
         await batch.commit();
-        developer.log('Final batch committed successfully.', name: logName);
+        _log.info('Final batch committed successfully.');
       } catch (e, s) {
-        developer.log('Error committing final batch.',
-            name: logName, error: e, stackTrace: s);
+        _log.severe('Error committing final batch.', e, s);
         rethrow; // Rethrow to be caught by the outer catch block
       }
 
       // Update the migration log status
-      developer.log('Updating migration log status to completed...',
-          name: logName);
+      _log.info('Updating migration log status to completed...');
       try {
         await logRef.update({
           'status': 'completed',
           'successCount': successCount,
           'completedAt': FieldValue.serverTimestamp(),
         });
-        developer.log('Migration log updated successfully.', name: logName);
+        _log.info('Migration log updated successfully.');
       } catch (e, s) {
-        developer.log('Error updating migration log.',
-            name: logName, error: e, stackTrace: s);
         // Decide if you want to rethrow here or just log the error
         // If this fails, the main operation succeeded, but logging failed.
         // For now, let's just log it and continue.
         // rethrow;
+        _log.warning('Error updating migration log.', e, s);
       }
 
       // Record metrics for this migration
-      developer.log('Recording migration metrics...', name: logName);
+      _log.info('Recording migration metrics...');
       try {
         await _recordMigrationMetrics(
             standardSystem.standardName, successCount);
-        developer.log('Migration metrics recorded successfully.',
-            name: logName);
+        _log.info('Migration metrics recorded successfully.');
       } catch (e, s) {
-        developer.log('Error recording migration metrics.',
-            name: logName, error: e, stackTrace: s);
         // Similar to log update, decide if this error should stop the process
         // For now, just log it.
         // rethrow;
+        _log.warning('Error recording migration metrics.', e, s);
       }
     }
 
-    developer.log('Finished applyStandardToQuests successfully.',
-        name: logName);
+    _log.fine('Finished applyStandardToQuests successfully.');
     return successCount;
   }
 
@@ -391,7 +379,7 @@ class GameSystemMigrationService {
         'skipped': skipped,
         'lowConfidence': lowConfidence,
       };
-    } catch (e) {
+    } catch (e, st) {
       // Log the error
       await migrationLogs.doc(migrationId).update({
         'status': 'error',
@@ -403,9 +391,7 @@ class GameSystemMigrationService {
         'lowConfidence': lowConfidence,
       });
 
-      developer.log('Error in automated migration',
-          name: 'GameSystemMigrationService.runAutomatedMigration',
-          error: e); // Fixed debugPrint
+      _log.severe('Error in automated migration', e, st);
       rethrow;
     }
   }
@@ -591,19 +577,16 @@ class GameSystemMigrationService {
 
   /// Record metrics about a migration for analytics
   Future<void> _recordMigrationMetrics(String standardName, int count) async {
-    final logName = 'GameSystemMigrationService._recordMigrationMetrics';
-    developer.log('Recording metrics for $standardName - count: $count',
-        name: logName);
+    _log.fine('Recording metrics for $standardName - count: $count');
     try {
       await migrationMetrics.add({
         'standardName': standardName,
         'updatedCount': count,
         'timestamp': FieldValue.serverTimestamp(),
       });
-      developer.log('Successfully added metrics document.', name: logName);
+      _log.fine('Successfully added metrics document.');
     } catch (e, s) {
-      developer.log('Failed to add metrics document.',
-          name: logName, error: e, stackTrace: s);
+      _log.warning('Failed to add metrics document.', e, s);
       rethrow; // Rethrow so the caller knows metrics failed
     }
   }

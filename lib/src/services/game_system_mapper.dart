@@ -1,6 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
 import 'package:quest_cards/src/services/game_system_service.dart';
+
+final _log = Logger('GameSystemMapper');
 
 /// Result of a mapping operation with confidence score
 class MappingResult {
@@ -38,10 +40,7 @@ class GameSystemMapper {
 
   /// Log error messages for debugging
   void _logError(String message, dynamic error, [StackTrace? stackTrace]) {
-    debugPrint('$message: $error');
-    if (stackTrace != null) {
-      debugPrint(stackTrace.toString());
-    }
+    _log.warning(message, error, stackTrace);
   }
 
   /// Find the best matching standard game system for a given name

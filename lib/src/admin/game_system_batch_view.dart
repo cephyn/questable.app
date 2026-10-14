@@ -1,6 +1,6 @@
-import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
@@ -13,16 +13,14 @@ import 'package:quest_cards/src/services/game_system_migration_service.dart';
 class GameSystemBatchView extends StatefulWidget {
   final StandardGameSystem gameSystem;
 
-  const GameSystemBatchView({
-    super.key,
-    required this.gameSystem,
-  });
+  const GameSystemBatchView({super.key, required this.gameSystem});
 
   @override
   State<GameSystemBatchView> createState() => _GameSystemBatchViewState();
 }
 
 class _GameSystemBatchViewState extends State<GameSystemBatchView> {
+  static final _log = Logger('GameSystemBatchView');
   final GameSystemMigrationService _migrationService =
       GameSystemMigrationService();
 
@@ -88,15 +86,12 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
   }
 
   Future<void> _applyStandardization() async {
-    developer.log('Starting...',
-        name: '_GameSystemBatchViewState._applyStandardization'); // Changed log
+    _log.info('Starting...');
     if (_affectedQuests.isEmpty) {
-      developer.log('No quests to update. Aborting.',
-          name:
-              '_GameSystemBatchViewState._applyStandardization'); // Changed log
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No quests to update')),
-      );
+      _log.info('No quests to update. Aborting.');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No quests to update')));
       return;
     }
 
@@ -106,35 +101,27 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
     });
 
     try {
-      developer.log(
-          'Calling migrationService.applyStandardToQuests for ${widget.gameSystem.standardName} with ${_affectedQuests.length} quests.',
-          name:
-              '_GameSystemBatchViewState._applyStandardization'); // Changed log
+      _log.info(
+        'Calling migrationService.applyStandardToQuests for ${widget.gameSystem.standardName} with ${_affectedQuests.length} quests.',
+      );
       final count = await _migrationService.applyStandardToQuests(
         widget.gameSystem,
         _affectedQuests,
       );
-      developer.log('Migration service returned count: $count',
-          name:
-              '_GameSystemBatchViewState._applyStandardization'); // Changed log
+      _log.info('Migration service returned count: $count');
 
       setState(() {
         _processedCount = count;
         _isMigrating = false;
       });
 
-      developer.log('Update successful. Showing SnackBar.',
-          name:
-              '_GameSystemBatchViewState._applyStandardization'); // Changed log
+      _log.info('Update successful. Showing SnackBar.');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Successfully updated $count quests')),
       );
     } catch (e, s) {
-      // Added stack trace parameter 's'
-      developer.log('Error caught during standardization.',
-          name: '_GameSystemBatchViewState._applyStandardization',
-          error: e,
-          stackTrace: s); // Changed log
+      _log.severe('Error caught during standardization.', e, s);
       setState(() {
         // Display the specific Firestore error if available
         String displayError = 'Error applying standardization: $e';
@@ -146,12 +133,10 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
         _isMigrating = false;
       });
 
-      developer.log('Error state set. Showing SnackBar.',
-          name:
-              '_GameSystemBatchViewState._applyStandardization'); // Changed log
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $_errorMessage')),
-      );
+      _log.info('Error state set. Showing SnackBar.');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $_errorMessage')));
     }
   }
 
@@ -162,9 +147,7 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
     // Only accessible to admins
     if (!userContext.isAdmin) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Access Denied'),
-        ),
+        appBar: AppBar(title: const Text('Access Denied')),
         body: const Center(
           child: Text('You must be an admin to access this page.'),
         ),
@@ -190,16 +173,21 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline,
-                color: Theme.of(context).colorScheme.error, size: 48),
+            Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+              size: 48,
+            ),
             const SizedBox(height: 16),
             Text(
               'Error:',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(_errorMessage,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(
+              _errorMessage,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadAffectedQuests,
@@ -216,8 +204,11 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.info_outline,
-                size: 48, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.info_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: 16),
             Text(
               'No quest cards found for "${widget.gameSystem.standardName}" or its aliases',
@@ -245,8 +236,10 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
             children: [
               Text(
                 'Standard System: ${widget.gameSystem.standardName}',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text('Aliases: ${widget.gameSystem.aliases.join(", ")}'),
@@ -330,8 +323,10 @@ class _GameSystemBatchViewState extends State<GameSystemBatchView> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Icon(Icons.check_circle,
-                color: Theme.of(context).colorScheme.secondary),
+            Icon(
+              Icons.check_circle,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

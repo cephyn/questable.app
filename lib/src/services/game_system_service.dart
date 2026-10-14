@@ -2,8 +2,11 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart';
 import '../models/standard_game_system.dart';
 import 'package:quest_cards/src/quest_card/quest_card.dart'; // Correct import path for QuestCard model
+
+final _log = Logger('GameSystemService');
 
 abstract class GameSystemLookupService {
   Future<List<StandardGameSystem>> getAllGameSystems();
@@ -36,7 +39,7 @@ class GameSystemService implements GameSystemLookupService {
         ? '$errorMessage\n$stackTrace'
         : errorMessage;
 
-    debugPrint(errorMessage); // Use Flutter's logging system
+    _log.warning(message, error, stackTrace);
 
     // Only write to file if platform supports it
     if (_errorLogFile != null) {
@@ -46,7 +49,7 @@ class GameSystemService implements GameSystemLookupService {
           mode: FileMode.append,
         );
       } catch (e) {
-        debugPrint('Failed to write to error log: $e');
+        _log.warning('Failed to write to error log', e);
       }
     }
   }
@@ -55,9 +58,9 @@ class GameSystemService implements GameSystemLookupService {
   @override
   Future<List<StandardGameSystem>> getAllGameSystems() async {
     try {
-      debugPrint('Fetching all game systems from Firestore...');
+      _log.info('Fetching all game systems from Firestore...');
       final snapshot = await gameSystems.get();
-      debugPrint('Received ${snapshot.docs.length} game system documents');
+      _log.info('Received ${snapshot.docs.length} game system documents');
 
       return snapshot.docs
           .map((doc) => StandardGameSystem.fromFirestore(doc, null))
@@ -322,7 +325,7 @@ class GameSystemService implements GameSystemLookupService {
   /// This includes null, pending, failed, needs_review, etc.
   Future<List<QuestCard>> getQuestCardsNeedingReview({int limit = 50}) async {
     try {
-      debugPrint(
+      _log.info(
         '[getQuestCardsNeedingReview] Fetching quest cards where systemMigrationStatus is NOT \'completed\' (limit: $limit)...',
       );
 
@@ -336,7 +339,7 @@ class GameSystemService implements GameSystemLookupService {
           .limit(limit)
           .get();
 
-      debugPrint(
+      _log.info(
         '[getQuestCardsNeedingReview] Query 1 (isNotEqualTo: completed) found ${notCompletedSnapshot.docs.length} documents.',
       );
 
@@ -350,11 +353,11 @@ class GameSystemService implements GameSystemLookupService {
             .limit(remainingLimit)
             .get();
         nullStatusDocs = nullStatusSnapshot.docs;
-        debugPrint(
+        _log.info(
           '[getQuestCardsNeedingReview] Query 2 (isNull: true) found ${nullStatusDocs.length} documents.',
         );
       } else {
-        debugPrint(
+        _log.info(
           '[getQuestCardsNeedingReview] Query 1 already met limit, skipping Query 2 (isNull: true).',
         );
       }
@@ -362,13 +365,13 @@ class GameSystemService implements GameSystemLookupService {
       // Combine results (no need for deduplication as queries are mutually exclusive)
       final finalDocs = [...notCompletedSnapshot.docs, ...nullStatusDocs];
 
-      debugPrint(
+      _log.info(
         '[getQuestCardsNeedingReview] Total documents found: ${finalDocs.length}',
       );
 
       return finalDocs.map((doc) {
         final questCard = QuestCard.fromJson(doc.data())..id = doc.id;
-        debugPrint(
+        _log.fine(
           '[getQuestCardsNeedingReview] Mapping doc ${doc.id} to QuestCard: ${questCard.title ?? 'No Title'} (Status: ${questCard.systemMigrationStatus ?? 'null'})',
         );
         return questCard;

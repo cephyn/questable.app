@@ -4,8 +4,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:simple_icons/simple_icons.dart'; // For X and Bluesky icons
+import 'package:logging/logging.dart';
 
 class ShareOptionsModal extends StatelessWidget {
+  static final _log = Logger('ShareOptionsModal');
   final String shareText;
   final String shareUrl;
   final String questId;
@@ -37,7 +39,7 @@ class ShareOptionsModal extends StatelessWidget {
       await _logSharePlatform(platform);
       if (context.mounted) Navigator.pop(context); // Close modal on success
     } catch (e) { // Catch potential exceptions during launch
-      debugPrint('Could not launch $uri: $e');
+      _log.warning('Could not launch $uri', e);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open link for $platform.')),
@@ -111,7 +113,7 @@ class ShareOptionsModal extends StatelessWidget {
                 await SharePlus.instance.share(ShareParams(text: shareText, title: shareText, subject: 'Questable: $questTitle'));
                 await _logSharePlatform('system_share_sheet'); // Log if system sheet is used via modal
              } catch (e) {
-                 debugPrint('Error using system share: $e');
+                 _log.warning('Error using system share', e);
                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Could not open sharing options.')),

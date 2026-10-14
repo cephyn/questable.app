@@ -1,12 +1,14 @@
 import 'dart:async';
-import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logging/logging.dart';
 import '../models/backfill_stats.dart';
 import '../services/purchase_link_service.dart';
 import '../config/config.dart';
 
 /// Controller for handling the purchase link backfill process
 class PurchaseLinkBackfillController {
+  static final _log = Logger('PurchaseLinkBackfillController');
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   PurchaseLinkService? _purchaseLinkService; // Made nullable
 
@@ -22,14 +24,14 @@ class PurchaseLinkBackfillController {
     try {
       // Ensure configuration is initialized before proceeding
       await Config.initializeAppConfig();
-      log('Configuration initialized in controller. API Key: ${Config.googleApiKey}, Engine ID: ${Config.googleSearchEngineId}');
+      _log.fine('Configuration initialized in controller. API Key: ${Config.googleApiKey.isNotEmpty ? 'present' : 'missing'}, Engine ID: ${Config.googleSearchEngineId}');
 
       // Now that config is loaded, initialize the service
       _purchaseLinkService = PurchaseLinkService();
 
       // Validate configuration before starting
       if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
-        log('ERROR: Google API Key or Search Engine ID is missing');
+        _log.warning('Google API Key or Search Engine ID is missing');
         throw Exception(
             'Google API configuration is incomplete. Please set up your API keys in Firebase Remote Config.');
       }
@@ -80,10 +82,10 @@ class PurchaseLinkBackfillController {
 
       final int totalDocsNeeding = allDocsToProcess.length;
 
-      log('Found $totalDocsNeeding documents needing purchase links');
-      log('- ${nullLinkSnapshot.docs.length} documents with null links');
-      log('- ${emptyLinkSnapshot.docs.length} documents with empty links');
-      log('- ${missingLinkDocs.length} documents without a link field (from sample)');
+      _log.info('Found $totalDocsNeeding documents needing purchase links');
+      _log.info('- ${nullLinkSnapshot.docs.length} documents with null links');
+      _log.info('- ${emptyLinkSnapshot.docs.length} documents with empty links');
+      _log.info('- ${missingLinkDocs.length} documents without a link field (from sample)');
 
       // Update total count in stats
       _currentStats = _currentStats.copyWith(
@@ -94,7 +96,7 @@ class PurchaseLinkBackfillController {
       yield _currentStats;
 
       if (totalDocsNeeding == 0) {
-        log('No documents found that need purchase links');
+        _log.info('No documents found that need purchase links');
         return;
       }
 
@@ -104,7 +106,7 @@ class PurchaseLinkBackfillController {
 
         final int currentBatch = (i ~/ batchSize) + 1;
         final int totalBatches = (allDocsToProcess.length / batchSize).ceil();
-        log('Processing batch $currentBatch of $totalBatches');
+        _log.info('Processing batch $currentBatch of $totalBatches');
 
         // Get the current batch
         final int endIdx = i + batchSize > allDocsToProcess.length
@@ -112,7 +114,7 @@ class PurchaseLinkBackfillController {
             : i + batchSize;
         final currentBatchDocs = allDocsToProcess.sublist(i, endIdx);
 
-        log('Processing ${currentBatchDocs.length} documents in this batch');
+        _log.info('Processing ${currentBatchDocs.length} documents in this batch');
 
         // Process each document in the batch
         for (final doc in currentBatchDocs) {
@@ -123,11 +125,11 @@ class PurchaseLinkBackfillController {
             final String title = questCardData['productTitle'] ?? '';
             final String subtitle = questCardData['title'] ?? '';
 
-            log('Processing document: ${doc.id}, title: $title, subtitle: $subtitle');
+            _log.fine('Processing document: ${doc.id}, title: $title, subtitle: $subtitle');
 
             // Skip if we don't have enough data
             if (title.isEmpty && subtitle.isEmpty) {
-              log('Skipping document due to empty title and subtitle: ${doc.id}');
+              _log.fine('Skipping document due to empty title and subtitle: ${doc.id}');
               _currentStats = _currentStats.copyWith(
                 processed: _currentStats.processed + 1,
                 skipped: _currentStats.skipped + 1,
@@ -137,13 +139,13 @@ class PurchaseLinkBackfillController {
             }
 
             // Search for purchase link
-            log('Searching for purchase link for: $title');
+            _log.fine('Searching for purchase link for: $title');
             final String? purchaseLink = await _purchaseLinkService!
                 .findPurchaseLink(questCardData); // Added null assertion
 
             // Update firestore with link if found
             if (purchaseLink != null && purchaseLink.isNotEmpty) {
-              log('Found purchase link for ${doc.id}: $purchaseLink');
+              _log.fine('Found purchase link for ${doc.id}: $purchaseLink');
               await _firestore
                   .collection('questCards')
                   .doc(doc.id)
@@ -157,7 +159,7 @@ class PurchaseLinkBackfillController {
               );
             } else {
               // Link not found
-              log('No purchase link found for ${doc.id}');
+              _log.fine('No purchase link found for ${doc.id}');
               _currentStats = _currentStats.copyWith(
                 processed: _currentStats.processed + 1,
                 failed: _currentStats.failed + 1,
@@ -169,7 +171,7 @@ class PurchaseLinkBackfillController {
             yield _currentStats;
           } catch (e) {
             // Handle individual document error
-            log('Error processing document ${doc.id}: $e');
+            _log.warning('Error processing document ${doc.id}', e);
             _currentStats = _currentStats.copyWith(
               processed: _currentStats.processed + 1,
               failed: _currentStats.failed + 1,
@@ -179,22 +181,22 @@ class PurchaseLinkBackfillController {
         }
 
         // Brief delay to avoid hitting API rate limits
-        log('Completed batch. Taking a short break to avoid rate limits.');
+        _log.info('Completed batch. Taking a short break to avoid rate limits.');
         await Future.delayed(const Duration(milliseconds: 500));
       }
-    } catch (e) {
+    } catch (e, st) {
       // Handle overall process error
-      log('Error in processBackfill: $e');
+      _log.severe('Error in processBackfill', e, st);
       rethrow;
     } finally {
-      log('Backfill process completed or paused');
+      _log.info('Backfill process completed or paused');
       await _statsStreamController?.close();
     }
   }
 
   /// Pause the backfill process
   Future<void> pauseBackfill() async {
-    log('Pausing backfill process');
+    _log.info('Pausing backfill process');
     _isPaused = true;
     await _statsStreamController?.close();
   }

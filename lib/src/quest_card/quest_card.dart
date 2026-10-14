@@ -2,8 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Added Firestore import
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_ai/firebase_ai.dart';
+import 'package:logging/logging.dart';
 
 class QuestCard {
+  static final _log = Logger('QuestCard');
+
   String? id;
   String? productTitle;
   String? title;
@@ -99,8 +102,8 @@ class QuestCard {
         systemMigrationTimestamp = DateTime.tryParse(smtValue);
       } else {
         // Log or handle other unexpected types
-        print(
-            'Warning: systemMigrationTimestamp in fromJson has unexpected type: \${smtValue.runtimeType}');
+        _log.warning(
+            'Warning: systemMigrationTimestamp in fromJson has unexpected type: ${smtValue.runtimeType}');
         systemMigrationTimestamp = null;
       }
     } else {
@@ -120,8 +123,8 @@ class QuestCard {
         uploadedTimestamp = DateTime.tryParse(utValue);
       } else {
         // Log or handle other unexpected types
-        print(
-            'Warning: uploadedTimestamp in fromJson has unexpected type: \${utValue.runtimeType}');
+        _log.warning(
+            'Warning: uploadedTimestamp in fromJson has unexpected type: ${utValue.runtimeType}');
         uploadedTimestamp = null;
       }
     } else {
@@ -169,7 +172,7 @@ class QuestCard {
         systemMigrationTimestamp = DateTime.tryParse(timestampValue);
       } else {
         final type = timestampValue.runtimeType;
-        print(
+        _log.warning(
             'Warning: systemMigrationTimestamp has unexpected type: $type. Value: $timestampValue');
         systemMigrationTimestamp = null;
       }
@@ -190,7 +193,7 @@ class QuestCard {
         uploadedTimestamp = DateTime.tryParse(uploadedTimestampValue);
       } else {
         final type = uploadedTimestampValue.runtimeType;
-        print(
+        _log.warning(
             'Warning: uploadedTimestamp has unexpected type: $type. Value: $uploadedTimestampValue');
         uploadedTimestamp = null;
       }

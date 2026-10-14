@@ -198,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         const Text('Sign out of your account'),
                                     onTap: () async {
                                       await authProvider.signOut();
-                                      if (mounted &&
+                                      if (context.mounted &&
                                           !authProvider.isAuthenticated) {
                                         context.go('/');
                                       }

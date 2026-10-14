@@ -13,6 +13,7 @@ import '../util/utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart';
 
 /// A version of QuestCardListView that works without authentication.
 /// Shows quest cards to non-authenticated users and replaces edit/delete
@@ -26,6 +27,7 @@ class PublicQuestCardListView extends StatefulWidget {
 }
 
 class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
+  static final _log = Logger('PublicQuestCardListView');
   final FirestoreService _firestoreService = FirestoreService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -84,7 +86,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
         setState(() {});
       }
     } catch (e) {
-      debugPrint('Error loading quest count: $e');
+      _log.warning('Error loading quest count', e);
     }
   }
 
@@ -136,7 +138,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading more quests: $e');
+      _log.warning('Error loading more quests', e);
       setState(() {
         _isLoading = false;
       });
@@ -174,7 +176,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
       // No valid cache, load from Firestore
       _refreshQuestCards();
     } catch (e) {
-      debugPrint('Error loading cached data: $e');
+      _log.warning('Error loading cached data', e);
       // If cache loading fails, fallback to network
       _refreshQuestCards();
     }
@@ -215,7 +217,7 @@ class _PublicQuestCardListViewState extends State<PublicQuestCardListView> {
       );
     } catch (e) {
       // Cache error is non-fatal, just log it
-      debugPrint('Failed to cache quest cards: $e');
+      _log.warning('Failed to cache quest cards', e);
     }
   }
 

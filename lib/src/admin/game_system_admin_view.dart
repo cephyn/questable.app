@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
@@ -19,6 +20,7 @@ class GameSystemAdminView extends StatefulWidget {
 }
 
 class _GameSystemAdminViewState extends State<GameSystemAdminView> {
+  static final _log = Logger('GameSystemAdminView');
   final GameSystemService _gameSystemService = GameSystemService();
   late Future<List<StandardGameSystem>> _gameSystems;
   bool _isLoading = false;
@@ -35,32 +37,33 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
-      // Add debug print
-      debugPrint('Loading game systems...');
+      _log.info('Loading game systems...');
 
-      _gameSystems = _gameSystemService.getAllGameSystems().then((systems) {
-        debugPrint('Loaded ${systems.length} game systems');
-        return systems;
-      }).catchError((error) {
-        debugPrint('Error loading game systems: $error');
-        setState(() {
-          _errorMessage = 'Failed to load game systems: $error';
-        });
-        return <StandardGameSystem>[];
-      }).whenComplete(() {
-        setState(() {
-          _isLoading = false;
-        });
-      });
+      _gameSystems = _gameSystemService
+          .getAllGameSystems()
+          .then((systems) {
+            _log.info('Loaded ${systems.length} game systems');
+            return systems;
+          })
+          .catchError((error) {
+            _log.warning('Error loading game systems', error);
+            setState(() {
+              _errorMessage = 'Failed to load game systems: $error';
+            });
+            return <StandardGameSystem>[];
+          })
+          .whenComplete(() {
+            setState(() {
+              _isLoading = false;
+            });
+          });
     });
   }
 
   void _navigateToAddSystem() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const GameSystemDetailView(),
-      ),
+      MaterialPageRoute(builder: (context) => const GameSystemDetailView()),
     ).then((_) => _loadGameSystems());
   }
 
@@ -76,14 +79,13 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
   void _navigateToUnstandardizedQuests() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const UnstandardizedQuestsView(),
-      ),
+      MaterialPageRoute(builder: (context) => const UnstandardizedQuestsView()),
     );
   }
 
   Future<void> _deleteSystem(StandardGameSystem system) async {
-    final bool confirm = await showDialog(
+    final bool confirm =
+        await showDialog(
           context: context,
           builder: (BuildContext dialogContext) {
             return AlertDialog(
@@ -112,22 +114,25 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
       try {
         setState(() => _isLoading = true);
         await _gameSystemService.deleteGameSystem(system.id!);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Deleted ${system.standardName}')),
         );
         _loadGameSystems();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
   List<StandardGameSystem> _getFilteredSystems(
-      List<StandardGameSystem> systems) {
+    List<StandardGameSystem> systems,
+  ) {
     if (_searchQuery.isEmpty) return systems;
 
     final query = _searchQuery.toLowerCase();
@@ -159,9 +164,7 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
     // Only accessible to admins
     if (!userContext.isAdmin) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Access Denied'),
-        ),
+        appBar: AppBar(title: const Text('Access Denied')),
         body: const Center(
           child: Text('You must be an admin to access this page.'),
         ),
@@ -174,7 +177,8 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
         actions: [
           IconButton(
             icon: const Icon(
-                Icons.rule_folder_outlined), // Icon for unstandardized quests
+              Icons.rule_folder_outlined,
+            ), // Icon for unstandardized quests
             onPressed: _navigateToUnstandardizedQuests,
             tooltip: 'View Unstandardized Quests', // Tooltip for the new button
           ),
@@ -224,7 +228,9 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
               child: Text(
                 _errorMessage,
                 style: TextStyle(
-                    color: Theme.of(context).colorScheme.error, fontSize: 16),
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 16,
+                ),
               ),
             ),
           Expanded(
@@ -242,21 +248,25 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline,
-                            color: Theme.of(context).colorScheme.error,
-                            size: 48),
+                        Icon(
+                          Icons.error_outline,
+                          color: Theme.of(context).colorScheme.error,
+                          size: 48,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'Error loading game systems:',
                           style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 16),
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '${snapshot.error}',
                           style: TextStyle(
-                              color: Theme.of(context).colorScheme.error),
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                         ),
                       ],
                     ),
@@ -330,9 +340,8 @@ class _GameSystemAdminViewState extends State<GameSystemAdminView> {
                               onPressed: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => GameSystemBatchView(
-                                    gameSystem: system,
-                                  ),
+                                  builder: (context) =>
+                                      GameSystemBatchView(gameSystem: system),
                                 ),
                               ),
                               tooltip: 'Batch Operations',

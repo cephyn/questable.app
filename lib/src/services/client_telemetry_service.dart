@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:developer';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:logging/logging.dart';
 
 /// Best-effort client→server telemetry for debugging production issues.
 ///
@@ -9,6 +9,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 /// debug cases where the client fails before Firestore writes occur.
 class ClientTelemetryService {
   const ClientTelemetryService();
+
+  static final _log = Logger('ClientTelemetry');
 
   static Future<void> event({
     required String stage,
@@ -26,7 +28,7 @@ class ClientTelemetryService {
       });
     } catch (e) {
       // Never fail user flows due to telemetry.
-      log('ClientTelemetryService.event failed: $e');
+      _log.warning('Telemetry event failed', e);
     }
   }
 
@@ -48,7 +50,7 @@ class ClientTelemetryService {
         'context': context ?? const <String, dynamic>{},
       });
     } catch (e) {
-      log('ClientTelemetryService.error failed: $e');
+      _log.warning('Telemetry error report failed', e);
     }
   }
 

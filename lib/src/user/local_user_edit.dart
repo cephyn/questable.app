@@ -52,6 +52,7 @@ class _LocalUserEditState extends State<LocalUserEdit> {
                 child: ElevatedButton(
                   onPressed: () async {
                     await emailService.sendActivationEmail(_localUser!.email);
+                    if (!context.mounted) return;
                     Fluttertoast.showToast(
                         msg: "Email Sent!",
                         toastLength: Toast.LENGTH_SHORT,
@@ -135,7 +136,7 @@ class _LocalUserEditState extends State<LocalUserEdit> {
                       if (_formKey.currentState!.validate()) {
                         _formKey.currentState?.save();
                         await firestoreService.updateUser(_localUser!);
-                        if (mounted) {
+                        if (context.mounted) {
                           Navigator.pop(context);
                         }
                       }

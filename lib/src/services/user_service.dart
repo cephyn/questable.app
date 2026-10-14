@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:developer';
+import 'package:logging/logging.dart';
 
 class UserService {
+  static final _log = Logger('UserService');
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -51,7 +52,7 @@ class UserService {
       }
       return ownedQuests;
     } catch (e) {
-      log('Error fetching owned quests: $e');
+      _log.warning('Error fetching owned quests', e);
       return [];
     }
   }
@@ -66,7 +67,7 @@ class UserService {
           .doc(questId)
           .set({'ownedAt': FieldValue.serverTimestamp()});
     } catch (e) {
-      log('Error adding quest to owned: $e');
+      _log.warning('Error adding quest to owned', e);
     }
   }
 
@@ -80,7 +81,7 @@ class UserService {
           .doc(questId)
           .delete();
     } catch (e) {
-      log('Error removing quest from owned: $e');
+      _log.warning('Error removing quest from owned', e);
     }
   }
 

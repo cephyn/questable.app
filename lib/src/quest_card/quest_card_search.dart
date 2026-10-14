@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart';
 
 import '../util/utils.dart';
 
@@ -14,6 +15,8 @@ class QuestCardSearch extends StatefulWidget {
 }
 
 class _QuestCardSearchState extends State<QuestCardSearch> {
+  static final _log = Logger('QuestCardSearch');
+
   final TextEditingController _controller = TextEditingController();
 
   static const int _pageSize = 10;
@@ -81,7 +84,7 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
         _currentPage = pageKey;
       });
     } catch (e, st) {
-      debugPrint('Search fetch error: $e\n$st');
+      _log.warning('Search fetch error', e, st);
     } finally {
       setState(() => _isSearching = false);
     }
@@ -99,7 +102,7 @@ class _QuestCardSearchState extends State<QuestCardSearch> {
           [];
       return hits.map((h) => h['title']?.toString() ?? '').toList();
     } catch (e) {
-      debugPrint('Suggestion fetch error: $e');
+      _log.warning('Suggestion fetch error', e);
       return [];
     }
   }

@@ -1,4 +1,4 @@
-import 'dart:developer';
+import 'package:logging/logging.dart';
 import '../config/config.dart';
 import 'google_pse_client.dart';
 import 'purchase_link_validator.dart';
@@ -13,6 +13,7 @@ class PurchaseLinkResult {
 
 /// A service to find purchase links for RPG adventures
 class PurchaseLinkService {
+  static final _log = Logger('PurchaseLinkService');
   final GooglePSEClient _searchClient;
   final PurchaseLinkValidator _validator;
   // cache removed - not used at the moment
@@ -32,11 +33,10 @@ class PurchaseLinkService {
               marketplaceDomains: Config.marketplaceDomains,
             )
         {
-    // log('PurchaseLinkService constructor: Config.googleApiKey at time of GooglePSEClient init is "${Config.googleApiKey}"');
     // log('PurchaseLinkService constructor: Config.googleSearchEngineId at time of GooglePSEClient init is "${Config.googleSearchEngineId}"');
     // Validate configuration on initialization
     if (Config.googleApiKey.isEmpty || Config.googleSearchEngineId.isEmpty) {
-      log('WARNING: Google API Key or Search Engine ID is not configured properly');
+      _log.warning('Google API Key or Search Engine ID is not configured properly');
     }
   }
 
@@ -48,7 +48,7 @@ class PurchaseLinkService {
     if (metadata['productTitle']?.isEmpty ??
         true && metadata['title']?.isEmpty ??
         true) {
-      log('Cannot search without a product title');
+      _log.info('Cannot search without a product title');
       return null;
     }
 
@@ -79,31 +79,31 @@ class PurchaseLinkService {
         query += ' by $publisher';
       }
 
-      log('Searching for: $query');
+      _log.info('Searching for: $query');
 
       // Execute the search
       final result = await _searchClient.search(query);
-      log('Search returned ${result.length} results');
+      _log.info('Search returned ${result.length} results');
 
       if (result.isEmpty) {
-        log('No search results found');
+        _log.info('No search results found');
         return null;
       }
 
       // Log first few results for debugging
       for (int i = 0; i < result.length && i < 3; i++) {
-        log('Result $i: ${result[i].title} - ${result[i].link}');
+        _log.fine('Result $i: ${result[i].title} - ${result[i].link}');
       }
 
       // Process results and find the most likely purchase link
       var link = await _extractPurchaseLink(result, title, publisher);
-      log(link != null
+      _log.info(link != null
           ? 'Final purchase link selected: $link'
           : 'No valid purchase link found after validation');
 
       return link;
-    } catch (e) {
-      log('Error in findPurchaseLink: $e');
+    } catch (e, st) {
+      _log.severe('Error in findPurchaseLink', e, st);
       // Rethrow to make errors visible
       rethrow;
     }
@@ -133,7 +133,7 @@ class PurchaseLinkService {
           validationResults.add(validationResult);
         }
       } catch (e) {
-        log('Error validating URL ${result.link}: $e');
+        _log.warning('Error validating URL ${result.link}', e);
       }
     }
 
@@ -152,7 +152,7 @@ class PurchaseLinkService {
 
     // Return the URL of the best result
     final bestResult = validationResults.first;
-    log('Best purchase link for ${metadata['title']}: ${bestResult.url} '
+    _log.info('Best purchase link for ${metadata['title']}: ${bestResult.url} '
         '(priority: ${bestResult.priority}, score: ${bestResult.confidenceScore})');
 
     return bestResult.url;
@@ -171,7 +171,7 @@ class PurchaseLinkService {
 
     // Limit to top 5 results
     final topResults = results.length > 5 ? results.sublist(0, 5) : results;
-    log('Processing only top ${topResults.length} search results');
+    _log.fine('Processing only top ${topResults.length} search results');
 
     // Process each result and get validation data
     final validationResults = <ValidationResult>[];
@@ -188,7 +188,7 @@ class PurchaseLinkService {
           validationResults.add(validationResult);
         }
       } catch (e) {
-        log('Error validating URL ${result.link}: $e');
+        _log.warning('Error validating URL ${result.link}', e);
       }
     }
 
@@ -207,7 +207,7 @@ class PurchaseLinkService {
 
     // Return the URL of the best result
     final bestResult = validationResults.first;
-    log('Selected purchase link: ${bestResult.url} (priority: ${bestResult.priority}, score: ${bestResult.confidenceScore})');
+    _log.info('Selected purchase link:  ${bestResult.url} (priority: ${bestResult.priority}, score: ${bestResult.confidenceScore})');
 
     return bestResult.url;
   }

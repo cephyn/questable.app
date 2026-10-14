@@ -43,14 +43,17 @@ class FirebaseUserProfileWidget extends StatelessWidget {
 
   Future<void> _signOut(BuildContext context) async {
     await auth.signOut();
+    if (!context.mounted) return;
     Navigator.of(context).pop(); // Navigate back after signing out
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
     try {
       await auth.deleteCurrentUser();
+      if (!context.mounted) return;
       Navigator.of(context).pop(); // Navigate back after deleting account
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to delete account: $e')),
       );

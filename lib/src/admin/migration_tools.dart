@@ -1,8 +1,7 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Added missing import
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +17,8 @@ class MigrationTools extends StatefulWidget {
 }
 
 class _MigrationToolsState extends State<MigrationTools> {
+  static final _log = Logger('MigrationTools');
+
   bool _isRunning = false;
   String _statusMessage = '';
   bool _success = false;
@@ -634,7 +635,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         final snapshot = await query.get();
 
         if (snapshot.docs.isEmpty) {
-          log('No more documents found for checking.');
+          _log.info('No more documents found for checking.');
           break; // Exit loop
         }
 
@@ -671,7 +672,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         });
       }
     } catch (e, s) {
-      log('Error checking missing isPublic fields: $e', stackTrace: s);
+      _log.warning('Error checking missing isPublic fields', e, s);
       if (mounted) {
         setState(() {
           _isChecking = false;
@@ -695,6 +696,7 @@ class _MigrationToolsState extends State<MigrationTools> {
           .limit(1)
           .get();
 
+      if (!mounted) return;
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -704,6 +706,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       final errorMessage = e.toString();
       String displayMessage = 'Query failed: $e';
       bool hasIndexLink = false;
@@ -777,7 +780,7 @@ class _MigrationToolsState extends State<MigrationTools> {
 
       // Print the full error with the link to the console for easy access
       if (hasIndexLink) {
-        log('Index creation link: $indexLink');
+        _log.fine('Index creation link: $indexLink');
       }
     }
   }
@@ -834,21 +837,25 @@ class _MigrationToolsState extends State<MigrationTools> {
             'Backfill complete: processed $processed, updated $updated';
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Backfill complete: processed $processed, updated $updated',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Backfill complete: processed $processed, updated $updated',
+            ),
           ),
-        ),
-      );
+        );
+      }
     } catch (e) {
-      log('Backfill failed: $e');
+      _log.severe('Backfill failed', e);
       setState(() {
         _uploaderBackfillStatus = 'Backfill failed: $e';
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Backfill failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Backfill failed: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isUploaderBackfillRunning = false;
@@ -898,7 +905,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         final snapshot = await query.get();
 
         if (snapshot.docs.isEmpty) {
-          log('No more documents found for migration.');
+          _log.info('No more documents found for migration.');
           break; // Exit loop
         }
 
@@ -920,9 +927,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                 _statusMessage =
                     'Committing batch (Processed: $processedCount, Updated: $updatedCount)...';
               });
-              log('Committing isPublic migration batch...');
+              _log.info('Committing isPublic migration batch...');
               await batch.commit();
-              log('Batch committed.');
+              _log.info('Batch committed.');
               batch = firestore.batch(); // Start new batch
               batchCounter = 0;
               await Future.delayed(
@@ -945,11 +952,11 @@ class _MigrationToolsState extends State<MigrationTools> {
         setState(() {
           _statusMessage = 'Committing final batch...';
         });
-        log(
+        _log.info(
           'Committing final isPublic migration batch ($batchCounter operations)...',
         );
         await batch.commit();
-        log('Final batch committed.');
+        _log.info('Final batch committed.');
       }
 
       if (mounted) {
@@ -961,7 +968,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         });
       }
     } catch (e, s) {
-      log('Error during isPublic migration: $e', stackTrace: s);
+      _log.severe('Error during isPublic migration', e, s);
       if (mounted) {
         setState(() {
           _isRunning = false;
@@ -1011,15 +1018,13 @@ class _MigrationToolsState extends State<MigrationTools> {
         final snapshot = await query.get();
 
         if (snapshot.docs.isEmpty) {
-          log('No more documents found.');
+          _log.info('No more documents found.');
           break; // Exit loop
         }
 
         lastDoc = snapshot.docs.last;
         final currentBatchSize = snapshot.docs.length;
-        log(
-          'Processing ${currentBatchSize} documents (up to ${lastDoc.id})...',
-        );
+        _log.info('Processing $currentBatchSize documents (up to ${lastDoc.id})...');
 
         for (final doc in snapshot.docs) {
           _processedLowercaseCount++;
@@ -1054,9 +1059,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                   _populateLowercaseStatus =
                       'Committing batch (Processed: $_processedLowercaseCount, Updated: $_populatedLowercaseCount)...';
                 });
-                log('Committing batch...');
+                _log.info('Committing batch...');
                 await batch.commit();
-                log('Batch committed.');
+                _log.info('Batch committed.');
                 batch = firestore.batch(); // Start new batch
                 batchCounter = 0;
                 await Future.delayed(
@@ -1086,9 +1091,9 @@ class _MigrationToolsState extends State<MigrationTools> {
         setState(() {
           _populateLowercaseStatus = 'Committing final batch...';
         });
-        log('Committing final batch ($batchCounter operations)...');
+        _log.info('Committing final batch ($batchCounter operations)...');
         await batch.commit();
-        log('Final batch committed.');
+        _log.info('Final batch committed.');
       }
 
       if (mounted) {
@@ -1100,7 +1105,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         });
       }
     } catch (e, s) {
-      log('Error during gameSystem_lowercase population: $e', stackTrace: s);
+      _log.severe('Error during gameSystem_lowercase population', e, s);
       if (mounted) {
         setState(() {
           _isPopulatingLowercase = false;
@@ -1149,7 +1154,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         final snapshot = await query.get();
 
         if (snapshot.docs.isEmpty) {
-          log('No more documents found for product title backfill.');
+          _log.info('No more documents found for product title backfill.');
           break;
         }
 
@@ -1186,9 +1191,9 @@ class _MigrationToolsState extends State<MigrationTools> {
                 _backfillProductTitleStatus =
                     'Committing batch (Processed: $_processedProductTitleCount, Updated: $_backfilledProductTitleCount)...';
               });
-              log('Committing product title backfill batch...');
+              _log.info('Committing product title backfill batch...');
               await batch.commit();
-              log('Product title backfill batch committed.');
+              _log.info('Product title backfill batch committed.');
               batch = firestore.batch();
               batchCounter = 0;
               await Future.delayed(const Duration(milliseconds: 50));
@@ -1215,11 +1220,11 @@ class _MigrationToolsState extends State<MigrationTools> {
           _backfillProductTitleStatus =
               'Committing final product title backfill batch...';
         });
-        log(
+        _log.info(
           'Committing final product title backfill batch ($batchCounter operations)...',
         );
         await batch.commit();
-        log('Final product title backfill batch committed.');
+        _log.info('Final product title backfill batch committed.');
       }
 
       if (mounted) {
@@ -1231,7 +1236,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         });
       }
     } catch (e, s) {
-      log('Error during product title backfill: $e', stackTrace: s);
+      _log.severe('Error during product title backfill', e, s);
       if (mounted) {
         setState(() {
           _isBackfillingProductTitle = false;
@@ -1268,7 +1273,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         _isBackfillingSearchIndex = false;
       });
     } catch (e, s) {
-      log('Error calling backfill_search_index: $e', stackTrace: s);
+      _log.severe('Error calling backfill_search_index', e, s);
       setState(() {
         _isBackfillingSearchIndex = false;
         _backfillSearchStatus = 'Error during search backfill: $e';
@@ -1302,7 +1307,7 @@ class _MigrationToolsState extends State<MigrationTools> {
         _backfillSearchSuccess = exists;
       });
     } catch (e, s) {
-      log('Error checking search index status: $e', stackTrace: s);
+      _log.warning('Error checking search index status', e, s);
       setState(() {
         _backfillSearchStatus = 'Error checking search index: $e';
         _backfillSearchSuccess = false;
@@ -1362,14 +1367,14 @@ class _MigrationToolsState extends State<MigrationTools> {
         if (!mounted) return;
         setState(() {
           _batchGameSystemStatus =
-              'Processing ${_batchGameSystemProcessed}/${questIds.length} quests...';
+              'Processing $_batchGameSystemProcessed/${questIds.length} quests...';
         });
 
         final docRef = firestore.collection('questCards').doc(questId);
         final docSnapshot = await docRef.get();
 
         if (!docSnapshot.exists) {
-          log('Quest $questId does not exist, skipping...');
+          _log.fine('Quest $questId does not exist, skipping...');
           continue;
         }
 
@@ -1386,11 +1391,11 @@ class _MigrationToolsState extends State<MigrationTools> {
           if (!mounted) return;
           setState(() {
             _batchGameSystemStatus =
-                'Committing batch (${_batchGameSystemProcessed}/${questIds.length}, Updated: ${_batchGameSystemUpdated})...';
+                'Committing batch ($_batchGameSystemProcessed/${questIds.length}, Updated: $_batchGameSystemUpdated)...';
           });
-          log('Committing batch update...');
+          _log.info('Committing batch update...');
           await batch.commit();
-          log('Batch committed.');
+          _log.info('Batch committed.');
           batch = firestore.batch();
           batchCounter = 0;
           await Future.delayed(const Duration(milliseconds: 50));
@@ -1402,18 +1407,18 @@ class _MigrationToolsState extends State<MigrationTools> {
         if (!mounted) return;
         setState(() {
           _batchGameSystemStatus =
-              'Committing final batch (${_batchGameSystemUpdated} quests)...';
+              'Committing final batch ($_batchGameSystemUpdated quests)...';
         });
-        log('Committing final batch ($batchCounter operations)...');
+        _log.info('Committing final batch ($batchCounter operations)...');
         await batch.commit();
-        log('Final batch committed.');
+        _log.info('Final batch committed.');
       }
 
       if (mounted) {
         setState(() {
           _isBatchUpdatingGameSystem = false;
           _batchGameSystemStatus =
-              'Batch update complete! Updated: ${_batchGameSystemUpdated}/${questIds.length} quests to "$newGameSystem"';
+              'Batch update complete! Updated: $_batchGameSystemUpdated/${questIds.length} quests to "$newGameSystem"';
           _batchGameSystemSuccess = true;
         });
 
@@ -1422,12 +1427,12 @@ class _MigrationToolsState extends State<MigrationTools> {
         _batchGameSystemController.clear();
       }
     } catch (e, s) {
-      log('Error during batch game system update: $e', stackTrace: s);
+      _log.severe('Error during batch game system update', e, s);
       if (mounted) {
         setState(() {
           _isBatchUpdatingGameSystem = false;
           _batchGameSystemStatus =
-              'Error during batch update: $e. Processed: ${_batchGameSystemProcessed}, Updated: ${_batchGameSystemUpdated}';
+              'Error during batch update: $e. Processed: $_batchGameSystemProcessed, Updated: $_batchGameSystemUpdated';
           _batchGameSystemSuccess = false;
         });
       }

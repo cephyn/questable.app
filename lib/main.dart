@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
@@ -12,6 +11,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart';
 
 import 'package:quest_cards/firebase_options.dart';
 import 'package:quest_cards/src/config/app_constants.dart';
@@ -23,7 +23,10 @@ import 'package:quest_cards/src/providers/auth_provider.dart'; // Import AuthPro
 import 'src/app.dart';
 import 'src/settings/settings_controller.dart';
 import 'src/settings/settings_service.dart';
+import 'src/logging/app_logger.dart';
 import 'src/services/early_error_reporter.dart';
+
+final _log = Logger('Startup');
 
 // Define the GoRouter configuration
 final GoRouter _router = GoRouter(
@@ -103,11 +106,13 @@ Future<void> _activateAppCheck() async {
       providerApple: const AppleAppAttestWithDeviceCheckFallbackProvider(),
     );
   } catch (e) {
-    log('App Check activation failed: $e');
+    _log.warning('App Check activation failed', e);
   }
 }
 
 void main() async {
+  configureLogging();
+
   // Install a web-only early error hook that reports via plain HTTP,
   // so we get logs even if Firebase isn't initialized yet.
   EarlyErrorReporter.install();
@@ -128,7 +133,7 @@ void main() async {
         },
       });
     } catch (e) {
-      log('Fatal error reporting failed: $e');
+      _log.warning('Fatal error reporting failed', e);
       // Fallback for early-startup / callable failures (web).
       await EarlyErrorReporter.report(
         stage: 'fatal_fallback',
@@ -187,7 +192,7 @@ void main() async {
         try {
           FirebaseFirestore.instance.settings = base;
         } catch (e) {
-          log('Firestore web settings failed, continuing: $e');
+          _log.warning('Firestore web settings failed, continuing', e);
         }
       }
 
@@ -201,7 +206,8 @@ void main() async {
       // Initialize Firebase Remote Config for secure access to API keys
       await Config.initializeAppConfig();
     } catch (e, st) {
-      log('Firebase initialization error: $e');
+      // reportFatal below already forwards this error, so log it at WARNING to avoid a duplicate report.
+      _log.warning('Firebase initialization error', e, st);
       reportFatal(e, st);
       // Continue with app initialization even if Firebase fails
     }

@@ -1,9 +1,11 @@
 import 'dart:convert';
-import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'package:logging/logging.dart';
 
 /// A class to handle communication with Google Programmable Search Engine
 class GooglePSEClient {
+  static final _log = Logger('GooglePSEClient');
+
   final String apiKey;
   final String searchEngineId;
   final http.Client _httpClient;
@@ -28,12 +30,11 @@ class GooglePSEClient {
       final url = Uri.parse(
           'https://www.googleapis.com/customsearch/v1?key=$apiKey&cx=$searchEngineId&q=$encodedQuery');
 
-      log('Searching for: $query');
-      //log('Request URL: $url');
+      _log.info('Searching for: $query');
       final response = await _httpClient.get(url);
 
       if (response.statusCode != 200) {
-        log('Error response: ${response.statusCode} - ${response.body}');
+        _log.warning('Error response: ${response.statusCode} - ${response.body}');
         throw Exception('Failed to search: ${response.statusCode}');
       }
 
@@ -41,17 +42,24 @@ class GooglePSEClient {
 
       // Check if there are search results
       if (!jsonResponse.containsKey('items') || jsonResponse['items'] == null) {
-        log('No search results found');
+        _log.info('No search results found');
         return [];
       }
 
       final items = jsonResponse['items'] as List<dynamic>;
       return items.map((item) => SearchResult.fromJson(item)).toList();
-    } catch (e) {
-      log('Error during search: $e');
+    } catch (e, st) {
+      // The request URL carries the API key, and http's ClientException includes that URL.
+      final safeMessage = _redactApiKey(e);
+      _log.warning('Error during search: $safeMessage', null, st);
       // Implement retry logic here in the future
-      rethrow;
+      throw Exception(safeMessage);
     }
+  }
+
+  String _redactApiKey(Object error) {
+    final text = error.toString();
+    return apiKey.isEmpty ? text : text.replaceAll(apiKey, '[REDACTED]');
   }
 
   /// Creates a search query from a QuestCard's metadata

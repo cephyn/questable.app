@@ -117,6 +117,7 @@ class AuthGate extends StatelessWidget {
                                   .signInWithCredential(credential);
                             }
                           } catch (e) {
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                   content: Text('Google sign-in failed: $e')),

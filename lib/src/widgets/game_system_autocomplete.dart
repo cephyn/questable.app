@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/services/game_system_client_service.dart';
 
 /// A specialized autocomplete field for game systems that supports standardization
@@ -31,6 +32,7 @@ class GameSystemAutocompleteField extends StatefulWidget {
 
 class _GameSystemAutocompleteFieldState
     extends State<GameSystemAutocompleteField> {
+  static final _log = Logger('GameSystemAutocomplete');
   final GameSystemClientService _gameSystemService = GameSystemClientService();
   final TextEditingController _controller = TextEditingController();
   List<StandardGameSystemOption> _options = [];
@@ -73,7 +75,7 @@ class _GameSystemAutocompleteFieldState
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading game system options: $e');
+      _log.warning('Error loading game system options', e);
       setState(() {
         _isLoading = false;
       });

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart'; // Add this import
+import 'package:logging/logging.dart';
 
 import 'package:quest_cards/src/filters/active_filter_chips.dart';
 import 'package:quest_cards/src/filters/filter_drawer.dart';
@@ -26,6 +27,7 @@ class QuestCardListView extends StatefulWidget {
 }
 
 class _QuestCardListViewState extends State<QuestCardListView> {
+  static final _log = Logger('QuestCardListView');
   final FirestoreService firestoreService = FirestoreService();
   final FirebaseAuthService auth = FirebaseAuthService();
   final RoleBasedDeleteDocumentsButtons rbDeleteDocumentsButtons =
@@ -79,7 +81,7 @@ class _QuestCardListViewState extends State<QuestCardListView> {
         setState(() {});
       }
     } catch (e) {
-      debugPrint('Error loading quest count: $e');
+      _log.warning('Error loading quest count', e);
     }
   }
 
@@ -243,12 +245,6 @@ class _QuestCardListViewState extends State<QuestCardListView> {
           final error = snapshot.error;
           final stackTrace = snapshot.stackTrace;
 
-          // Log to console for immediate visibility
-          debugPrint('');
-          debugPrint('====== QUEST LIST ERROR ======');
-          debugPrint('Error: $error');
-          debugPrint('StackTrace: $stackTrace');
-
           // Check if error contains a URL for better display
           String errorMessage = error.toString();
           final urlRegExp = RegExp(r'https?:\/\/[^\s]+');
@@ -256,9 +252,12 @@ class _QuestCardListViewState extends State<QuestCardListView> {
           String? url;
           if (match != null) {
             url = match.group(0);
-            debugPrint('Error URL: $url');
           }
-          debugPrint('==============================');
+          _log.warning(
+            'Quest list error${url != null ? ' URL: $url' : ''}',
+            error,
+            stackTrace,
+          );
 
           // Display a user-friendly error message with details
           return Center(

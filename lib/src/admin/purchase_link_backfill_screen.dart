@@ -1,7 +1,7 @@
-import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart'; // For callable functions
+import 'package:logging/logging.dart';
 import '../controllers/purchase_link_backfill_controller.dart';
 import '../models/backfill_stats.dart';
 import '../config/config.dart'; // Added to access API keys
@@ -17,6 +17,7 @@ class PurchaseLinkBackfillScreen extends StatefulWidget {
 
 class _PurchaseLinkBackfillScreenState
     extends State<PurchaseLinkBackfillScreen> {
+  static final _log = Logger('PurchaseLinkBackfillScreen');
   final PurchaseLinkBackfillController _controller =
       PurchaseLinkBackfillController();
   BackfillStats? _stats;
@@ -44,7 +45,7 @@ class _PurchaseLinkBackfillScreenState
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      log('No user signed in. Cannot fetch authenticated config.');
+      _log.info('No user signed in. Cannot fetch authenticated config.');
       if (mounted) {
         setState(() {
           _configErrorMessage =
@@ -56,18 +57,18 @@ class _PurchaseLinkBackfillScreenState
       return;
     }
 
-    log('User ${currentUser.uid} is signed in. Attempting to load config.');
+    _log.info('User ${currentUser.uid} is signed in. Attempting to load config.');
 
     try {
       // Attempt to get a fresh ID token
-      log('Attempting to refresh ID token...');
+      _log.fine('Attempting to refresh ID token...');
       final String? token = await currentUser.getIdToken(
         true,
       ); // true forces refresh
       if (token != null) {
-        log('Successfully refreshed ID token.');
+        _log.fine('Successfully refreshed ID token.');
       } else {
-        log('Failed to refresh ID token (token is null).');
+        _log.warning('Failed to refresh ID token (token is null).');
         // This case might not be strictly necessary to handle here if getIdToken(true) throws on failure,
         // but it's good for logging.
       }
@@ -85,11 +86,12 @@ class _PurchaseLinkBackfillScreenState
         });
       }
     } catch (e) {
-      log(
-        'Error during _loadConfiguration (token refresh or app config init): $e',
+      _log.warning(
+        'Error during _loadConfiguration (token refresh or app config init)',
+        e,
       );
       if (e is FirebaseAuthException) {
-        log(
+        _log.fine(
           'FirebaseAuthException details: code=${e.code}, message=${e.message}',
         );
       }
@@ -377,7 +379,7 @@ class _PurchaseLinkBackfillScreenState
         });
       }
     } catch (e) {
-      log('Error during backfill: $e');
+      _log.severe('Error during backfill', e);
       if (mounted) {
         setState(() {
           _isProcessing = false;
@@ -398,7 +400,7 @@ class _PurchaseLinkBackfillScreenState
         });
       }
     } catch (e) {
-      log('Error pausing backfill: $e');
+      _log.warning('Error pausing backfill', e);
       if (mounted) {
         setState(() {
           _errorDetails = e.toString();
@@ -421,7 +423,7 @@ class _PurchaseLinkBackfillScreenState
         });
       }
     } catch (e) {
-      log('Error checking stats: $e');
+      _log.warning('Error checking stats', e);
       if (mounted) {
         setState(() {
           _statusMessage = 'Error checking status.';
@@ -485,24 +487,28 @@ class _PurchaseLinkBackfillScreenState
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Backfill complete: processed $processed, updated $updated',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Backfill complete: processed $processed, updated $updated',
+            ),
           ),
-        ),
-      );
+        );
+      }
     } catch (e) {
-      log('Backfill uploader emails failed: $e');
+      _log.severe('Backfill uploader emails failed', e);
       if (mounted) {
         setState(() {
           _statusMessage = 'Backfill failed';
           _errorDetails = e.toString();
         });
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Backfill failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Backfill failed: $e')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

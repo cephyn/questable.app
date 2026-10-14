@@ -1,5 +1,5 @@
-import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'package:logging/logging.dart';
 import 'package:cloud_functions/cloud_functions.dart'; // Added for Firebase Functions
 
 /// Priority levels for domains
@@ -34,6 +34,8 @@ class ValidationResult {
 
 /// A class to validate and prioritize purchase links
 class PurchaseLinkValidator {
+  static final _log = Logger('PurchaseLinkValidator');
+
   final List<String> publisherDomains;
   final List<String> marketplaceDomains;
   final List<String> retailerDomains;
@@ -59,12 +61,12 @@ class PurchaseLinkValidator {
   Future<ValidationResult> validate(
       String url, Map<String, String> metadata) async {
     try {
-      log('Validating URL: $url');
+      _log.info('Validating URL: $url');
 
       // Check if the URL uses HTTP/HTTPS protocol
       final urlLower = url.toLowerCase();
       if (!urlLower.startsWith('http://') && !urlLower.startsWith('https://')) {
-        log('URL rejected: Not an HTTP/HTTPS link: $url');
+        _log.info('URL rejected: Not an HTTP/HTTPS link: $url');
         return ValidationResult(
           url: url,
           priority: DomainPriority.unknown,
@@ -75,21 +77,21 @@ class PurchaseLinkValidator {
 
       // Get domain priority
       int priority = getDomainPriority(url);
-      log('Domain priority: $priority');
+      _log.fine('Domain priority: $priority');
 
       // Check URL structure
       int structureScore = getUrlStructureScore(url);
-      log('URL structure score: $structureScore');
+      _log.fine('URL structure score: $structureScore');
 
       // Verify URL accessibility (with timeout)
       bool isAccessible = await isUrlAccessible(url);
-      log('URL accessible: $isAccessible');
+      _log.fine('URL accessible: $isAccessible');
 
       // Check if URL matches title and publisher
       bool titleMatches = checkUrlMatchesTitle(url, metadata);
       bool publisherMatches = checkUrlMatchesPublisher(url, metadata);
-      log('URL matches title: $titleMatches');
-      log('URL matches publisher: $publisherMatches');
+      _log.fine('URL matches title: $titleMatches');
+      _log.fine('URL matches publisher: $publisherMatches');
 
       // Calculate confidence score (0-100)
       int confidenceScore = calculateDetailedConfidenceScore(
@@ -98,13 +100,13 @@ class PurchaseLinkValidator {
           isAccessible: isAccessible,
           titleMatches: titleMatches,
           publisherMatches: publisherMatches);
-      log('Final confidence score: $confidenceScore');
+      _log.info('Final confidence score: $confidenceScore');
 
       // Modified validation logic: URL is valid if confidence score is high enough,
       // even if the accessibility check fails when other indicators are strong
       bool isValid =
           (isAccessible || (confidenceScore >= 60)) && confidenceScore > 30;
-      log('URL validation result: ${isValid ? 'Valid' : 'Invalid'} (score: $confidenceScore)');
+      _log.info('URL validation result: ${isValid ? 'Valid' : 'Invalid'} (score: $confidenceScore)');
 
       return ValidationResult(
         url: url,
@@ -113,7 +115,7 @@ class PurchaseLinkValidator {
         confidenceScore: confidenceScore,
       );
     } catch (e) {
-      log('Error validating URL $url: $e');
+      _log.warning('Error validating URL $url', e);
       return ValidationResult(
         url: url,
         priority: DomainPriority.unknown,
@@ -205,7 +207,7 @@ class PurchaseLinkValidator {
   /// [url] is the URL to check
   /// Returns true if accessible, false otherwise
   Future<bool> isUrlAccessible(String url) async {
-    log('Checking accessibility for URL (via proxy): $url');
+    _log.fine('Checking accessibility for URL (via proxy): $url');
     try {
       // Initialize FirebaseFunctions instance
       // Ensure your Firebase project is correctly configured in your Flutter app
@@ -225,16 +227,16 @@ class PurchaseLinkValidator {
       // This statusCode is from the target URL's response
       if (result.data != null && result.data['statusCode'] != null) {
         final int statusCode = result.data['statusCode'];
-        log('Proxy target URL ($url) responded with status code: $statusCode');
+        _log.fine('Proxy target URL ($url) responded with status code: $statusCode');
         return statusCode >= 200 && statusCode < 300; // 2xx codes indicate success
       } else {
-        log('Proxy response did not include a statusCode for $url.');
+        _log.info('Proxy response did not include a statusCode for $url.');
         return false;
       }
     } on FirebaseFunctionsException catch (e) {
-      log('FirebaseFunctionsException while checking URL $url: ${e.code} - ${e.message}');
+      _log.warning('FirebaseFunctionsException while checking URL $url: ${e.code} - ${e.message}', e);
       if (e.details != null) {
-        log('FirebaseFunctionsException details: ${e.details}');
+        _log.fine('FirebaseFunctionsException details: ${e.details}');
       }
       // Specific handling for common errors from the proxy
       if (e.details != null && e.details is Map) {
@@ -242,16 +244,16 @@ class PurchaseLinkValidator {
         if (detailsMap.containsKey('message')) {
           final String proxyErrorMessage = detailsMap['message'] as String;
           if (proxyErrorMessage.contains('timed out')) {
-            log('URL $url timed out via proxy.');
+            _log.info('URL $url timed out via proxy.');
             // Consider if timeout should be treated as not accessible or a temporary issue
           } else if (proxyErrorMessage.contains('Failed to fetch content')) {
-            log('URL $url failed to fetch via proxy (e.g., 403, 404, 500 from target).');
+            _log.info('URL $url failed to fetch via proxy (e.g., 403, 404, 500 from target).');
           }
         }
       }
       return false; // URL is not accessible if the proxy call fails or target returns error
     } catch (e) {
-      log('Generic error checking URL accessibility via proxy for $url: $e');
+      _log.warning('Generic error checking URL accessibility via proxy for $url', e);
       return false;
     }
   }
@@ -270,12 +272,12 @@ class PurchaseLinkValidator {
           metadata['title']?.toLowerCase() ??
           '';
 
-      log('DEBUG: checkUrlMatchesTitle');
-      log('DEBUG: URL: $urlLower');
-      log('DEBUG: Title: $title');
+      _log.fine('DEBUG: checkUrlMatchesTitle');
+      _log.fine('DEBUG: URL: $urlLower');
+      _log.fine('DEBUG: Title: $title');
 
       if (title.isEmpty) {
-        log('DEBUG: Title is empty');
+        _log.fine('DEBUG: Title is empty');
         return false;
       }
 
@@ -286,18 +288,18 @@ class PurchaseLinkValidator {
           .where((word) => word.length > 3) // Skip short words
           .toList();
 
-      log('DEBUG: Title words to match: $titleWords');
+      _log.fine('DEBUG: Title words to match: $titleWords');
 
       if (titleWords.isEmpty) {
-        log('DEBUG: No significant title words found (all words are too short)');
+        _log.fine('DEBUG: No significant title words found (all words are too short)');
         return false;
       }
 
       int matchCount = 0;
-      log('DEBUG: Checking title words in URL:');
+      _log.fine('DEBUG: Checking title words in URL:');
       for (final word in titleWords) {
         final wordInUrl = urlLower.contains(word);
-        log('DEBUG:   "$word" in URL: ${wordInUrl ? "YES" : "NO"}');
+        _log.fine('DEBUG:   "$word" in URL: ${wordInUrl ? "YES" : "NO"}');
         if (wordInUrl) {
           matchCount++;
         }
@@ -305,16 +307,16 @@ class PurchaseLinkValidator {
 
       // Calculate threshold for matching
       final threshold = titleWords.length / 2;
-      log('DEBUG: Match count: $matchCount out of ${titleWords.length}');
-      log('DEBUG: Threshold: $threshold');
+      _log.fine('DEBUG: Match count: $matchCount out of ${titleWords.length}');
+      _log.fine('DEBUG: Threshold: $threshold');
 
       // If more than half of the significant title words are in the URL,
       // it's likely a match
       final isMatch = matchCount >= threshold;
-      log('DEBUG: Title words match is ${isMatch ? "ABOVE" : "BELOW"} threshold');
+      _log.fine('DEBUG: Title words match is ${isMatch ? "ABOVE" : "BELOW"} threshold');
       return isMatch;
     } catch (e) {
-      log('DEBUG: Error in checkUrlMatchesTitle: $e');
+      _log.warning('DEBUG: Error in checkUrlMatchesTitle', e);
       return false;
     }
   }
@@ -329,21 +331,21 @@ class PurchaseLinkValidator {
       final urlLower = url.toLowerCase();
       final publisher = metadata['publisher']?.toLowerCase() ?? '';
 
-      log('DEBUG: checkUrlMatchesPublisher');
-      log('DEBUG: URL: $urlLower');
-      log('DEBUG: Publisher: $publisher');
+      _log.fine('DEBUG: checkUrlMatchesPublisher');
+      _log.fine('DEBUG: URL: $urlLower');
+      _log.fine('DEBUG: Publisher: $publisher');
 
       if (publisher.isEmpty) {
-        log('DEBUG: Publisher is empty');
+        _log.fine('DEBUG: Publisher is empty');
         return false;
       }
 
       // First try direct string match
       final publisherInUrl = urlLower.contains(publisher);
-      log('DEBUG: Publisher "$publisher" in URL (direct match): ${publisherInUrl ? "YES" : "NO"}');
+      _log.fine('DEBUG: Publisher "$publisher" in URL (direct match): ${publisherInUrl ? "YES" : "NO"}');
 
       if (publisherInUrl) {
-        log('DEBUG: Publisher match is TRUE (direct)');
+        _log.fine('DEBUG: Publisher match is TRUE (direct)');
         return true;
       }
 
@@ -353,12 +355,12 @@ class PurchaseLinkValidator {
       final normalizedUrl = urlLower.replaceAll('-', '');
       final normalizedMatch = normalizedUrl.contains(normalizedPublisher);
 
-      log('DEBUG: Normalized publisher: "$normalizedPublisher"');
-      log('DEBUG: Normalized URL: "$normalizedUrl"');
-      log('DEBUG: Publisher in URL (normalized): ${normalizedMatch ? "YES" : "NO"}');
+      _log.fine('DEBUG: Normalized publisher: "$normalizedPublisher"');
+      _log.fine('DEBUG: Normalized URL: "$normalizedUrl"');
+      _log.fine('DEBUG: Publisher in URL (normalized): ${normalizedMatch ? "YES" : "NO"}');
 
       if (normalizedMatch) {
-        log('DEBUG: Publisher match is TRUE (normalized)');
+        _log.fine('DEBUG: Publisher match is TRUE (normalized)');
         return true;
       }
 
@@ -369,33 +371,33 @@ class PurchaseLinkValidator {
             .where((word) => word.length > 3) // Skip short words
             .toList();
 
-        log('DEBUG: Publisher words to match: $publisherWords');
+        _log.fine('DEBUG: Publisher words to match: $publisherWords');
 
         if (publisherWords.isNotEmpty) {
           int matchCount = 0;
           for (final word in publisherWords) {
             if (urlLower.contains(word)) {
-              log('DEBUG: Publisher word "$word" found in URL');
+              _log.fine('DEBUG: Publisher word "$word" found in URL');
               matchCount++;
             }
           }
 
           // If we match at least half of the publisher words, it's likely a match
           final wordThreshold = publisherWords.length / 2;
-          log('DEBUG: Publisher word match count: $matchCount out of ${publisherWords.length}');
-          log('DEBUG: Publisher word threshold: $wordThreshold');
+          _log.fine('DEBUG: Publisher word match count: $matchCount out of ${publisherWords.length}');
+          _log.fine('DEBUG: Publisher word threshold: $wordThreshold');
 
           if (matchCount >= wordThreshold) {
-            log('DEBUG: Publisher words match is ABOVE threshold');
+            _log.fine('DEBUG: Publisher words match is ABOVE threshold');
             return true;
           }
         }
       }
 
-      log('DEBUG: No publisher match found');
+      _log.fine('DEBUG: No publisher match found');
       return false;
     } catch (e) {
-      log('DEBUG: Error in checkUrlMatchesPublisher: $e');
+      _log.warning('DEBUG: Error in checkUrlMatchesPublisher', e);
       return false;
     }
   }

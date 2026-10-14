@@ -308,15 +308,17 @@ class _FilterDrawerState extends State<FilterDrawer> {
               onPressed: () async {
                 final name = _saveFilterNameController.text.trim();
                 if (name.isNotEmpty) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(context);
                   final success = await provider.saveCurrentFilters(name);
-                  Navigator.of(context).pop();
+                  navigator.pop();
 
                   if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(content: Text('Saved filter set: $name')),
                     );
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(
                           content: Text('Failed to save filter set')),
                     );
@@ -358,15 +360,17 @@ class _FilterDrawerState extends State<FilterDrawer> {
             TextButton(
               child: const Text('DELETE'),
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
                 final success = await provider.deleteSavedFilterSet(name);
-                Navigator.of(context).pop();
+                navigator.pop();
 
                 if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text('Deleted filter set: $name')),
                   );
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     const SnackBar(
                         content: Text('Failed to delete filter set')),
                   );

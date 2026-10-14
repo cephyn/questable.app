@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 
 /// A widget to collect user feedback on game system standardization.
 class GameSystemFeedbackWidget extends StatefulWidget {
@@ -20,6 +20,7 @@ class GameSystemFeedbackWidget extends StatefulWidget {
 }
 
 class _GameSystemFeedbackWidgetState extends State<GameSystemFeedbackWidget> {
+  static final _log = Logger('GameSystemFeedback');
   bool _feedbackSubmitted = false;
   bool _isLoading = false;
 
@@ -33,13 +34,12 @@ class _GameSystemFeedbackWidgetState extends State<GameSystemFeedbackWidget> {
 
     try {
       // Log feedback details
-      developer.log(
+      _log.info(
           'Game System Feedback Submitted: '
           'QuestID=${widget.questId}, '
           'Original=${widget.originalSystem}, '
           'Standardized=${widget.standardizedSystem}, '
-          'UserReportedCorrect=$isCorrect',
-          name: 'GameSystemFeedback');
+          'UserReportedCorrect=$isCorrect');
 
       // --- Optional: Store feedback in Firestore ---
       /*
@@ -64,8 +64,7 @@ class _GameSystemFeedbackWidgetState extends State<GameSystemFeedbackWidget> {
         );
       }
     } catch (e) {
-      developer.log('Error submitting feedback: $e',
-          name: 'GameSystemFeedback', error: e);
+      _log.warning('Error submitting feedback', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error submitting feedback: $e')),

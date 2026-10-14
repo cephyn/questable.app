@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:quest_cards/src/auth/user_context.dart';
 import 'package:quest_cards/src/models/standard_game_system.dart';
@@ -20,6 +21,7 @@ class GameSystemDetailView extends StatefulWidget {
 }
 
 class _GameSystemDetailViewState extends State<GameSystemDetailView> {
+  static final _log = Logger('GameSystemDetailView');
   final _formKey = GlobalKey<FormState>();
   final GameSystemService _gameSystemService = GameSystemService();
   final GameSystemMigrationService _migrationService =
@@ -108,6 +110,7 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
 
       if (_isEditing) {
         await _gameSystemService.updateGameSystem(gameSystem);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Game system updated successfully')),
         );
@@ -115,6 +118,7 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
         //final id = await _gameSystemService.createGameSystem(gameSystem);
         await _gameSystemService.createGameSystem(
             gameSystem); // Fix: Uncommented and removed unused 'id'
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Game system created successfully')),
         );
@@ -122,11 +126,12 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
 
       Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -241,7 +246,7 @@ class _GameSystemDetailViewState extends State<GameSystemDetailView> {
       setState(() {
         _isLoadingPreview = false;
       });
-      debugPrint('Error loading affected quests preview: $e');
+      _log.warning('Error loading affected quests preview', e);
     }
   }
 

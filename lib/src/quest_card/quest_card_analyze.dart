@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:developer';
 import 'dart:math' as math;
 import 'dart:async';
 // Import needed for WriteBatch
@@ -8,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:logging/logging.dart';
 import 'package:mime/mime.dart';
 import 'package:quest_cards/src/services/email_service.dart';
 import 'package:quest_cards/src/services/firebase_functions_service.dart';
@@ -22,6 +22,8 @@ import '../services/firestore_service.dart';
 import '../util/utils.dart';
 import 'quest_card.dart';
 import 'quest_card_list_view.dart';
+
+final _log = Logger('QuestCardAnalyze');
 
 class QuestCardAnalyze extends StatefulWidget {
   const QuestCardAnalyze({super.key});
@@ -273,7 +275,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         );
       }
     } catch (e) {
-      log("Error during analysis: $e");
+      _log.warning("Error during analysis", e);
       ClientTelemetryService.emit(
         ClientTelemetryService.error(
           stage: 'handleAnalysis',
@@ -293,7 +295,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   }
 
   Future<List<String>> autoAnalyzeFile() async {
-    log("Auto analyze file");
+    _log.info("Auto analyze file");
     if (_file == null) {
       throw Exception("No file selected for analysis.");
     }
@@ -304,7 +306,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       }
       // Upload the file (or its converted content) ONCE
       var mimeType = lookupMimeType(_file!.name);
-      log('File MIME type: ${mimeType ?? 'unknown'}');
+      _log.info('File MIME type: ${mimeType ?? 'unknown'}');
 
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
@@ -319,7 +321,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       );
 
       if (mimeType == 'application/pdf') {
-        log('Converting PDF to Markdown...');
+        _log.info('Converting PDF to Markdown...');
         if (mounted) {
           setState(() => _stage = 'pdf_to_md');
         }
@@ -352,7 +354,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
             );
           },
         );
-        log('Generated Markdown uploaded to: $url');
+        _log.info('Generated Markdown uploaded to: $url');
         ClientTelemetryService.emit(
           ClientTelemetryService.event(
             stage: 'pdf_to_md_done',
@@ -361,7 +363,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           ),
         );
       } else if (mimeType != null && mimeType.startsWith('text/')) {
-        log('Uploading text file...');
+        _log.info('Uploading text file...');
         if (mounted) {
           setState(() => _stage = 'uploading_text');
         }
@@ -369,13 +371,13 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         url = await firebaseStorageService.uploadFile(_file!);
       } else {
         // Handle other file types if necessary, or treat as generic upload
-        log('Uploading generic file...');
+        _log.info('Uploading generic file...');
         if (mounted) {
           setState(() => _stage = 'uploading_generic');
         }
         url = await firebaseStorageService.uploadFile(_file!);
       }
-      log('File uploaded to: $url');
+      _log.info('File uploaded to: $url');
 
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
@@ -386,7 +388,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       );
 
       // Analyze the file using AI service to determine contents
-      log('Determining adventure type...');
+      _log.info('Determining adventure type...');
       if (mounted) {
         setState(() => _stage = 'ai_determine_type');
       }
@@ -415,7 +417,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           'Could not determine adventure type (empty AI response).',
         );
       }
-      log('Determined adventure type: $adventureType');
+      _log.info('Determined adventure type: $adventureType');
 
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
@@ -499,8 +501,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
 
       return resultDocIds;
     } catch (e, s) {
-      log("Error in autoAnalyzeFile: $e");
-      log("Stacktrace: $s");
+      _log.severe("Error in autoAnalyzeFile", e, s);
 
       final failedStage = _stage;
 
@@ -527,7 +528,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           },
         );
       } catch (reportError) {
-        log('Failed to report client error: $reportError');
+        _log.warning('Failed to report client error', reportError);
       }
 
       if (mounted) {
@@ -539,17 +540,21 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       // Attempt to delete the file even if analysis failed
       if (url != null) {
         try {
-          log('Deleting uploaded file after error...');
+          _log.info('Deleting uploaded file after error...');
           bool success = await firebaseStorageService.deleteFile(url);
           if (success) {
-            log('File deleted successfully.');
+            _log.info('File deleted successfully.');
           } else {
-            log(
+            _log.warning(
               'Failed to delete file after error. It may not exist or you may not have permission.',
             );
           }
-        } catch (deleteError) {
-          log('Exception while trying to delete file: $deleteError');
+        } catch (deleteError, deleteStack) {
+          _log.warning(
+            'Exception while trying to delete file',
+            deleteError,
+            deleteStack,
+          );
           // We don't rethrow here to avoid masking the original error
         }
       }
@@ -559,10 +564,10 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   }
 
   Future<List<String>> analyzeSingleFile(String fileUrl) async {
-    log("Analyze single quest file from URL: $fileUrl");
+    _log.info("Analyze single quest file from URL: $fileUrl");
     try {
       // Start AI metadata extraction
-      log('Calling AI service for single file analysis...');
+      _log.info('Calling AI service for single file analysis...');
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
           stage: 'ai_single_generate_start',
@@ -602,22 +607,22 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         questCard.uploadedBy = currentUser.uid;
         questCard.uploaderEmail = currentUser.email;
         questCard.uploadedTimestamp = DateTime.now();
-        log(
+        _log.info(
           'Set uploader info: UID - ${currentUser.uid}, Email - ${currentUser.email}',
         );
       } else {
-        log('Error: Current user is null, cannot set uploader information.');
+        _log.warning('Current user is null, cannot set uploader information.');
         // Handle cases where user might not be available, though this should ideally not happen here
         // For example, by throwing an error or setting default/anonymous values if appropriate
       }
 
-      log('AI analysis complete. Title: ${questCard.title}');
+      _log.info('AI analysis complete. Title: ${questCard.title}');
 
       // If productTitle is blank, set it to title
       if (questCard.productTitle == null ||
           questCard.productTitle!.trim().isEmpty) {
         questCard.productTitle = questCard.title;
-        log(
+        _log.info(
           'Product title was blank after AI analysis, set to title: ${questCard.title}',
         );
       }
@@ -626,26 +631,26 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       String? purchaseLink = await purchaseLinkFuture;
       if (purchaseLink != null && purchaseLink.isNotEmpty) {
         questCard.link = purchaseLink;
-        log('Purchase link found: ${questCard.link}');
+        _log.info('Purchase link found: ${questCard.link}');
       }
 
       // Check for duplicates
-      log('Checking for duplicate title: ${questCard.title}');
+      _log.fine('Checking for duplicate title: ${questCard.title}');
       String? dupeId = await firestoreService.getQuestByTitle(
         questCard.title ?? '',
       );
 
       if (dupeId != null) {
         // A duplicate is found
-        log(
+        _log.info(
           "Duplicate found: $dupeId for title '${questCard.title}'. Returning existing ID.",
         );
         return [dupeId];
       } else {
-        log("No duplicate found for title '${questCard.title}'.");
+        _log.info("No duplicate found for title '${questCard.title}'.");
         // Check classification
         if (questCard.classification != 'Adventure') {
-          log(
+          _log.info(
             'Classification is not Adventure (${questCard.classification}). Sending notification.',
           );
           // AI has determined it is not an adventure, send an email to admin
@@ -655,7 +660,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         }
 
         // No duplicate found, add the new quest card
-        log('Adding new quest card to Firestore...');
+        _log.info('Adding new quest card to Firestore...');
         ClientTelemetryService.emit(
           ClientTelemetryService.event(
             stage: 'firestore_add_quest_start',
@@ -667,7 +672,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           ),
         );
         String docId = await firestoreService.addQuestCard(questCard);
-        log('New quest card added with ID: $docId');
+        _log.info('New quest card added with ID: $docId');
         ClientTelemetryService.emit(
           ClientTelemetryService.event(
             stage: 'firestore_add_quest_done',
@@ -678,8 +683,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         return [docId];
       }
     } catch (e, s) {
-      log("Error in analyzeSingleFile: $e");
-      log("Stacktrace: $s");
+      _log.severe("Error in analyzeSingleFile", e, s);
       ClientTelemetryService.emit(
         ClientTelemetryService.error(
           stage: 'analyzeSingleFile',
@@ -695,7 +699,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   }
 
   Future<List<String>> analyzeMultiFile(String fileUrl) async {
-    log("Analyze multiple quest file from URL: $fileUrl");
+    _log.info("Analyze multiple quest file from URL: $fileUrl");
     List<String> resultingDocIds = [];
     List<QuestCard> cardsToAdd = [];
     List<Map<String, dynamic>> nonAdventureCardsData = [];
@@ -704,7 +708,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       // REMOVED redundant file upload
 
       // Analyze the file using AI service
-      log('Calling AI service for multi-file analysis...');
+      _log.info('Calling AI service for multi-file analysis...');
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
           stage: 'ai_multi_generate_start',
@@ -775,10 +779,10 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           .toList()
           .cast<String>(); // Ensure non-null, non-empty titles
 
-      log('Checking ${titlesToCheck.length} titles for duplicates...');
+      _log.info('Checking ${titlesToCheck.length} titles for duplicates...');
       Map<String, String> existingTitles = await firestoreService
           .getQuestsByTitles(titlesToCheck);
-      log('Found ${existingTitles.length} existing titles.');
+      _log.info('Found ${existingTitles.length} existing titles.');
       ClientTelemetryService.emit(
         ClientTelemetryService.event(
           stage: 'multi_duplicate_check_done',
@@ -798,11 +802,11 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       if (currentUser != null) {
         currentUserId = currentUser.uid;
         currentUserEmail = currentUser.email;
-        log(
+        _log.info(
           'Current user for multi-file: UID - $currentUserId, Email - $currentUserEmail',
         );
       } else {
-        log(
+        _log.warning(
           'Error: Current user is null for multi-file analysis. UploadedBy and uploaderEmail will be null.',
         );
         // Decide how to handle this - throw error, or allow anonymous if your model supports it
@@ -820,7 +824,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         // If productTitle is blank, set it to title
         if (q.productTitle == null || q.productTitle!.trim().isEmpty) {
           q.productTitle = q.title;
-          log(
+          _log.info(
             'Product title was blank after AI analysis for multi-file, set to title: ${q.title}',
           );
         }
@@ -830,17 +834,17 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
         if (titleLower != null && existingTitles.containsKey(titleLower)) {
           // Duplicate found
           String dupeId = existingTitles[titleLower]!;
-          log(
+          _log.info(
             "Duplicate found: $dupeId for title '${q.title}'. Adding existing ID.",
           );
           resultingDocIds.add(dupeId);
         } else {
-          log("No duplicate found for title '${q.title}'. Preparing to add.");
+          _log.info("No duplicate found for title '${q.title}'. Preparing to add.");
           // Not a duplicate, prepare for batch write
           cardsToAdd.add(q);
           // Check classification for potential email notification
           if (q.classification != 'Adventure') {
-            log(
+            _log.info(
               "Classification is not Adventure (${q.classification}) for title '${q.title}'. Queuing notification.",
             );
             nonAdventureCardsData.add(
@@ -852,7 +856,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
 
       // --- Batch Write ---
       if (cardsToAdd.isNotEmpty) {
-        log('Adding ${cardsToAdd.length} new quest cards in a batch...');
+        _log.info('Adding ${cardsToAdd.length} new quest cards in a batch...');
         ClientTelemetryService.emit(
           ClientTelemetryService.event(
             stage: 'firestore_add_multiple_start',
@@ -864,7 +868,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           cardsToAdd,
         );
         resultingDocIds.addAll(newDocIds);
-        log('Batch write complete. Added IDs: $newDocIds');
+        _log.info('Batch write complete. Added IDs: $newDocIds');
         ClientTelemetryService.emit(
           ClientTelemetryService.event(
             stage: 'firestore_add_multiple_done',
@@ -880,22 +884,21 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
 
       // --- Handle Non-Adventure Notifications ---
       if (nonAdventureCardsData.isNotEmpty) {
-        log(
+        _log.info(
           'Sending notifications for ${nonAdventureCardsData.length} non-adventure items...',
         );
         // Consider batching emails if your EmailService supports it
         for (var cardData in nonAdventureCardsData) {
           await emailService.sendNonAdventureEmailToAdmin(jsonEncode(cardData));
         }
-        log('Non-adventure notifications sent.');
+        _log.info('Non-adventure notifications sent.');
       }
       // --- End Notifications ---
 
-      log('Total resulting document IDs: ${resultingDocIds.length}');
+      _log.info('Total resulting document IDs: ${resultingDocIds.length}');
       return resultingDocIds;
     } catch (e, s) {
-      log("Error in analyzeMultiFile: $e");
-      log("Stacktrace: $s");
+      _log.severe("Error in analyzeMultiFile", e, s);
       ClientTelemetryService.emit(
         ClientTelemetryService.error(
           stage: 'analyzeMultiFile',
@@ -967,13 +970,13 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   /// Searches for a purchase link based on metadata
   Future<String?> _searchForPurchaseLink(Map<String, dynamic> metadata) async {
     if (metadata['productTitle']?.isEmpty ?? true) {
-      log('No product title in metadata, skipping purchase link search');
+      _log.info('No product title in metadata, skipping purchase link search');
       return null;
     }
 
     try {
-      log('Searching for purchase link for ${metadata['productTitle']}');
-      log(
+      _log.info('Searching for purchase link for ${metadata['productTitle']}');
+      _log.fine(
         'Search metadata: ${metadata['publisher'] ?? 'unknown publisher'}, ${metadata['gameSystem'] ?? 'unknown system'}',
       );
 
@@ -981,14 +984,14 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
       var result = await compute(_isolatedPurchaseLinkSearch, metadata);
 
       if (result == null) {
-        log('No purchase link found for ${metadata['productTitle']}');
+        _log.info('No purchase link found for ${metadata['productTitle']}');
       } else {
-        log('Purchase link found: $result');
+        _log.info('Purchase link found: $result');
       }
 
       return result;
-    } catch (e) {
-      log('Error in purchase link search: $e');
+    } catch (e, st) {
+      _log.warning('Error in purchase link search', e, st);
       return null;
     }
   }
@@ -1006,7 +1009,7 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
   }
 
   Future<List<String>> callTestFunction(String s) async {
-    log("Calling test function");
+    _log.info("Calling test function");
     List<String> results = [];
     try {
       var x = await FirebaseFunctions.instance
@@ -1014,10 +1017,10 @@ class _QuestCardAnalyzeState extends State<QuestCardAnalyze> {
           .call({'text': s});
 
       results.add(x.data.toString());
-      log("Results: $results");
+      _log.info("Results: $results");
       return results;
-    } catch (e) {
-      log("Error in testFunction: $e");
+    } catch (e, st) {
+      _log.severe("Error in testFunction", e, st);
       rethrow; // Rethrow the exception after logging
     }
   }

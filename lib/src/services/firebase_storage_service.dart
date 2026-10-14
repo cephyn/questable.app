@@ -5,11 +5,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart';
 import 'package:mime/mime.dart';
 
 import '../util/utils.dart';
 
 class FirebaseStorageService {
+  static final _log = Logger('FirebaseStorageService');
+
   final storage = FirebaseStorage.instance;
 
   // Map to keep track of download URLs to their corresponding storage paths
@@ -109,7 +112,7 @@ class FirebaseStorageService {
       // Fall back to the refFromURL method, which may not work with download URLs
       return storage.refFromURL(url);
     } catch (e) {
-      debugPrint('Error getting file reference: $e');
+      _log.warning('Error getting file reference', e);
       return null;
     }
   }
@@ -122,7 +125,7 @@ class FirebaseStorageService {
       String downloadUrl = await fileReference.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      debugPrint('Error getting download URL: $e, falling back to gs:// URL');
+      _log.warning('Error getting download URL, falling back to gs:// URL', e);
       // Fall back to gs:// URL format
       final bucket = fileReference.bucket;
       final fullPath = fileReference.fullPath;
@@ -163,14 +166,14 @@ class FirebaseStorageService {
           }
 
           if (path.isNotEmpty) {
-            debugPrint('Attempting to delete file with extracted path: $path');
+            _log.fine('Attempting to delete file with extracted path: $path');
             fileReference = storage.ref(path);
           } else {
-            debugPrint('Could not extract path from URL: $url');
+            _log.warning('Could not extract path from URL: $url');
             return false;
           }
         } catch (pathError) {
-          debugPrint('Error extracting path from URL: $pathError');
+          _log.warning('Error extracting path from URL', pathError);
           return false;
         }
       }
@@ -191,7 +194,7 @@ class FirebaseStorageService {
       return true; // Return true on successful deletion
     } catch (e) {
       // Log error but don't rethrow so application flow isn't interrupted
-      debugPrint('Error deleting file from storage: $e');
+      _log.warning('Error deleting file from storage', e);
       return false; // Return false on failed deletion
     }
   }

@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/filters/filter_state.dart';
 import 'package:quest_cards/src/services/email_service.dart';
 import 'package:rxdart/rxdart.dart'; // Import rxdart
@@ -10,6 +10,8 @@ import '../quest_card/quest_card.dart';
 import '../user/local_user.dart';
 
 class FirestoreService {
+  static final _log = Logger('FirestoreService');
+
   //get collection of quest cards
   final CollectionReference questCards =
       FirebaseFirestore.instance.collection('questCards');
@@ -29,7 +31,7 @@ class FirestoreService {
         return [];
       }
     } catch (e) {
-      log('Error fetching owned quest IDs for user $userId: $e');
+      _log.warning('Error fetching owned quest IDs for user $userId', e);
       return []; // Return empty list on error
     }
   }
@@ -115,7 +117,7 @@ class FirestoreService {
     // --- Ownership Filter Logic ---
     if (userId != null && ownershipFilter != null) {
       List<String> ownedQuestIds = await _fetchOwnedQuestIds(userId);
-      log('Ownership filter active. User: $userId, Owned IDs: ${ownedQuestIds.length}, Filter: ${ownershipFilter.value}');
+      _log.fine('Ownership filter active. User: $userId, Owned IDs: ${ownedQuestIds.length}, Filter: ${ownershipFilter.value}');
 
       if (ownershipFilter.value == 'owned') {
         if (ownedQuestIds.isEmpty) {
@@ -154,7 +156,7 @@ class FirestoreService {
           } else {
             // Filtering all quests: Use whereNotIn if possible (<= 30 IDs)
             if (ownedQuestIds.length <= 30) {
-              log('Applying whereNotIn for unowned filter.');
+              _log.fine('Applying whereNotIn for unowned filter.');
               baseQuery = baseQuery.where(FieldPath.documentId,
                   whereNotIn: ownedQuestIds);
               // We applied the filter directly to baseQuery, don't use whereIn later
@@ -164,7 +166,7 @@ class FirestoreService {
               // For now, we log and proceed without this specific filter.
               // A more robust solution might involve fetching all IDs and filtering client-side,
               // or fetching owned IDs and then querying in batches, which is complex.
-              log('Warning: Cannot apply "unowned" filter efficiently as user owns > 30 quests. Returning all quests matching other filters.');
+              _log.warning('Cannot apply "unowned" filter efficiently as user owns > 30 quests. Returning all quests matching other filters.');
               // Proceed without adding whereNotIn, effectively ignoring the unowned filter in this edge case.
               useWhereInQuery =
                   false; // Ensure we don't accidentally use whereIn later
@@ -177,7 +179,7 @@ class FirestoreService {
 
     // Apply standard filters (excluding ownership)
     if (effectiveFilterState != null && effectiveFilterState.hasFilters) {
-      log('Applying standard filters: ${effectiveFilterState.filters}');
+      _log.fine('Applying standard filters: ${effectiveFilterState.filters}');
       baseQuery = effectiveFilterState.applyFiltersToQuery(baseQuery);
     }
 
@@ -186,9 +188,9 @@ class FirestoreService {
     // Firestore requires the first orderBy field to match the inequality/whereIn field.
     if (!useWhereInQuery) {
       baseQuery = baseQuery.orderBy('title');
-      log('Applied default title sort.');
+      _log.fine('Applied default title sort.');
     } else {
-      log('Skipping default sort due to whereIn filter.');
+      _log.fine('Skipping default sort due to whereIn filter.');
       // If useWhereInQuery is true, results might not be sorted unless
       // the filter state itself included an orderBy on FieldPath.documentId
     }
@@ -204,14 +206,14 @@ class FirestoreService {
       }
 
       if (targetDocIds.length <= limit) {
-        log('Executing single whereIn query for ${targetDocIds.length} IDs.');
+        _log.fine('Executing single whereIn query for ${targetDocIds.length} IDs.');
         Query finalQuery =
             baseQuery.where(FieldPath.documentId, whereIn: targetDocIds);
         yield* finalQuery
             .snapshots()
             .map((snapshot) => snapshot.docs); // Use yield*
       } else {
-        log('Executing chunked whereIn query for ${targetDocIds.length} IDs.');
+        _log.fine('Executing chunked whereIn query for ${targetDocIds.length} IDs.');
         List<Stream<List<QueryDocumentSnapshot>>> streams = [];
         for (int i = 0; i < targetDocIds.length; i += limit) {
           List<String> chunk = targetDocIds.sublist(
@@ -237,7 +239,7 @@ class FirestoreService {
           for (final doc in combinedDocs) {
             uniqueDocs[doc.id] = doc;
           }
-          log('Combined ${uniqueDocs.length} unique docs from chunks.');
+          _log.fine('Combined ${uniqueDocs.length} unique docs from chunks.');
           // Sort combined results by title if default sort was skipped due to whereIn
           var sortedDocs = uniqueDocs.values.toList();
           try {
@@ -251,14 +253,14 @@ class FirestoreService {
               return titleA.compareTo(titleB);
             });
           } catch (e) {
-            log("Error sorting combined docs by title: $e");
+            _log.warning('Error sorting combined docs by title', e);
           }
           return sortedDocs;
         });
       }
     } else {
       // Execute the baseQuery (which might have whereNotIn or just standard filters)
-      log('Executing query without whereIn.');
+      _log.fine('Executing query without whereIn.');
       yield* baseQuery
           .snapshots()
           .map((snapshot) => snapshot.docs); // Use yield*
@@ -306,7 +308,7 @@ class FirestoreService {
       var res = await query.count().get();
       return res.count ?? 0;
     } catch (e) {
-      log("Error getting public quest card count: $e");
+      _log.warning('Error getting public quest card count', e);
       return 0;
     }
   }
@@ -345,10 +347,10 @@ class FirestoreService {
       final snapshot = await query.get();
       return snapshot.docs;
     } catch (e) {
-      log("Error fetching public quest card batch: $e");
+      _log.warning('Error fetching public quest card batch', e);
       // Log specific Firestore errors if helpful
       if (e is FirebaseException) {
-        log("Firestore error code: ${e.code}, message: ${e.message}");
+        _log.fine('Firestore error code: ${e.code}, message: ${e.message}');
       }
       return []; // Return empty list on error
     }
@@ -385,7 +387,7 @@ class FirestoreService {
         if (ownedQuestIds.length <= 30) {
           query = query.where(FieldPath.documentId, whereIn: ownedQuestIds);
         } else {
-          log('Warning: Count for "Owned" filter may be inaccurate (user owns > 30 quests).');
+          _log.warning('Count for "Owned" filter may be inaccurate (user owns > 30 quests).');
           // Cannot apply whereIn filter for count(). Returning count matching *other* filters.
           // Or return -1 to indicate inaccuracy? Let's return the count without this filter for now.
         }
@@ -395,7 +397,7 @@ class FirestoreService {
         } else if (ownedQuestIds.length <= 30) {
           query = query.where(FieldPath.documentId, whereNotIn: ownedQuestIds);
         } else {
-          log('Warning: Count for "Unowned" filter may be inaccurate (user owns > 30 quests).');
+          _log.warning('Count for "Unowned" filter may be inaccurate (user owns > 30 quests).');
           // Cannot apply whereNotIn filter for count(). Returning count matching *other* filters.
         }
       }
@@ -406,10 +408,10 @@ class FirestoreService {
       var res = await query.count().get();
       return res.count ?? 0;
     } catch (e) {
-      log("Error getting quest card count: $e");
+      _log.warning('Error getting quest card count', e);
       // Log specific Firestore errors if helpful
       if (e is FirebaseException) {
-        log("Firestore error code: ${e.code}, message: ${e.message}");
+        _log.fine('Firestore error code: ${e.code}, message: ${e.message}');
       }
       return 0; // Return 0 on error
     }
@@ -445,15 +447,15 @@ class FirestoreService {
         return [];
       }
     } catch (e) {
-      log('Error fetching similar quests for quest $questId: $e');
+      _log.warning('Error fetching similar quests for quest $questId', e);
       return []; // Return empty list on error
     }
   }
 
   //update
   Future<void> updateQuestCard(String docId, QuestCard questCard) {
-    log("Updating quest card with ID: $docId");
-    log(questCard.toJson().toString());
+    _log.info("Updating quest card with ID: $docId");
+    _log.fine(questCard.toJson().toString());
     return questCards.doc(docId).update({
       'id': questCard.id,
       'title':
@@ -514,7 +516,7 @@ class FirestoreService {
       return questId;
     } catch (e) {
       // Log any error that occurs
-      log("Error completing: $e");
+      _log.warning("Error completing", e);
       return null;
     }
   }
@@ -540,11 +542,11 @@ class FirestoreService {
         return LocalUser.fromMap(
             documentSnapshot.data() as Map<String, dynamic>);
       } else {
-        log("User document not found: $userId");
+        _log.warning("User document not found: $userId");
         return null;
       }
     } catch (e) {
-      log("Error getting user document $userId: $e");
+      _log.warning("Error getting user document $userId", e);
       return null;
     }
   }
@@ -558,7 +560,7 @@ class FirestoreService {
         return List<String>.from(data['roles'] ?? []);
       }
     } catch (e) {
-      log("Error getting user roles $userId: $e");
+      _log.warning("Error getting user roles $userId", e);
     }
     return null;
   }
@@ -578,7 +580,7 @@ class FirestoreService {
         await emailService.sendActivationEmail(email);
       }
     } catch (e) {
-      log('Error storing user roles $userId: $e');
+      _log.warning('Error storing user roles $userId', e);
     }
   }
 
@@ -628,7 +630,7 @@ class FirestoreService {
         }
       }
     } catch (e) {
-      log("Error in getQuestsByTitles: $e");
+      _log.warning("Error in getQuestsByTitles", e);
       // Depending on requirements, you might want to rethrow or handle differently
     }
     return existingTitles;
@@ -682,9 +684,9 @@ class FirestoreService {
 
         // Commit batch if limit is reached and start a new one
         if (operationCount == batchLimit) {
-          log('Committing batch of $operationCount operations...');
+          _log.info('Committing batch of $operationCount operations...');
           await batch.commit();
-          log('Batch committed.');
+          _log.info('Batch committed.');
           batch = FirebaseFirestore.instance.batch(); // Start new batch
           operationCount = 0;
         }
@@ -692,12 +694,12 @@ class FirestoreService {
 
       // Commit any remaining operations in the last batch
       if (operationCount > 0) {
-        log('Committing final batch of $operationCount operations...');
+        _log.info('Committing final batch of $operationCount operations...');
         await batch.commit();
-        log('Final batch committed.');
+        _log.info('Final batch committed.');
       }
     } catch (e) {
-      log("Error adding multiple quest cards: $e");
+      _log.warning("Error adding multiple quest cards", e);
       // Consider how to handle partial failures if needed
       return []; // Return empty list or partial list depending on requirements
     }
@@ -725,7 +727,7 @@ class FirestoreService {
       QuerySnapshot querySnapshot = await query.get();
       return querySnapshot.docs;
     } catch (e) {
-      log("Error fetching unstandardized quest cards: $e");
+      _log.warning("Error fetching unstandardized quest cards", e);
       return [];
     }
   }
@@ -746,7 +748,7 @@ class FirestoreService {
           'originalEditionForReview': originalEdition,
       });
     } catch (e) {
-      log("Error updating standardization status for $docId: $e");
+      _log.warning("Error updating standardization status for $docId", e);
     }
   }
 
@@ -758,9 +760,9 @@ class FirestoreService {
       await users.doc(userId).collection('ownedQuests').doc(questId).set({
         'addedTimestamp': Timestamp.now(),
       });
-      log('Added quest $questId to owned list for user $userId');
-    } catch (e) {
-      log('Error adding owned quest $questId for user $userId: $e');
+      _log.info('Added quest $questId to owned list for user $userId');
+    } catch (e, st) {
+      _log.severe('Error adding owned quest $questId for user $userId', e, st);
       // Rethrow or handle as needed
       rethrow;
     }
@@ -770,9 +772,9 @@ class FirestoreService {
   Future<void> removeOwnedQuest(String userId, String questId) async {
     try {
       await users.doc(userId).collection('ownedQuests').doc(questId).delete();
-      log('Removed quest $questId from owned list for user $userId');
-    } catch (e) {
-      log('Error removing owned quest $questId for user $userId: $e');
+      _log.info('Removed quest $questId from owned list for user $userId');
+    } catch (e, st) {
+      _log.severe('Error removing owned quest $questId for user $userId', e, st);
       // Rethrow or handle as needed
       rethrow;
     }
@@ -791,7 +793,7 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.exists) // True if the document exists
         .handleError((error) {
-      log('Error checking ownership for user $userId, quest $questId: $error');
+      _log.warning('Error checking ownership for user $userId, quest $questId', error);
       return false; // Assume not owned on error
     });
   }
@@ -814,7 +816,7 @@ class FirestoreService {
       final snapshot = await query.get();
       return snapshot.docs;
     } catch (e) {
-      log('Error fetching owned quests batch for user $userId: $e');
+      _log.warning('Error fetching owned quests batch for user $userId', e);
       return [];
     }
   }
@@ -850,13 +852,13 @@ class FirestoreService {
               results.add(questCard);
             }
           } catch (e) {
-            log("Error parsing QuestCard from Firestore doc ${doc.id}: $e");
+            _log.warning("Error parsing QuestCard from Firestore doc ${doc.id}", e);
             // Optionally skip this card or handle error differently
           }
         }
       }
     } catch (e) {
-      log("Error fetching quest cards by IDs: $e");
+      _log.warning("Error fetching quest cards by IDs", e);
       // Depending on requirements, might want to return partial results or rethrow
     }
 
@@ -868,7 +870,7 @@ class FirestoreService {
         return titleA.compareTo(titleB);
       });
     } catch (e) {
-      log("Error sorting final results by title: $e");
+      _log.warning("Error sorting final results by title", e);
     }
 
     return results;

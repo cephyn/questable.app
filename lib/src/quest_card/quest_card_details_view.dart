@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:logging/logging.dart';
 import 'package:quest_cards/src/navigation/root_navigator.dart';
 import 'package:quest_cards/src/quest_card/quest_card_edit.dart';
 import 'package:quest_cards/src/services/firestore_service.dart';
@@ -32,6 +33,7 @@ class QuestCardDetailsView extends StatefulWidget {
 }
 
 class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
+  static final _log = Logger('QuestCardDetailsView');
   final FirestoreService _firestoreService = FirestoreService();
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   late UserService _userService; // Added UserService
@@ -82,7 +84,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
             // Extract data from the snapshot
             _questCardData = snapshot.data() as Map<String, dynamic>?;
             // Log data to help with debugging
-            debugPrint(
+            _log.info(
                 'Loaded quest card data: ${_questCardData?['title'] ?? "N/A"}');
           } else {
             _hasError = true;
@@ -140,7 +142,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
         setState(() {
           _isLoadingSimilarQuests = false;
           // Optionally, set an error message for similar quests
-          debugPrint('Error loading similar quests: $e');
+          _log.warning('Error loading similar quests', e);
         });
       }
     }
@@ -161,7 +163,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating ownership: \$e')),
+          SnackBar(content: Text('Error updating ownership: $e')),
         );
       }
     }
@@ -807,7 +809,7 @@ class _QuestCardDetailsViewState extends State<QuestCardDetailsView> {
     } catch (e) {
       // Catch errors related to *initiating* the share (e.g., logging analytics)
       // Errors during actual sharing (copy, launch URL) are handled in the modal
-      debugPrint('Error initiating share action: $e');
+      _log.warning('Error initiating share action', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not start sharing process.')),

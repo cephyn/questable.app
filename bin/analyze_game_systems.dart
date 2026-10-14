@@ -7,9 +7,9 @@ import 'dart:io';
 // Setup error logging to file
 void logMessage(String message, {bool isError = false}) {
   if (isError) {
-    print('ERROR: $message');
+    stdout.writeln('ERROR: $message');
   } else {
-    print(message);
+    stdout.writeln(message);
   }
 
   final errorLog = File('error.log');

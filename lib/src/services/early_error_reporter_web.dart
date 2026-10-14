@@ -1,9 +1,12 @@
 import 'dart:convert';
-import 'dart:developer';
 import 'dart:html' as html;
+
+import 'package:logging/logging.dart';
 
 // ignore: avoid_classes_with_only_static_members
 class EarlyErrorReporterImpl {
+  static final _log = Logger('EarlyErrorReporterImpl');
+
   // Must be an HTTP endpoint, not a callable.
   static const String _endpoint =
       'https://us-central1-quest-cards-3c47a.cloudfunctions.net/report_client_error_http';
@@ -59,7 +62,7 @@ class EarlyErrorReporterImpl {
       );
     } catch (e) {
       // Never fail user flows due to reporting.
-      log('EarlyErrorReporterImpl.report failed: $e');
+      _log.warning('EarlyErrorReporterImpl.report failed', e);
     }
   }
 }
