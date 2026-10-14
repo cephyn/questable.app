@@ -1,7 +1,7 @@
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 
-String getDocumentTitle() => html.document.title;
+String getDocumentTitle() => web.document.title;
 
 void setDocumentTitle(String title) {
-  html.document.title = title;
+  web.document.title = title;
 }

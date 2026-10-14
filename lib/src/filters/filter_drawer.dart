@@ -474,46 +474,36 @@ class _FilterDrawerState extends State<FilterDrawer> {
 
     return [
       // Ownership Status Filter (Radio Buttons)
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          RadioListTile<OwnershipFilterStatus>(
-            title: const Text('All'),
-            value: OwnershipFilterStatus.all,
-            groupValue: currentStatus,
-            onChanged: (OwnershipFilterStatus? value) {
-              if (value != null) {
-                provider.setOwnershipStatus(value);
-              }
-            },
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-          ),
-          RadioListTile<OwnershipFilterStatus>(
-            title: const Text('Owned'),
-            value: OwnershipFilterStatus.owned,
-            groupValue: currentStatus,
-            onChanged: (OwnershipFilterStatus? value) {
-              if (value != null) {
-                provider.setOwnershipStatus(value);
-              }
-            },
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-          ),
-          RadioListTile<OwnershipFilterStatus>(
-            title: const Text('Unowned'),
-            value: OwnershipFilterStatus.unowned,
-            groupValue: currentStatus,
-            onChanged: (OwnershipFilterStatus? value) {
-              if (value != null) {
-                provider.setOwnershipStatus(value);
-              }
-            },
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-          ),
-        ],
+      RadioGroup<OwnershipFilterStatus>(
+        groupValue: currentStatus,
+        onChanged: (OwnershipFilterStatus? value) {
+          if (value != null) {
+            provider.setOwnershipStatus(value);
+          }
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RadioListTile<OwnershipFilterStatus>(
+              title: const Text('All'),
+              value: OwnershipFilterStatus.all,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            RadioListTile<OwnershipFilterStatus>(
+              title: const Text('Owned'),
+              value: OwnershipFilterStatus.owned,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            RadioListTile<OwnershipFilterStatus>(
+              title: const Text('Unowned'),
+              value: OwnershipFilterStatus.unowned,
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        ),
       ),
     ];
   }
@@ -538,7 +528,9 @@ class _FilterDrawerState extends State<FilterDrawer> {
         ),
         const SizedBox(height: 4),
         DropdownButtonFormField<String>(
-          value: currentValue as String?,
+          // Keyed on the value so the field rebuilds when the filter changes externally.
+          key: ValueKey('$field-${currentValue ?? ''}'),
+          initialValue: currentValue as String?,
           hint: Text(placeholder),
           isExpanded: true,
           decoration: InputDecoration(

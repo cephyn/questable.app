@@ -31,8 +31,10 @@ class AppTheme {
       orElse: () => ThemePreset.classic,
     );
     final seed = _presetSeeds[preset] ?? _presetSeeds[ThemePreset.classic]!;
-    final colorScheme =
-        ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light);
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.light,
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -40,8 +42,9 @@ class AppTheme {
       // Keep legacy compatibility (some widgets still use primaryColor)
       primaryColor: colorScheme.primary,
       // Reasonable defaults for typography + elevated buttons
-      textTheme:
-          Typography.material2021(platform: TargetPlatform.android).black,
+      textTheme: Typography.material2021(
+        platform: TargetPlatform.android,
+      ).black,
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: colorScheme.primary,
@@ -50,7 +53,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surfaceVariant,
+        fillColor: colorScheme.surfaceContainerHighest,
       ),
     );
   }
@@ -61,15 +64,18 @@ class AppTheme {
       orElse: () => ThemePreset.classic,
     );
     final seed = _presetSeeds[preset] ?? _presetSeeds[ThemePreset.classic]!;
-    final colorScheme =
-        ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.dark,
+    );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       primaryColor: colorScheme.primary,
-      textTheme:
-          Typography.material2021(platform: TargetPlatform.android).white,
+      textTheme: Typography.material2021(
+        platform: TargetPlatform.android,
+      ).white,
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: colorScheme.primary,
@@ -78,7 +84,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surfaceVariant,
+        fillColor: colorScheme.surfaceContainerHighest,
       ),
     );
   }

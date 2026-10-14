@@ -8,13 +8,13 @@ class SimilarQuestPreviewCard extends StatelessWidget {
   final VoidCallback? onTap; // Added onTap callback
 
   const SimilarQuestPreviewCard({
-    Key? key,
+    super.key,
     required this.questId, // Added questId
     required this.questName,
     required this.questGenre,
     required this.similarityScore,
     this.onTap, // Added onTap callback
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,10 +28,7 @@ class SimilarQuestPreviewCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                questName,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text(questName, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8.0),
               Text(
                 'Genre: $questGenre',

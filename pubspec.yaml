@@ -49,6 +49,7 @@ dependencies:
   simple_icons: ^16.23.0 # Add simple_icons
   firebase_ai: ^4.0.0
   logging: ^1.3.0
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

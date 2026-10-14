@@ -1,5 +1,5 @@
 import 'early_error_reporter_stub.dart'
-    if (dart.library.html) 'early_error_reporter_web.dart';
+    if (dart.library.js_interop) 'early_error_reporter_web.dart';
 
 /// Hooks very-early, web-specific error reporting.
 ///

@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:js_interop';
 
 import 'package:logging/logging.dart';
+import 'package:web/web.dart' as web;
 
 // ignore: avoid_classes_with_only_static_members
 class EarlyErrorReporterImpl {
@@ -17,19 +18,24 @@ class EarlyErrorReporterImpl {
     if (_installed) return;
     _installed = true;
 
-    html.window.onError.listen((event) {
-      final errorEvent = event is html.ErrorEvent ? event : null;
-      final message = errorEvent?.message ?? 'window.onerror';
-      final errorObj = errorEvent?.error ?? message;
-      final ctx = <String, dynamic>{
-        'filename': errorEvent?.filename,
-        'lineno': errorEvent?.lineno,
-        'colno': errorEvent?.colno,
-      };
-      // Best-effort; don't await.
-      // ignore: discarded_futures
-      report(stage: 'window_onError', error: errorObj, context: ctx);
-    });
+    web.window.addEventListener(
+      'error',
+      ((web.Event event) {
+        final errorEvent = event.isA<web.ErrorEvent>()
+            ? event as web.ErrorEvent
+            : null;
+        final message = errorEvent?.message ?? 'window.onerror';
+        final errorObj = errorEvent?.error?.toString() ?? message;
+        final ctx = <String, dynamic>{
+          'filename': errorEvent?.filename,
+          'lineno': errorEvent?.lineno,
+          'colno': errorEvent?.colno,
+        };
+        // Best-effort; don't await.
+        // ignore: discarded_futures
+        report(stage: 'window_onError', error: errorObj, context: ctx);
+      }).toJS,
+    );
   }
 
   static Future<void> report({
@@ -47,19 +53,26 @@ class EarlyErrorReporterImpl {
         'error': error.toString(),
         'stack': (stackTrace ?? StackTrace.current).toString(),
         'context': {
-          'userAgent': html.window.navigator.userAgent,
+          'userAgent': web.window.navigator.userAgent,
           ...?context,
         },
       };
 
-      await html.HttpRequest.request(
-        _endpoint,
-        method: 'POST',
-        sendData: jsonEncode(payload),
-        requestHeaders: const {
-          'Content-Type': 'application/json',
-        },
-      );
+      final headers = web.Headers()
+        ..append('Content-Type', 'application/json');
+      final response = await web.window
+          .fetch(
+            _endpoint.toJS,
+            web.RequestInit(
+              method: 'POST',
+              headers: headers,
+              body: jsonEncode(payload).toJS,
+            ),
+          )
+          .toDart;
+      if (!response.ok) {
+        throw Exception('HTTP ${response.status}');
+      }
     } catch (e) {
       // Never fail user flows due to reporting.
       _log.warning('EarlyErrorReporterImpl.report failed', e);

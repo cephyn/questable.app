@@ -13,10 +13,12 @@ class FirestoreService {
   static final _log = Logger('FirestoreService');
 
   //get collection of quest cards
-  final CollectionReference questCards =
-      FirebaseFirestore.instance.collection('questCards');
-  final CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
+  final CollectionReference questCards = FirebaseFirestore.instance.collection(
+    'questCards',
+  );
+  final CollectionReference users = FirebaseFirestore.instance.collection(
+    'users',
+  );
   final EmailService emailService = EmailService();
 
   // Helper to fetch owned quest IDs for a user
@@ -39,45 +41,46 @@ class FirestoreService {
   //create
   Future<String> addQuestCard(QuestCard questCard) async {
     String docId = "";
-    await questCards.add({
-      'id': questCard.generateUniqueHash(),
-      'title':
-          questCard.title?.toLowerCase(), // Ensure title is stored lowercase
-      'productTitle': questCard.productTitle,
-      'gameSystem': questCard.gameSystem,
-        'standardizedGameSystem': questCard.standardizedGameSystem,
-      'gameSystem_lowercase':
-          questCard.gameSystem?.toLowerCase(), // Add lowercase field
-      'edition': questCard.edition,
-      'level': questCard.level,
-      'pageLength': questCard.pageLength,
-      'authors': questCard.authors,
-      'publisher': questCard.publisher,
-      'publicationYear': questCard.publicationYear,
-      'setting': questCard.setting,
-      'environments': questCard.environments,
-      'link': questCard.link?.toString(),
-      'bossVillains': questCard.bossVillains,
-      'commonMonsters': questCard.commonMonsters,
-      'notableItems': questCard.notableItems,
-      'summary': questCard.summary,
-      'timestamp': Timestamp.now(),
-      'genre': questCard.genre,
-      'classification': questCard.classification,
-      'uploadedBy': questCard.uploadedBy,
-      'isPublic': questCard.isPublic, // Add isPublic field
-        'systemMigrationStatus': questCard.systemMigrationStatus,
-        'systemMigrationTimestamp': questCard.systemMigrationTimestamp != null
-          ? Timestamp.fromDate(questCard.systemMigrationTimestamp!)
-          : null,
-        'uploaderEmail': questCard.uploaderEmail,
-        'uploadedTimestamp':
-          questCard.uploadedTimestamp != null
-            ? Timestamp.fromDate(questCard.uploadedTimestamp!)
-            : null,
-    }).then((DocumentReference ref) {
-      docId = ref.id;
-    });
+    await questCards
+        .add({
+          'id': questCard.generateUniqueHash(),
+          'title': questCard.title
+              ?.toLowerCase(), // Ensure title is stored lowercase
+          'productTitle': questCard.productTitle,
+          'gameSystem': questCard.gameSystem,
+          'standardizedGameSystem': questCard.standardizedGameSystem,
+          'gameSystem_lowercase': questCard.gameSystem
+              ?.toLowerCase(), // Add lowercase field
+          'edition': questCard.edition,
+          'level': questCard.level,
+          'pageLength': questCard.pageLength,
+          'authors': questCard.authors,
+          'publisher': questCard.publisher,
+          'publicationYear': questCard.publicationYear,
+          'setting': questCard.setting,
+          'environments': questCard.environments,
+          'link': questCard.link?.toString(),
+          'bossVillains': questCard.bossVillains,
+          'commonMonsters': questCard.commonMonsters,
+          'notableItems': questCard.notableItems,
+          'summary': questCard.summary,
+          'timestamp': Timestamp.now(),
+          'genre': questCard.genre,
+          'classification': questCard.classification,
+          'uploadedBy': questCard.uploadedBy,
+          'isPublic': questCard.isPublic, // Add isPublic field
+          'systemMigrationStatus': questCard.systemMigrationStatus,
+          'systemMigrationTimestamp': questCard.systemMigrationTimestamp != null
+              ? Timestamp.fromDate(questCard.systemMigrationTimestamp!)
+              : null,
+          'uploaderEmail': questCard.uploaderEmail,
+          'uploadedTimestamp': questCard.uploadedTimestamp != null
+              ? Timestamp.fromDate(questCard.uploadedTimestamp!)
+              : null,
+        })
+        .then((DocumentReference ref) {
+          docId = ref.id;
+        });
     //print(docId);
     return docId;
   }
@@ -97,17 +100,19 @@ class FirestoreService {
   }) async* {
     // Changed to async* to use await inside
     Query baseQuery = questCards; // Start with the base collection
-    List<String> targetDocIds =
-        List.from(docIds); // IDs to eventually query with whereIn
+    List<String> targetDocIds = List.from(
+      docIds,
+    ); // IDs to eventually query with whereIn
     bool useWhereInQuery =
         docIds.isNotEmpty; // Start assuming we filter by provided docIds
-    FilterState? effectiveFilterState =
-        filterState?.clone(); // Clone to modify locally
+    FilterState? effectiveFilterState = filterState
+        ?.clone(); // Clone to modify locally
 
     FilterCriteria? ownershipFilter;
     if (userId != null && effectiveFilterState != null) {
-      ownershipFilter =
-          effectiveFilterState.getFilterForField(ownershipFilterField);
+      ownershipFilter = effectiveFilterState.getFilterForField(
+        ownershipFilterField,
+      );
       if (ownershipFilter != null) {
         // Remove ownership filter so it's not applied by applyFiltersToQuery
         effectiveFilterState.removeFilterByField(ownershipFilterField);
@@ -117,7 +122,9 @@ class FirestoreService {
     // --- Ownership Filter Logic ---
     if (userId != null && ownershipFilter != null) {
       List<String> ownedQuestIds = await _fetchOwnedQuestIds(userId);
-      _log.fine('Ownership filter active. User: $userId, Owned IDs: ${ownedQuestIds.length}, Filter: ${ownershipFilter.value}');
+      _log.fine(
+        'Ownership filter active. User: $userId, Owned IDs: ${ownedQuestIds.length}, Filter: ${ownershipFilter.value}',
+      );
 
       if (ownershipFilter.value == 'owned') {
         if (ownedQuestIds.isEmpty) {
@@ -127,8 +134,9 @@ class FirestoreService {
         }
         if (useWhereInQuery) {
           // Intersect provided docIds with ownedQuestIds
-          targetDocIds =
-              targetDocIds.where((id) => ownedQuestIds.contains(id)).toList();
+          targetDocIds = targetDocIds
+              .where((id) => ownedQuestIds.contains(id))
+              .toList();
           if (targetDocIds.isEmpty) {
             yield []; // Emit empty list and stop
             return;
@@ -157,8 +165,10 @@ class FirestoreService {
             // Filtering all quests: Use whereNotIn if possible (<= 30 IDs)
             if (ownedQuestIds.length <= 30) {
               _log.fine('Applying whereNotIn for unowned filter.');
-              baseQuery = baseQuery.where(FieldPath.documentId,
-                  whereNotIn: ownedQuestIds);
+              baseQuery = baseQuery.where(
+                FieldPath.documentId,
+                whereNotIn: ownedQuestIds,
+              );
               // We applied the filter directly to baseQuery, don't use whereIn later
               useWhereInQuery = false;
             } else {
@@ -166,7 +176,9 @@ class FirestoreService {
               // For now, we log and proceed without this specific filter.
               // A more robust solution might involve fetching all IDs and filtering client-side,
               // or fetching owned IDs and then querying in batches, which is complex.
-              _log.warning('Cannot apply "unowned" filter efficiently as user owns > 30 quests. Returning all quests matching other filters.');
+              _log.warning(
+                'Cannot apply "unowned" filter efficiently as user owns > 30 quests. Returning all quests matching other filters.',
+              );
               // Proceed without adding whereNotIn, effectively ignoring the unowned filter in this edge case.
               useWhereInQuery =
                   false; // Ensure we don't accidentally use whereIn later
@@ -206,33 +218,43 @@ class FirestoreService {
       }
 
       if (targetDocIds.length <= limit) {
-        _log.fine('Executing single whereIn query for ${targetDocIds.length} IDs.');
-        Query finalQuery =
-            baseQuery.where(FieldPath.documentId, whereIn: targetDocIds);
-        yield* finalQuery
-            .snapshots()
-            .map((snapshot) => snapshot.docs); // Use yield*
+        _log.fine(
+          'Executing single whereIn query for ${targetDocIds.length} IDs.',
+        );
+        Query finalQuery = baseQuery.where(
+          FieldPath.documentId,
+          whereIn: targetDocIds,
+        );
+        yield* finalQuery.snapshots().map(
+          (snapshot) => snapshot.docs,
+        ); // Use yield*
       } else {
-        _log.fine('Executing chunked whereIn query for ${targetDocIds.length} IDs.');
+        _log.fine(
+          'Executing chunked whereIn query for ${targetDocIds.length} IDs.',
+        );
         List<Stream<List<QueryDocumentSnapshot>>> streams = [];
         for (int i = 0; i < targetDocIds.length; i += limit) {
           List<String> chunk = targetDocIds.sublist(
-              i,
-              i + limit > targetDocIds.length
-                  ? targetDocIds.length
-                  : i + limit);
+            i,
+            i + limit > targetDocIds.length ? targetDocIds.length : i + limit,
+          );
           if (chunk.isNotEmpty) {
             // Apply the whereIn to the baseQuery *with filters already applied*
-            Query chunkQuery =
-                baseQuery.where(FieldPath.documentId, whereIn: chunk);
-            streams
-                .add(chunkQuery.snapshots().map((snapshot) => snapshot.docs));
+            Query chunkQuery = baseQuery.where(
+              FieldPath.documentId,
+              whereIn: chunk,
+            );
+            streams.add(
+              chunkQuery.snapshots().map((snapshot) => snapshot.docs),
+            );
           }
         }
 
         // Combine streams and yield results
-        yield* Rx.combineLatest<List<QueryDocumentSnapshot<Object?>>,
-            List<QueryDocumentSnapshot<Object?>>>(streams, (listOfDocLists) {
+        yield* Rx.combineLatest<
+          List<QueryDocumentSnapshot<Object?>>,
+          List<QueryDocumentSnapshot<Object?>>
+        >(streams, (listOfDocLists) {
           final combinedDocs = listOfDocLists.expand((list) => list).toList();
           // Deduplicate (important if original docIds had duplicates or logic error)
           final uniqueDocs = <String, QueryDocumentSnapshot<Object?>>{};
@@ -246,10 +268,10 @@ class FirestoreService {
             sortedDocs.sort((a, b) {
               var titleA =
                   (a.data() as Map<String, dynamic>?)?['title'] as String? ??
-                      '';
+                  '';
               var titleB =
                   (b.data() as Map<String, dynamic>?)?['title'] as String? ??
-                      '';
+                  '';
               return titleA.compareTo(titleB);
             });
           } catch (e) {
@@ -261,22 +283,26 @@ class FirestoreService {
     } else {
       // Execute the baseQuery (which might have whereNotIn or just standard filters)
       _log.fine('Executing query without whereIn.');
-      yield* baseQuery
-          .snapshots()
-          .map((snapshot) => snapshot.docs); // Use yield*
+      yield* baseQuery.snapshots().map(
+        (snapshot) => snapshot.docs,
+      ); // Use yield*
     }
   }
 
   /// Gets a stream of all public quest cards. Ignores ownership filters.
-  Stream<List<QueryDocumentSnapshot<Object?>>> getPublicQuestCardsStream(
-      {FilterState? filterState}) {
-    Query query = questCards.where('isPublic',
-        isEqualTo: true); // Base query for public cards
+  Stream<List<QueryDocumentSnapshot<Object?>>> getPublicQuestCardsStream({
+    FilterState? filterState,
+  }) {
+    Query query = questCards.where(
+      'isPublic',
+      isEqualTo: true,
+    ); // Base query for public cards
 
     // Clone filter state and remove ownership filter if present
     FilterState? effectiveFilterState = filterState?.clone();
-    effectiveFilterState
-        ?.removeFilterByField(ownershipFilterField); // Ignore ownership
+    effectiveFilterState?.removeFilterByField(
+      ownershipFilterField,
+    ); // Ignore ownership
 
     // Apply remaining filters
     if (effectiveFilterState != null && effectiveFilterState.hasFilters) {
@@ -291,13 +317,16 @@ class FirestoreService {
 
   /// Gets the count of public quest cards. Ignores ownership filters.
   Future<int> getPublicQuestCardCount({FilterState? filterState}) async {
-    Query query = questCards.where('isPublic',
-        isEqualTo: true); // Base query for public cards
+    Query query = questCards.where(
+      'isPublic',
+      isEqualTo: true,
+    ); // Base query for public cards
 
     // Clone filter state and remove ownership filter if present
     FilterState? effectiveFilterState = filterState?.clone();
-    effectiveFilterState
-        ?.removeFilterByField(ownershipFilterField); // Ignore ownership
+    effectiveFilterState?.removeFilterByField(
+      ownershipFilterField,
+    ); // Ignore ownership
 
     // Apply remaining filters
     if (effectiveFilterState != null && effectiveFilterState.hasFilters) {
@@ -324,8 +353,9 @@ class FirestoreService {
 
     // Clone filter state and remove ownership filter if present
     FilterState? effectiveFilterState = filterState?.clone();
-    effectiveFilterState
-        ?.removeFilterByField(ownershipFilterField); // Ignore ownership
+    effectiveFilterState?.removeFilterByField(
+      ownershipFilterField,
+    ); // Ignore ownership
 
     // Apply remaining filters
     if (effectiveFilterState != null && effectiveFilterState.hasFilters) {
@@ -358,15 +388,18 @@ class FirestoreService {
 
   /// Gets the count of quest cards, potentially applying ownership filter.
   /// Note: Count may be inaccurate for 'Owned'/'Unowned' filters if user owns > 30 quests.
-  Future<int> getQuestCardsCount(
-      {FilterState? filterState, String? userId}) async {
+  Future<int> getQuestCardsCount({
+    FilterState? filterState,
+    String? userId,
+  }) async {
     Query query = questCards; // Start with base collection
     FilterState? effectiveFilterState = filterState?.clone(); // Clone to modify
 
     FilterCriteria? ownershipFilter;
     if (userId != null && effectiveFilterState != null) {
-      ownershipFilter =
-          effectiveFilterState.getFilterForField(ownershipFilterField);
+      ownershipFilter = effectiveFilterState.getFilterForField(
+        ownershipFilterField,
+      );
       if (ownershipFilter != null) {
         // Remove ownership filter so it's not applied by applyFiltersToQuery
         effectiveFilterState.removeFilterByField(ownershipFilterField);
@@ -387,7 +420,9 @@ class FirestoreService {
         if (ownedQuestIds.length <= 30) {
           query = query.where(FieldPath.documentId, whereIn: ownedQuestIds);
         } else {
-          _log.warning('Count for "Owned" filter may be inaccurate (user owns > 30 quests).');
+          _log.warning(
+            'Count for "Owned" filter may be inaccurate (user owns > 30 quests).',
+          );
           // Cannot apply whereIn filter for count(). Returning count matching *other* filters.
           // Or return -1 to indicate inaccuracy? Let's return the count without this filter for now.
         }
@@ -397,7 +432,9 @@ class FirestoreService {
         } else if (ownedQuestIds.length <= 30) {
           query = query.where(FieldPath.documentId, whereNotIn: ownedQuestIds);
         } else {
-          _log.warning('Count for "Unowned" filter may be inaccurate (user owns > 30 quests).');
+          _log.warning(
+            'Count for "Unowned" filter may be inaccurate (user owns > 30 quests).',
+          );
           // Cannot apply whereNotIn filter for count(). Returning count matching *other* filters.
         }
       }
@@ -458,12 +495,12 @@ class FirestoreService {
     _log.fine(questCard.toJson().toString());
     return questCards.doc(docId).update({
       'id': questCard.id,
-      'title':
-          questCard.title?.toLowerCase(), // Ensure title is stored lowercase
+      'title': questCard.title
+          ?.toLowerCase(), // Ensure title is stored lowercase
       'productTitle': questCard.productTitle,
       'gameSystem': questCard.gameSystem,
-      'gameSystem_lowercase':
-          questCard.gameSystem?.toLowerCase(), // Add/Update lowercase field
+      'gameSystem_lowercase': questCard.gameSystem
+          ?.toLowerCase(), // Add/Update lowercase field
       'edition': questCard.edition,
       'level': questCard.level,
       'pageLength': questCard.pageLength,
@@ -482,16 +519,15 @@ class FirestoreService {
       'classification': questCard.classification,
       'uploadedBy': questCard.uploadedBy,
       'isPublic': questCard.isPublic, // Add isPublic field
-        'standardizedGameSystem': questCard.standardizedGameSystem,
-        'systemMigrationStatus': questCard.systemMigrationStatus,
-        'systemMigrationTimestamp': questCard.systemMigrationTimestamp != null
+      'standardizedGameSystem': questCard.standardizedGameSystem,
+      'systemMigrationStatus': questCard.systemMigrationStatus,
+      'systemMigrationTimestamp': questCard.systemMigrationTimestamp != null
           ? Timestamp.fromDate(questCard.systemMigrationTimestamp!)
           : null,
-        'uploaderEmail': questCard.uploaderEmail,
-        'uploadedTimestamp':
-          questCard.uploadedTimestamp != null
-            ? Timestamp.fromDate(questCard.uploadedTimestamp!)
-            : null,
+      'uploaderEmail': questCard.uploaderEmail,
+      'uploadedTimestamp': questCard.uploadedTimestamp != null
+          ? Timestamp.fromDate(questCard.uploadedTimestamp!)
+          : null,
       // Keep standardizedGameSystem fields if they exist, don't overwrite on general update
       // 'standardizedGameSystem': questCard.standardizedGameSystem, // Handled separately
       // 'systemMigrationStatus': questCard.systemMigrationStatus, // Handled separately
@@ -502,8 +538,9 @@ class FirestoreService {
   Future<String?> getQuestByTitle(String title) async {
     try {
       // Perform the query and wait for the results
-      var querySnapshot =
-          await questCards.where("title", isEqualTo: title.toLowerCase()).get();
+      var querySnapshot = await questCards
+          .where("title", isEqualTo: title.toLowerCase())
+          .get();
       String? questId;
 
       // Iterate through the query results to get the document ID
@@ -540,7 +577,8 @@ class FirestoreService {
           .get();
       if (documentSnapshot.exists) {
         return LocalUser.fromMap(
-            documentSnapshot.data() as Map<String, dynamic>);
+          documentSnapshot.data() as Map<String, dynamic>,
+        );
       } else {
         _log.warning("User document not found: $userId");
         return null;
@@ -584,15 +622,17 @@ class FirestoreService {
     }
   }
 
-  getUserCardStream(String userId) {
+  Stream<DocumentSnapshot<Object?>> getUserCardStream(String userId) {
     final userStream = users.doc(userId).snapshots();
     return userStream;
   }
 
   Future<void> updateUser(LocalUser user) {
-    return users
-        .doc(user.uid)
-        .update({'uid': user.uid, 'email': user.email, 'roles': user.roles});
+    return users.doc(user.uid).update({
+      'uid': user.uid,
+      'email': user.email,
+      'roles': user.roles,
+    });
   }
 
   Future<void> deleteUser(String docId) {
@@ -610,7 +650,8 @@ class FirestoreService {
     List<List<String>> chunks = [];
     for (var i = 0; i < titles.length; i += 30) {
       chunks.add(
-          titles.sublist(i, i + 30 > titles.length ? titles.length : i + 30));
+        titles.sublist(i, i + 30 > titles.length ? titles.length : i + 30),
+      );
     }
 
     try {
@@ -618,8 +659,9 @@ class FirestoreService {
         if (chunk.isEmpty) continue;
         // Ensure all titles in the chunk are lowercase for the query
         var lowerCaseChunk = chunk.map((t) => t.toLowerCase()).toList();
-        var querySnapshot =
-            await questCards.where("title", whereIn: lowerCaseChunk).get();
+        var querySnapshot = await questCards
+            .where("title", whereIn: lowerCaseChunk)
+            .get();
         for (var docSnapshot in querySnapshot.docs) {
           var data = docSnapshot.data() as Map<String, dynamic>?;
           if (data != null && data.containsKey('title')) {
@@ -637,7 +679,8 @@ class FirestoreService {
   }
 
   Future<List<String>> addMultipleQuestCards(
-      List<QuestCard> questCardsToAdd) async {
+    List<QuestCard> questCardsToAdd,
+  ) async {
     List<String> newDocIds = [];
     if (questCardsToAdd.isEmpty) {
       return newDocIds;
@@ -649,8 +692,8 @@ class FirestoreService {
 
     try {
       for (QuestCard questCard in questCardsToAdd) {
-        DocumentReference docRef =
-            questCards.doc(); // Get a new document reference
+        DocumentReference docRef = questCards
+            .doc(); // Get a new document reference
         batch.set(docRef, {
           'id': questCard
               .generateUniqueHash(), // Consider if ID should be docRef.id
@@ -658,8 +701,8 @@ class FirestoreService {
               ?.toLowerCase(), // Ensure title is stored lowercase
           'productTitle': questCard.productTitle,
           'gameSystem': questCard.gameSystem,
-          'gameSystem_lowercase':
-              questCard.gameSystem?.toLowerCase(), // Add lowercase field
+          'gameSystem_lowercase': questCard.gameSystem
+              ?.toLowerCase(), // Add lowercase field
           'edition': questCard.edition,
           'level': questCard.level,
           'pageLength': questCard.pageLength,
@@ -708,18 +751,18 @@ class FirestoreService {
   }
 
   // --- Game System Standardization ---
-  Future<List<QueryDocumentSnapshot>> getUnstandardizedQuestCards(
-      {int limit = 50}) async {
+  Future<List<QueryDocumentSnapshot>> getUnstandardizedQuestCards({
+    int limit = 50,
+  }) async {
     try {
       // Query for documents where systemMigrationStatus is null or not 'standardized'
       // and standardizedGameSystem is null.
       // Order by timestamp to process older entries first.
       Query query = questCards
-          .where('systemMigrationStatus', whereIn: [
-            null,
-            'pending',
-            'failed'
-          ]) // Include null, pending, or failed
+          .where(
+            'systemMigrationStatus',
+            whereIn: [null, 'pending', 'failed'],
+          ) // Include null, pending, or failed
           // .where('standardizedGameSystem', isNull: true) // This might be too restrictive if some failed partially
           .orderBy('timestamp', descending: false) // Process oldest first
           .limit(limit);
@@ -733,8 +776,12 @@ class FirestoreService {
   }
 
   Future<void> updateQuestCardStandardization(
-      String docId, String standardizedGameSystem, String status,
-      {String? originalGameSystem, String? originalEdition}) async {
+    String docId,
+    String standardizedGameSystem,
+    String status, {
+    String? originalGameSystem,
+    String? originalEdition,
+  }) async {
     try {
       await questCards.doc(docId).update({
         'standardizedGameSystem': standardizedGameSystem,
@@ -742,10 +789,8 @@ class FirestoreService {
             status, // e.g., 'standardized', 'failed', 'manual_review'
         'systemMigrationTimestamp': Timestamp.now(),
         // Optionally store original values if needed for review
-        if (originalGameSystem != null)
-          'originalGameSystemForReview': originalGameSystem,
-        if (originalEdition != null)
-          'originalEditionForReview': originalEdition,
+        'originalGameSystemForReview': ?originalGameSystem,
+        'originalEditionForReview': ?originalEdition,
       });
     } catch (e) {
       _log.warning("Error updating standardization status for $docId", e);
@@ -774,7 +819,11 @@ class FirestoreService {
       await users.doc(userId).collection('ownedQuests').doc(questId).delete();
       _log.info('Removed quest $questId from owned list for user $userId');
     } catch (e, st) {
-      _log.severe('Error removing owned quest $questId for user $userId', e, st);
+      _log.severe(
+        'Error removing owned quest $questId for user $userId',
+        e,
+        st,
+      );
       // Rethrow or handle as needed
       rethrow;
     }
@@ -793,15 +842,21 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.exists) // True if the document exists
         .handleError((error) {
-      _log.warning('Error checking ownership for user $userId, quest $questId', error);
-      return false; // Assume not owned on error
-    });
+          _log.warning(
+            'Error checking ownership for user $userId, quest $questId',
+            error,
+          );
+          return false; // Assume not owned on error
+        });
   }
 
   /// Fetches owned quest documents (including timestamp) for a user, with optional batching.
   /// Returns a list of document snapshots.
-  Future<List<DocumentSnapshot>> getOwnedQuestsBatch(String userId,
-      {DocumentSnapshot? startAfter, int limit = 20}) async {
+  Future<List<DocumentSnapshot>> getOwnedQuestsBatch(
+    String userId, {
+    DocumentSnapshot? startAfter,
+    int limit = 20,
+  }) async {
     try {
       Query query = users
           .doc(userId)
@@ -833,15 +888,20 @@ class FirestoreService {
     const int limit = 30;
 
     for (int i = 0; i < questIds.length; i += limit) {
-      chunks.add(questIds.sublist(
-          i, i + limit > questIds.length ? questIds.length : i + limit));
+      chunks.add(
+        questIds.sublist(
+          i,
+          i + limit > questIds.length ? questIds.length : i + limit,
+        ),
+      );
     }
 
     try {
       for (List<String> chunk in chunks) {
         if (chunk.isEmpty) continue;
-        final querySnapshot =
-            await questCards.where(FieldPath.documentId, whereIn: chunk).get();
+        final querySnapshot = await questCards
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
         for (var doc in querySnapshot.docs) {
           try {
             final data = doc.data() as Map<String, dynamic>?;
@@ -852,7 +912,10 @@ class FirestoreService {
               results.add(questCard);
             }
           } catch (e) {
-            _log.warning("Error parsing QuestCard from Firestore doc ${doc.id}", e);
+            _log.warning(
+              "Error parsing QuestCard from Firestore doc ${doc.id}",
+              e,
+            );
             // Optionally skip this card or handle error differently
           }
         }
@@ -887,8 +950,13 @@ extension FilterStateClone on FilterState {
       // Assuming FilterCriteria constructor creates a deep enough copy
       // or FilterCriteria is immutable. If value can be a mutable object,
       // a deeper copy might be needed here.
-      newState.addFilter(FilterCriteria(
-          field: filter.field, value: filter.value, operator: filter.operator));
+      newState.addFilter(
+        FilterCriteria(
+          field: filter.field,
+          value: filter.value,
+          operator: filter.operator,
+        ),
+      );
     }
     return newState;
   }
